@@ -50,11 +50,14 @@ async def dashboard_overview(
     """Overall executive dashboard with KPIs and chart data across all projects."""
     cid = get_effective_company_id(current_user, db)
 
-    # Base log query with date filters
+    # Base log query with date filters — use subquery to avoid unbounded IN clause
     log_q = db.query(DailyActivityLog.id).filter(DailyActivityLog.company_id == cid)
     for f in _date_filters(DailyActivityLog.date, date_from, date_to):
         log_q = log_q.filter(f)
-    log_ids = [r[0] for r in log_q.all()]
+    log_subq = log_q.subquery()
+    log_id_q = db.query(log_subq.c.id)
+
+    total_logs = log_id_q.count()
 
     # --- KPIs ---
     total_projects = db.query(func.count(Project.id)).filter(
@@ -65,29 +68,27 @@ async def dashboard_overview(
         Project.company_id == cid, Project.is_deleted == False, Project.status == "inprogress"
     ).scalar() or 0
 
-    total_logs = len(log_ids)
-
     mp_stats = db.query(
         func.coalesce(func.sum(ManPower.total_hours), 0),
         func.coalesce(func.sum(ManPower.number_of_workers), 0),
-    ).filter(ManPower.dailylog_id.in_(log_ids)).first() if log_ids else (0, 0)
+    ).filter(ManPower.dailylog_id.in_(log_id_q)).first() or (0, 0)
 
     total_safety = (
-        (db.query(func.count(Accident.id)).filter(Accident.dailylog_id.in_(log_ids)).scalar() or 0) +
-        (db.query(func.count(SafetyViolation.id)).filter(SafetyViolation.dailylog_id.in_(log_ids)).scalar() or 0)
-    ) if log_ids else 0
+        (db.query(func.count(Accident.id)).filter(Accident.dailylog_id.in_(log_id_q)).scalar() or 0) +
+        (db.query(func.count(SafetyViolation.id)).filter(SafetyViolation.dailylog_id.in_(log_id_q)).scalar() or 0)
+    )
 
     total_inspections = db.query(func.count(Inspection.id)).filter(
-        Inspection.dailylog_id.in_(log_ids)
-    ).scalar() if log_ids else 0
+        Inspection.dailylog_id.in_(log_id_q)
+    ).scalar() or 0
 
     total_photos = db.query(func.count(Photo.id)).filter(
-        Photo.dailylog_id.in_(log_ids)
-    ).scalar() if log_ids else 0
+        Photo.dailylog_id.in_(log_id_q)
+    ).scalar() or 0
 
     total_visitors = db.query(func.count(Visitor.id)).filter(
-        Visitor.dailylog_id.in_(log_ids)
-    ).scalar() if log_ids else 0
+        Visitor.dailylog_id.in_(log_id_q)
+    ).scalar() or 0
 
     # --- Project Status Donut ---
     status_rows = db.query(Project.status, func.count(Project.id)).filter(
@@ -116,22 +117,21 @@ async def dashboard_overview(
     accident_by_month = defaultdict(int)
     violation_by_month = defaultdict(int)
 
-    if log_ids:
-        acc_rows = db.query(
-            extract('month', DailyActivityLog.date).label('m'), func.count(Accident.id)
-        ).join(DailyActivityLog, Accident.dailylog_id == DailyActivityLog.id
-        ).filter(Accident.dailylog_id.in_(log_ids)
-        ).group_by('m').all()
-        for m, c in acc_rows:
-            accident_by_month[int(m)] = c
+    acc_rows = db.query(
+        extract('month', DailyActivityLog.date).label('m'), func.count(Accident.id)
+    ).join(DailyActivityLog, Accident.dailylog_id == DailyActivityLog.id
+    ).filter(Accident.dailylog_id.in_(log_id_q)
+    ).group_by('m').all()
+    for m, c in acc_rows:
+        accident_by_month[int(m)] = c
 
-        viol_rows = db.query(
-            extract('month', DailyActivityLog.date).label('m'), func.count(SafetyViolation.id)
-        ).join(DailyActivityLog, SafetyViolation.dailylog_id == DailyActivityLog.id
-        ).filter(SafetyViolation.dailylog_id.in_(log_ids)
-        ).group_by('m').all()
-        for m, c in viol_rows:
-            violation_by_month[int(m)] = c
+    viol_rows = db.query(
+        extract('month', DailyActivityLog.date).label('m'), func.count(SafetyViolation.id)
+    ).join(DailyActivityLog, SafetyViolation.dailylog_id == DailyActivityLog.id
+    ).filter(SafetyViolation.dailylog_id.in_(log_id_q)
+    ).group_by('m').all()
+    for m, c in viol_rows:
+        violation_by_month[int(m)] = c
 
     active_months = sorted(set(list(accident_by_month.keys()) + list(violation_by_month.keys())))
     if not active_months:
@@ -147,30 +147,28 @@ async def dashboard_overview(
 
     # --- Activity by Type (pie chart) ---
     activity_counts = []
-    if log_ids:
-        for label, model in [
-            ("Manpower", ManPower), ("Notes", Notes), ("Inspections", Inspection),
-            ("Visitors", Visitor), ("Safety", SafetyViolation), ("Delays", Delay),
-            ("Deficiencies", Deficiency), ("Accidents", Accident), ("Photos", Photo),
-        ]:
-            c = db.query(func.count(model.id)).filter(model.dailylog_id.in_(log_ids)).scalar() or 0
-            if c > 0:
-                activity_counts.append({"name": label, "value": c})
+    for label, model in [
+        ("Manpower", ManPower), ("Notes", Notes), ("Inspections", Inspection),
+        ("Visitors", Visitor), ("Safety", SafetyViolation), ("Delays", Delay),
+        ("Deficiencies", Deficiency), ("Accidents", Accident), ("Photos", Photo),
+    ]:
+        c = db.query(func.count(model.id)).filter(model.dailylog_id.in_(log_id_q)).scalar() or 0
+        if c > 0:
+            activity_counts.append({"name": label, "value": c})
 
     # --- Weather Summary ---
     weather_summary = {}
-    if log_ids:
-        wf_stats = db.query(
-            func.avg(WeatherForecast.temperature),
-            func.avg(WeatherForecast.humidity),
-            func.avg(WeatherForecast.wind),
-        ).filter(WeatherForecast.dailylog_id.in_(log_ids)).first()
-        if wf_stats and wf_stats[0]:
-            weather_summary = {
-                "avg_temperature": round(float(wf_stats[0] or 0), 1),
-                "avg_humidity": round(float(wf_stats[1] or 0), 1),
-                "avg_wind": round(float(wf_stats[2] or 0), 1),
-            }
+    wf_stats = db.query(
+        func.avg(WeatherForecast.temperature),
+        func.avg(WeatherForecast.humidity),
+        func.avg(WeatherForecast.wind),
+    ).filter(WeatherForecast.dailylog_id.in_(log_id_q)).first()
+    if wf_stats and wf_stats[0]:
+        weather_summary = {
+            "avg_temperature": round(float(wf_stats[0] or 0), 1),
+            "avg_humidity": round(float(wf_stats[1] or 0), 1),
+            "avg_wind": round(float(wf_stats[2] or 0), 1),
+        }
 
     # --- Recent Logs ---
     recent = db.query(
@@ -230,44 +228,49 @@ async def dashboard_project(
     for f in _date_filters(DailyActivityLog.date, date_from, date_to):
         log_q = log_q.filter(f)
     logs = log_q.order_by(DailyActivityLog.date).all()
-    log_ids = [l.id for l in logs]
+
+    # Use subquery for child entity queries to avoid unbounded IN clause
+    log_id_subq = db.query(DailyActivityLog.id).filter(
+        DailyActivityLog.project_id == project_id
+    )
+    for f in _date_filters(DailyActivityLog.date, date_from, date_to):
+        log_id_subq = log_id_subq.filter(f)
+    log_subq = log_id_subq.subquery()
+    log_id_q = db.query(log_subq.c.id)
 
     # KPIs
     mp_stats = db.query(
         func.coalesce(func.sum(ManPower.total_hours), 0),
         func.coalesce(func.sum(ManPower.number_of_workers), 0),
-    ).filter(ManPower.dailylog_id.in_(log_ids)).first() if log_ids else (0, 0)
+    ).filter(ManPower.dailylog_id.in_(log_id_q)).first() or (0, 0)
 
-    accidents_count = db.query(func.count(Accident.id)).filter(Accident.dailylog_id.in_(log_ids)).scalar() if log_ids else 0
-    violations_count = db.query(func.count(SafetyViolation.id)).filter(SafetyViolation.dailylog_id.in_(log_ids)).scalar() if log_ids else 0
-    delays_count = db.query(func.count(Delay.id)).filter(Delay.dailylog_id.in_(log_ids)).scalar() if log_ids else 0
-    deficiencies_count = db.query(func.count(Deficiency.id)).filter(Deficiency.dailylog_id.in_(log_ids)).scalar() if log_ids else 0
-    inspections_count = db.query(func.count(Inspection.id)).filter(Inspection.dailylog_id.in_(log_ids)).scalar() if log_ids else 0
-    photos_count = db.query(func.count(Photo.id)).filter(Photo.dailylog_id.in_(log_ids)).scalar() if log_ids else 0
+    accidents_count = db.query(func.count(Accident.id)).filter(Accident.dailylog_id.in_(log_id_q)).scalar() or 0
+    violations_count = db.query(func.count(SafetyViolation.id)).filter(SafetyViolation.dailylog_id.in_(log_id_q)).scalar() or 0
+    delays_count = db.query(func.count(Delay.id)).filter(Delay.dailylog_id.in_(log_id_q)).scalar() or 0
+    deficiencies_count = db.query(func.count(Deficiency.id)).filter(Deficiency.dailylog_id.in_(log_id_q)).scalar() or 0
+    inspections_count = db.query(func.count(Inspection.id)).filter(Inspection.dailylog_id.in_(log_id_q)).scalar() or 0
+    photos_count = db.query(func.count(Photo.id)).filter(Photo.dailylog_id.in_(log_id_q)).scalar() or 0
 
     # Daily log activity timeline (line chart)
     log_dates = [str(l.date) for l in logs]
     # Group by week for manpower trend
     weekly_mp = defaultdict(float)
-    if log_ids:
-        weekly_rows = db.query(
-            extract('week', DailyActivityLog.date).label('w'),
-            func.sum(ManPower.total_hours),
-        ).join(DailyActivityLog, ManPower.dailylog_id == DailyActivityLog.id
-        ).filter(ManPower.dailylog_id.in_(log_ids)
-        ).group_by('w').order_by('w').all()
-        for w, h in weekly_rows:
-            weekly_mp[f"W{int(w)}"] = round(float(h), 1)
+    weekly_rows = db.query(
+        extract('week', DailyActivityLog.date).label('w'),
+        func.sum(ManPower.total_hours),
+    ).join(DailyActivityLog, ManPower.dailylog_id == DailyActivityLog.id
+    ).filter(ManPower.dailylog_id.in_(log_id_q)
+    ).group_by('w').order_by('w').all()
+    for w, h in weekly_rows:
+        weekly_mp[f"W{int(w)}"] = round(float(h), 1)
 
     manpower_weekly = [{"name": k, "value": v} for k, v in weekly_mp.items()]
 
     # Inspection pass/fail donut
-    inspection_results = []
-    if log_ids:
-        insp_rows = db.query(Inspection.result, func.count(Inspection.id)).filter(
-            Inspection.dailylog_id.in_(log_ids)
-        ).group_by(Inspection.result).all()
-        inspection_results = [{"name": r or "Unknown", "value": c} for r, c in insp_rows]
+    insp_rows = db.query(Inspection.result, func.count(Inspection.id)).filter(
+        Inspection.dailylog_id.in_(log_id_q)
+    ).group_by(Inspection.result).all()
+    inspection_results = [{"name": r or "Unknown", "value": c} for r, c in insp_rows]
 
     # Severity funnel
     severity_funnel = [
@@ -279,18 +282,17 @@ async def dashboard_project(
 
     # Weather summary
     weather_summary = {}
-    if log_ids:
-        wf = db.query(
-            func.avg(WeatherForecast.temperature),
-            func.avg(WeatherForecast.humidity),
-            func.count(case((WeatherForecast.weather_code >= 3, 1))),
-        ).filter(WeatherForecast.dailylog_id.in_(log_ids)).first()
-        if wf and wf[0]:
-            weather_summary = {
-                "avg_temperature": round(float(wf[0] or 0), 1),
-                "avg_humidity": round(float(wf[1] or 0), 1),
-                "rainy_readings": int(wf[2] or 0),
-            }
+    wf = db.query(
+        func.avg(WeatherForecast.temperature),
+        func.avg(WeatherForecast.humidity),
+        func.count(case((WeatherForecast.weather_code >= 3, 1))),
+    ).filter(WeatherForecast.dailylog_id.in_(log_id_q)).first()
+    if wf and wf[0]:
+        weather_summary = {
+            "avg_temperature": round(float(wf[0] or 0), 1),
+            "avg_humidity": round(float(wf[1] or 0), 1),
+            "rainy_readings": int(wf[2] or 0),
+        }
 
     return {
         "project": {

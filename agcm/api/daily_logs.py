@@ -644,13 +644,17 @@ async def periodic_project_report(
     Each daily log renders as a full page, concatenated into one HTML document.
     """
     current_user = _resolve_report_user(request, db, token)
+    company_id = get_effective_company_id(current_user, db)
 
-    project = db.query(Project).filter(Project.id == project_id).first()
+    project = db.query(Project).filter(Project.id == project_id, Project.company_id == company_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
     # Fetch logs in date range
-    log_q = db.query(DailyActivityLog).filter(DailyActivityLog.project_id == project_id)
+    log_q = db.query(DailyActivityLog).filter(
+        DailyActivityLog.project_id == project_id,
+        DailyActivityLog.company_id == company_id,
+    )
     if date_from:
         log_q = log_q.filter(DailyActivityLog.date >= date_from)
     if date_to:
@@ -689,11 +693,17 @@ async def periodic_project_report(
         date_range_str = "All dates"
 
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+    def esc(val):
+        if val is None:
+            return ''
+        return str(val).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+
     combined = f'''<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
-<title>Project Report - {project.name}</title>
+<title>Project Report - {esc(project.name)}</title>
 {css_block}
 <style>
   .page-break {{ page-break-before: always; }}
@@ -713,12 +723,12 @@ async def periodic_project_report(
 <!-- Cover Page -->
 <div class="report-cover">
   <h1>Periodic Project Report</h1>
-  <h2>{project.name}</h2>
-  <p style="font-size:14px; color:#555;">{project.ref_number} | {project.city or ""}, {project.state or ""}</p>
-  <p style="font-size:13px; color:#666;">Date Range: {date_range_str}</p>
+  <h2>{esc(project.name)}</h2>
+  <p style="font-size:14px; color:#555;">{esc(project.ref_number)} | {esc(project.city or "")}, {esc(project.state or "")}</p>
+  <p style="font-size:13px; color:#666;">Date Range: {esc(date_range_str)}</p>
   <p style="font-size:13px; color:#666;">{len(logs)} Daily Log(s)</p>
   <div class="meta">
-    Generated on: {now_str}
+    Generated on: {esc(now_str)}
   </div>
 </div>
 

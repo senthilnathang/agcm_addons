@@ -28,13 +28,12 @@ async def list_projects(
 ):
     """List construction projects with pagination and filtering."""
     svc = _get_service(db, current_user)
-    # TODO: check if user is management role for is_management flag
     result = svc.list_projects(
         page=pagination.page,
         page_size=pagination.page_size,
         status=status,
         search=search,
-        is_management=True,
+        is_management=current_user.is_superuser,
     )
     return result
 

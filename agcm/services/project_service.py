@@ -48,6 +48,7 @@ class ProjectService:
 
         Non-management users only see projects they are assigned to.
         """
+        page_size = min(page_size, 200)
         query = self.db.query(Project).filter(
             Project.company_id == self.company_id,
             Project.is_deleted == False,

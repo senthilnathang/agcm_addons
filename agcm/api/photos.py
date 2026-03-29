@@ -1,6 +1,8 @@
 """Photo API with multipart upload via core documents module"""
 
 import io
+import logging
+import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -12,6 +14,10 @@ from addons.agcm.models.photo import Photo
 from addons.agcm.models.daily_activity_log import DailyActivityLog
 from addons.agcm.services.sequence_service import next_sequence
 
+logger = logging.getLogger(__name__)
+
+ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "image/heic"}
+
 router = APIRouter()
 
 
@@ -22,9 +28,10 @@ async def list_photos(
     current_user=Depends(get_current_user),
 ):
     """List photos for a daily log."""
+    company_id = get_effective_company_id(current_user, db)
     items = (
         db.query(Photo)
-        .filter(Photo.dailylog_id == dailylog_id)
+        .filter(Photo.dailylog_id == dailylog_id, Photo.company_id == company_id)
         .order_by(Photo.id.desc())
         .all()
     )
@@ -73,13 +80,19 @@ async def upload_photo(
     if not log:
         raise HTTPException(status_code=404, detail="Daily log not found")
 
-    # Read file content
-    content = await file.read()
-    if len(content) > 50 * 1024 * 1024:
-        raise HTTPException(status_code=400, detail="File too large (max 50MB)")
+    # Read file content with size check
+    content = b""
+    while chunk := await file.read(1024 * 1024):  # 1MB chunks
+        content += chunk
+        if len(content) > 10 * 1024 * 1024:  # 10MB limit for images
+            raise HTTPException(status_code=400, detail="File too large (max 10MB)")
 
     filename = file.filename or "photo.jpg"
+    filename = os.path.basename(filename).replace("..", "")
     mime_type = file.content_type or "image/jpeg"
+
+    if mime_type not in ALLOWED_IMAGE_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid file type. Allowed: JPEG, PNG, GIF, WebP, HEIC")
     photo_name = name or filename
 
     # Upload via documents module
@@ -100,8 +113,8 @@ async def upload_photo(
         )
         storage_key = result.get("storage_key")
         file_url = f"/api/v1/storage/files/download/{storage_key}" if storage_key else None
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Storage fallback: {e}")
 
     # Fallback: use default storage service
     if not storage_key:
@@ -116,8 +129,8 @@ async def upload_photo(
             )
             storage_key = result.get("storage_key") or result.get("key")
             file_url = result.get("url") or f"/uploads/agcm/photos/{storage_key}" if storage_key else None
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning(f"Storage fallback: {e}")
 
     # Last resort: save to local filesystem directly
     if not storage_key:
@@ -155,8 +168,8 @@ async def upload_photo(
         db.add(doc)
         db.flush()
         document_id = doc.id
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Storage fallback: {e}")
 
     # Create Photo record
     photo = Photo(
@@ -194,7 +207,8 @@ async def delete_photo(
     current_user=Depends(get_current_user),
 ):
     """Delete a photo record."""
-    photo = db.query(Photo).filter(Photo.id == photo_id).first()
+    company_id = get_effective_company_id(current_user, db)
+    photo = db.query(Photo).filter(Photo.id == photo_id, Photo.company_id == company_id).first()
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
     db.delete(photo)

@@ -255,8 +255,10 @@ class DailyActivityLogService:
 
     def list_children(self, model_class, dailylog_id: int, page: int = 1, page_size: int = 50) -> dict:
         """List child entities for a daily log."""
+        page_size = min(page_size, 200)
         query = self.db.query(model_class).filter(
             model_class.dailylog_id == dailylog_id,
+            model_class.company_id == self.company_id,
         )
         total = query.count()
         skip = (page - 1) * page_size
@@ -272,7 +274,10 @@ class DailyActivityLogService:
 
     def get_child(self, model_class, record_id: int):
         """Get a single child entity by ID."""
-        return self.db.query(model_class).filter(model_class.id == record_id).first()
+        return self.db.query(model_class).filter(
+            model_class.id == record_id,
+            model_class.company_id == self.company_id,
+        ).first()
 
     def create_child(self, model_class, data: dict):
         """Create a child entity from dict data."""

@@ -83,6 +83,10 @@ class WeatherService:
             logger.warning(f"Project {project_id} has no coordinates, skipping weather fetch")
             return []
 
+        if not (-90 <= project.project_latitude <= 90 and -180 <= project.project_longitude <= 180):
+            logger.warning(f"Invalid coordinates for project {project_id}")
+            return []
+
         today = date.today()
         try:
             if log_date < today:
@@ -111,7 +115,7 @@ class WeatherService:
         """Get existing forecast records for a daily log."""
         items = (
             self.db.query(WeatherForecast)
-            .filter(WeatherForecast.dailylog_id == dailylog_id)
+            .filter(WeatherForecast.dailylog_id == dailylog_id, WeatherForecast.company_id == self.company_id)
             .order_by(WeatherForecast.time_interval)
             .all()
         )
@@ -236,7 +240,7 @@ class WeatherService:
         """List manual weather entries for a daily log."""
         items = (
             self.db.query(Weather)
-            .filter(Weather.dailylog_id == dailylog_id)
+            .filter(Weather.dailylog_id == dailylog_id, Weather.company_id == self.company_id)
             .order_by(Weather.id)
             .all()
         )
