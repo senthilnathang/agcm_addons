@@ -173,7 +173,7 @@ onMounted(async () => {
             </ACard>
           </ACol>
           <ACol :span="10">
-            <ACard title="Inspection Results" size="small" style="border-radius: 8px;">
+            <ACard title="Inspection Results" size="small" style="border-radius: 8px; margin-bottom: 16px;">
               <div style="padding: 12px 0;">
                 <div v-for="(item, i) in data.inspection_results" :key="i"
                      style="display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f5f5f5;">
@@ -187,18 +187,38 @@ onMounted(async () => {
                 <AEmpty v-if="!data.inspection_results?.length" description="No inspections" />
               </div>
             </ACard>
+            <ACard title="Weather Summary" size="small" style="border-radius: 8px;">
+              <div v-if="data.weather_summary?.avg_temperature" style="display: flex; align-items: center; justify-content: space-around; padding: 10px 0;">
+                <div style="text-align: center;">
+                  <div style="font-size: 28px;">🌡️</div>
+                  <div style="font-size: 22px; font-weight: 700; color: #fa8c16;">{{ data.weather_summary.avg_temperature }}°F</div>
+                  <div style="font-size: 10px; color: #888;">Avg Temp</div>
+                </div>
+                <div style="text-align: center;">
+                  <div style="font-size: 28px;">💧</div>
+                  <div style="font-size: 22px; font-weight: 700; color: #1890ff;">{{ data.weather_summary.avg_humidity }}%</div>
+                  <div style="font-size: 10px; color: #888;">Humidity</div>
+                </div>
+                <div style="text-align: center;">
+                  <div style="font-size: 28px;">🌧️</div>
+                  <div style="font-size: 22px; font-weight: 700; color: #722ed1;">{{ data.weather_summary.rainy_readings }}</div>
+                  <div style="font-size: 10px; color: #888;">Rainy</div>
+                </div>
+              </div>
+              <AEmpty v-else description="No weather data" />
+            </ACard>
           </ACol>
         </ARow>
 
-        <!-- Row 3: Severity Funnel + Weather -->
+        <!-- Row 3: Severity Funnel (full width) -->
         <ARow :gutter="16">
-          <ACol :span="14">
+          <ACol :span="24">
             <ACard title="Issue Severity Funnel" size="small" style="border-radius: 8px;">
               <div style="padding: 16px 0;">
                 <div v-for="(item, i) in data.severity_funnel" :key="i" style="margin-bottom: 6px;">
                   <div style="display: flex; align-items: center;">
                     <div :style="{
-                      width: Math.max(20, (item.value / Math.max(data.severity_funnel[0]?.value || 1, 1)) * 100) + '%',
+                      width: Math.max(10, (item.value / Math.max(data.severity_funnel[0]?.value || 1, 1)) * 100) + '%',
                       height: '36px',
                       backgroundColor: funnelColors[i],
                       borderRadius: '4px',
@@ -215,27 +235,6 @@ onMounted(async () => {
                   </div>
                 </div>
               </div>
-            </ACard>
-          </ACol>
-          <ACol :span="10">
-            <ACard title="Weather Summary" size="small" style="border-radius: 8px;">
-              <div v-if="data.weather_summary?.avg_temperature" style="text-align: center; padding: 20px 0;">
-                <div style="font-size: 48px;">🌡️</div>
-                <div style="font-size: 32px; font-weight: 700; color: #fa8c16;">
-                  {{ data.weather_summary.avg_temperature }}°F
-                </div>
-                <ARow :gutter="16" style="margin-top: 16px;">
-                  <ACol :span="12">
-                    <div style="font-size: 11px; color: #888;">Avg Humidity</div>
-                    <div style="font-size: 18px; font-weight: 600;">💧 {{ data.weather_summary.avg_humidity }}%</div>
-                  </ACol>
-                  <ACol :span="12">
-                    <div style="font-size: 11px; color: #888;">Rainy Readings</div>
-                    <div style="font-size: 18px; font-weight: 600;">🌧️ {{ data.weather_summary.rainy_readings }}</div>
-                  </ACol>
-                </ARow>
-              </div>
-              <AEmpty v-else description="No weather data" />
             </ACard>
           </ACol>
         </ARow>

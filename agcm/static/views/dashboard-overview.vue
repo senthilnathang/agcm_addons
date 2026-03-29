@@ -107,27 +107,52 @@ onMounted(fetchData);
           </ACol>
         </ARow>
 
-        <!-- Row 1: Project Status Donut + Manpower by Project Bar -->
+        <!-- Row 1: Project Status + Weather Avg + Manpower by Project -->
         <ARow :gutter="16" class="mb-6">
           <ACol :span="8">
-            <ACard title="Project Status" size="small" style="border-radius: 8px;">
-              <div style="height: 300px; display: flex; align-items: center; justify-content: center;">
+            <ACard title="Project Status" size="small" style="border-radius: 8px; margin-bottom: 16px;">
+              <div style="display: flex; align-items: center; justify-content: center; padding: 12px 0;">
                 <AProgress
                   v-for="(item, i) in data.project_status_chart"
                   :key="i"
                   type="circle"
                   :percent="Math.round((item.value / Math.max(data.kpis.total_projects, 1)) * 100)"
-                  :width="90"
+                  :width="80"
                   :stroke-color="['#1677ff', '#fa8c16', '#52c41a'][i] || '#ccc'"
-                  style="margin: 0 10px;"
+                  style="margin: 0 8px;"
                 >
                   <template #format>
                     <div style="text-align: center;">
-                      <div style="font-size: 18px; font-weight: bold;">{{ item.value }}</div>
+                      <div style="font-size: 16px; font-weight: bold;">{{ item.value }}</div>
                       <div style="font-size: 9px; color: #888;">{{ item.name }}</div>
                     </div>
                   </template>
                 </AProgress>
+              </div>
+            </ACard>
+            <ACard title="Weather Avg" size="small" style="border-radius: 8px;" v-if="data.weather_summary?.avg_temperature">
+              <div style="display: flex; align-items: center; justify-content: space-around; padding: 8px 0;">
+                <div style="text-align: center;">
+                  <div style="font-size: 28px;">🌡️</div>
+                  <div style="font-size: 22px; font-weight: 700; color: #fa8c16;">
+                    {{ data.weather_summary.avg_temperature }}°F
+                  </div>
+                  <div style="font-size: 10px; color: #888;">Avg Temp</div>
+                </div>
+                <div style="text-align: center;">
+                  <div style="font-size: 28px;">💧</div>
+                  <div style="font-size: 22px; font-weight: 700; color: #1890ff;">
+                    {{ data.weather_summary.avg_humidity }}%
+                  </div>
+                  <div style="font-size: 10px; color: #888;">Humidity</div>
+                </div>
+                <div style="text-align: center;">
+                  <div style="font-size: 28px;">💨</div>
+                  <div style="font-size: 22px; font-weight: 700; color: #52c41a;">
+                    {{ data.weather_summary.avg_wind }}
+                  </div>
+                  <div style="font-size: 10px; color: #888;">Wind mph</div>
+                </div>
               </div>
             </ACard>
           </ACol>
@@ -205,25 +230,9 @@ onMounted(fetchData);
           </ACol>
         </ARow>
 
-        <!-- Row 3: Weather + Recent Logs -->
+        <!-- Row 3: Recent Logs (full width) -->
         <ARow :gutter="16">
-          <ACol :span="6">
-            <ACard title="Weather Avg" size="small" style="border-radius: 8px;" v-if="data.weather_summary?.avg_temperature">
-              <div style="text-align: center; padding: 16px 0;">
-                <div style="font-size: 40px;">🌡️</div>
-                <div style="font-size: 28px; font-weight: 700; color: #fa8c16;">
-                  {{ data.weather_summary.avg_temperature }}°F
-                </div>
-                <div style="color: #888; font-size: 11px; margin-top: 8px;">
-                  💧 {{ data.weather_summary.avg_humidity }}% humidity
-                </div>
-                <div style="color: #888; font-size: 11px;">
-                  💨 {{ data.weather_summary.avg_wind }} mph wind
-                </div>
-              </div>
-            </ACard>
-          </ACol>
-          <ACol :span="18">
+          <ACol :span="24">
             <ACard title="Recent Daily Logs" size="small" style="border-radius: 8px;">
               <ATable
                 :data-source="data.recent_logs"

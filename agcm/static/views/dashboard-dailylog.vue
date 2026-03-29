@@ -109,15 +109,17 @@ onMounted(async () => {
           </div>
         </ACard>
 
-        <!-- KPI Cards -->
-        <ARow :gutter="[12, 12]" class="mb-6">
-          <ACol v-for="(val, key) in data.kpis" :key="key" :xs="8" :md="4" :lg="3">
-            <ACard size="small" style="border-radius: 8px; text-align: center;">
-              <div style="font-size: 24px; font-weight: 700; color: #333;">{{ val }}</div>
-              <div style="font-size: 11px; color: #888;">{{ key }}</div>
-            </ACard>
-          </ACol>
-        </ARow>
+        <!-- KPI Cards — single row -->
+        <div style="display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: nowrap;">
+          <div
+            v-for="(val, key) in data.kpis"
+            :key="key"
+            style="flex: 1; min-width: 0; background: #fff; border: 1px solid #f0f0f0; border-radius: 8px; padding: 8px 4px; text-align: center;"
+          >
+            <div style="font-size: 18px; font-weight: 700; color: #333; line-height: 1.2;">{{ val }}</div>
+            <div style="font-size: 9px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ key }}</div>
+          </div>
+        </div>
 
         <!-- Weather Strip -->
         <ACard title="Weather Forecast" size="small" class="mb-6" style="border-radius: 8px;" v-if="data.weather_strip?.length">
