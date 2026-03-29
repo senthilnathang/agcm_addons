@@ -46,7 +46,19 @@ function handleDateChange(dates) {
 }
 
 function handleExportPdf() {
-  window.print();
+  const content = document.querySelector('.dashboard-print-area');
+  if (!content) return;
+  const clone = content.cloneNode(true);
+  const win = window.open('', '_blank');
+  const doc = win.document;
+  const style = doc.createElement('style');
+  style.textContent = '* { box-sizing: border-box; } body { font-family: Arial, sans-serif; margin: 20px; color: #333; } @page { size: landscape; margin: 0.5in; }';
+  doc.head.appendChild(style);
+  const title = doc.createElement('title');
+  title.textContent = 'Construction Dashboard';
+  doc.head.appendChild(title);
+  doc.body.appendChild(clone);
+  setTimeout(() => { win.print(); }, 500);
 }
 
 const kpiConfig = [
@@ -89,7 +101,7 @@ onMounted(fetchData);
         </ASpace>
       </div>
 
-      <template v-if="data">
+      <div v-if="data" class="dashboard-print-area">
         <!-- KPI Cards -->
         <ARow :gutter="[16, 16]" class="mb-6">
           <ACol v-for="kpi in kpiConfig" :key="kpi.key" :xs="12" :sm="8" :md="6" :lg="3">
@@ -249,7 +261,7 @@ onMounted(fetchData);
             </ACard>
           </ACol>
         </ARow>
-      </template>
+      </div>
     </ASpin>
   </div>
 </template>
