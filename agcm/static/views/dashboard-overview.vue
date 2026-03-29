@@ -119,10 +119,10 @@ onMounted(fetchData);
           </ACol>
         </ARow>
 
-        <!-- Row 1: Project Status + Weather Avg + Manpower by Project -->
+        <!-- Row 1: Project Status | Weather Avg | Activity Distribution -->
         <ARow :gutter="16" class="mb-6">
           <ACol :span="8">
-            <ACard title="Project Status" size="small" style="border-radius: 8px; margin-bottom: 16px;">
+            <ACard title="Project Status" size="small" style="border-radius: 8px;">
               <div style="display: flex; align-items: center; justify-content: center; padding: 12px 0;">
                 <AProgress
                   v-for="(item, i) in data.project_status_chart"
@@ -142,37 +142,51 @@ onMounted(fetchData);
                 </AProgress>
               </div>
             </ACard>
+          </ACol>
+          <ACol :span="6">
             <ACard title="Weather Avg" size="small" style="border-radius: 8px;" v-if="data.weather_summary?.avg_temperature">
-              <div style="display: flex; align-items: center; justify-content: space-around; padding: 8px 0;">
+              <div style="display: flex; align-items: center; justify-content: space-around; padding: 12px 0;">
                 <div style="text-align: center;">
-                  <div style="font-size: 28px;">🌡️</div>
-                  <div style="font-size: 22px; font-weight: 700; color: #fa8c16;">
-                    {{ data.weather_summary.avg_temperature }}°F
-                  </div>
-                  <div style="font-size: 10px; color: #888;">Avg Temp</div>
+                  <div style="font-size: 24px;">🌡️</div>
+                  <div style="font-size: 20px; font-weight: 700; color: #fa8c16;">{{ data.weather_summary.avg_temperature }}°F</div>
+                  <div style="font-size: 9px; color: #888;">Avg Temp</div>
                 </div>
                 <div style="text-align: center;">
-                  <div style="font-size: 28px;">💧</div>
-                  <div style="font-size: 22px; font-weight: 700; color: #1890ff;">
-                    {{ data.weather_summary.avg_humidity }}%
-                  </div>
-                  <div style="font-size: 10px; color: #888;">Humidity</div>
+                  <div style="font-size: 24px;">💧</div>
+                  <div style="font-size: 20px; font-weight: 700; color: #1890ff;">{{ data.weather_summary.avg_humidity }}%</div>
+                  <div style="font-size: 9px; color: #888;">Humidity</div>
                 </div>
                 <div style="text-align: center;">
-                  <div style="font-size: 28px;">💨</div>
-                  <div style="font-size: 22px; font-weight: 700; color: #52c41a;">
-                    {{ data.weather_summary.avg_wind }}
-                  </div>
-                  <div style="font-size: 10px; color: #888;">Wind mph</div>
+                  <div style="font-size: 24px;">💨</div>
+                  <div style="font-size: 20px; font-weight: 700; color: #52c41a;">{{ data.weather_summary.avg_wind }}</div>
+                  <div style="font-size: 9px; color: #888;">Wind mph</div>
                 </div>
               </div>
             </ACard>
           </ACol>
-          <ACol :span="16">
+          <ACol :span="10">
+            <ACard title="Activity Distribution" size="small" style="border-radius: 8px;">
+              <div style="padding: 4px 0;">
+                <div v-for="(item, i) in data.activity_by_type" :key="i"
+                     style="display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #f8f8f8;">
+                  <span style="display: flex; align-items: center; gap: 5px; font-size: 11px;">
+                    <span :style="{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: ['#1677ff','#52c41a','#13c2c2','#2f54eb','#f5222d','#fa8c16','#722ed1','#eb2f96','#faad14'][i] }" />
+                    {{ item.name }}
+                  </span>
+                  <strong style="font-size: 11px;">{{ item.value.toLocaleString() }}</strong>
+                </div>
+              </div>
+            </ACard>
+          </ACol>
+        </ARow>
+
+        <!-- Row 2: Manpower by Project (full width) -->
+        <ARow :gutter="16" class="mb-6">
+          <ACol :span="24">
             <ACard title="Manpower Hours by Project" size="small" style="border-radius: 8px;">
-              <div style="padding: 12px 0;">
-                <div v-for="(item, i) in data.manpower_by_project" :key="i" style="margin-bottom: 10px;">
-                  <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px;">
+              <div style="display: flex; gap: 16px; flex-wrap: wrap; padding: 8px 0;">
+                <div v-for="(item, i) in data.manpower_by_project" :key="i" style="flex: 1; min-width: 180px;">
+                  <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 2px;">
                     <span>{{ item.name }}</span>
                     <strong>{{ item.value.toLocaleString() }} hrs</strong>
                   </div>
@@ -188,9 +202,9 @@ onMounted(fetchData);
           </ACol>
         </ARow>
 
-        <!-- Row 2: Safety Trend + Activity Distribution -->
+        <!-- Row 2: Safety Trend (full width) -->
         <ARow :gutter="16" class="mb-6">
-          <ACol :span="14">
+          <ACol :span="24">
             <ACard title="Safety Incidents Trend" size="small" style="border-radius: 8px;">
               <ATable
                 :data-source="(data.safety_trend?.categories || []).map((cat, i) => ({
@@ -221,23 +235,6 @@ onMounted(fetchData);
                   </template>
                 </template>
               </ATable>
-            </ACard>
-          </ACol>
-          <ACol :span="10">
-            <ACard title="Activity Distribution" size="small" style="border-radius: 8px;">
-              <div style="padding: 8px 0;">
-                <div v-for="(item, i) in data.activity_by_type" :key="i"
-                     style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f5f5f5;">
-                  <ASpace>
-                    <div :style="{
-                      width: '10px', height: '10px', borderRadius: '50%',
-                      backgroundColor: ['#1677ff','#52c41a','#13c2c2','#2f54eb','#f5222d','#fa8c16','#722ed1','#eb2f96','#faad14'][i]
-                    }" />
-                    <span style="font-size: 12px;">{{ item.name }}</span>
-                  </ASpace>
-                  <strong style="font-size: 12px;">{{ item.value.toLocaleString() }}</strong>
-                </div>
-              </div>
             </ACard>
           </ACol>
         </ARow>
