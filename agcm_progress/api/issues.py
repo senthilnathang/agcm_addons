@@ -68,6 +68,11 @@ async def create_issue(
     """Create a new issue."""
     svc = _get_service(db, current_user)
     issue = svc.create_issue(data)
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        await agcm_realtime.issue_created(db, issue)
+    except Exception:
+        pass
     return IssueResponse.model_validate(issue).model_dump()
 
 
@@ -80,9 +85,18 @@ async def update_issue(
 ):
     """Update an issue."""
     svc = _get_service(db, current_user)
+    old_issue = svc.get_issue(issue_id)
+    old_status = str(old_issue.status) if old_issue and old_issue.status else None
     issue = svc.update_issue(issue_id, data)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        new_status = str(issue.status) if issue.status else None
+        if old_status and new_status and old_status != new_status:
+            await agcm_realtime.issue_status_changed(db, issue, old_status, new_status)
+    except Exception:
+        pass
     return IssueResponse.model_validate(issue).model_dump()
 
 
@@ -109,6 +123,11 @@ async def resolve_issue(
     issue = svc.resolve_issue(issue_id)
     if not issue:
         raise HTTPException(status_code=404, detail="Issue not found")
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        await agcm_realtime.issue_status_changed(db, issue, "open", "resolved")
+    except Exception:
+        pass
     return IssueResponse.model_validate(issue).model_dump()
 
 

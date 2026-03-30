@@ -77,6 +77,11 @@ async def create_task(
     """Create a new task."""
     svc = _get_service(db, current_user)
     task = svc.create_task(data)
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        await agcm_realtime.task_created(db, task)
+    except Exception:
+        pass
     return TaskResponse.model_validate(task).model_dump()
 
 
@@ -89,9 +94,18 @@ async def update_task(
 ):
     """Update a task."""
     svc = _get_service(db, current_user)
+    old_task = svc.get_task(task_id)
+    old_status = str(old_task.status) if old_task and old_task.status else None
     task = svc.update_task(task_id, data)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        new_status = str(task.status) if task.status else None
+        if old_status and new_status and old_status != new_status:
+            await agcm_realtime.task_status_changed(db, task, old_status, new_status)
+    except Exception:
+        pass
     return TaskResponse.model_validate(task).model_dump()
 
 
@@ -116,9 +130,17 @@ async def update_task_progress(
 ):
     """Update task progress (0-100)."""
     svc = _get_service(db, current_user)
+    old_task = svc.get_task(task_id)
+    old_progress = old_task.progress if old_task else 0
     task = svc.update_progress(task_id, body.progress)
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        if old_progress != body.progress:
+            await agcm_realtime.task_progress_changed(db, task, old_progress, body.progress)
+    except Exception:
+        pass
     return TaskResponse.model_validate(task).model_dump()
 
 

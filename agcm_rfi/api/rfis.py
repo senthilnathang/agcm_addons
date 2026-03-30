@@ -58,7 +58,13 @@ async def create_rfi(
     current_user=Depends(get_current_user),
 ):
     svc = _get_service(db, current_user)
-    return svc.create_rfi(data)
+    rfi = svc.create_rfi(data)
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        await agcm_realtime.rfi_created(db, rfi)
+    except Exception:
+        pass
+    return rfi
 
 
 @router.put("/rfis/{rfi_id}", response_model=RFIResponseSchema)
@@ -96,6 +102,11 @@ async def close_rfi(
     result = svc.close_rfi(rfi_id)
     if not result:
         raise HTTPException(status_code=404, detail="RFI not found")
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        await agcm_realtime.rfi_closed(db, result)
+    except Exception:
+        pass
     return result
 
 
@@ -125,6 +136,13 @@ async def create_rfi_response(
     result = svc.create_response(rfi_id, data)
     if not result:
         raise HTTPException(status_code=404, detail="RFI not found")
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        rfi = svc.get_rfi(rfi_id)
+        if rfi:
+            await agcm_realtime.rfi_response_created(db, rfi, result)
+    except Exception:
+        pass
     return result
 
 

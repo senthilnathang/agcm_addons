@@ -65,7 +65,13 @@ async def create_change_order(
 ):
     """Create a new change order."""
     svc = _get_service(db, current_user)
-    return svc.create_change_order(data)
+    co = svc.create_change_order(data)
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        await agcm_realtime.change_order_created(db, co)
+    except Exception:
+        pass
+    return co
 
 
 @router.put("/change-orders/{co_id}", response_model=ChangeOrderResponse)
@@ -106,6 +112,11 @@ async def approve_change_order(
     result = svc.approve_change_order(co_id)
     if not result:
         raise HTTPException(status_code=404, detail="Change order not found")
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        await agcm_realtime.change_order_status_changed(db, result, "pending", "approved")
+    except Exception:
+        pass
     return result
 
 

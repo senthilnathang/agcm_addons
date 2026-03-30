@@ -54,6 +54,15 @@ This is a FastVue addon module for construction project daily activity logging. 
 - Upload via multipart `POST /photos/upload`
 - Files stored at `uploads/agcm/photos/YYYY/MM/DD/`
 
+### Real-time Events
+- Service: `from addons.agcm.services.realtime_events import agcm_realtime`
+- All events broadcast to **project team members** via `agcm_project_users` M2M
+- Fire-and-forget pattern — `try: await agcm_realtime.xxx(db, entity) except: pass`
+- Event types prefixed `agcm:` (e.g., `agcm:rfi:created`, `agcm:task:progress_changed`)
+- Frontend listens: `const { on } = useRealtime(); on('agcm:rfi:response_new', handler)`
+- No core framework changes needed — plugs into existing WebSocket room infrastructure
+- Wired into: RFI (create, close, response), Tasks (create, status, progress), Submittals (create, approve), Change Orders (create, approve), Issues (create, update, resolve)
+
 ### Weather
 - Two models: `WeatherForecast` (auto from weather.gov) and `Weather` (manual entry)
 - Forecast fetched via weather.gov Points API → station observations / hourly forecast

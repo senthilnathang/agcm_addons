@@ -80,6 +80,11 @@ async def create_submittal(
     """Create a new submittal."""
     svc = _get_service(db, current_user)
     submittal = svc.create_submittal(data)
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        await agcm_realtime.submittal_created(db, submittal)
+    except Exception:
+        pass
     return SubmittalResponse.model_validate(submittal).model_dump()
 
 
@@ -119,11 +124,22 @@ async def approve_submittal(
 ):
     """Approve, reject, or request revision on a submittal."""
     svc = _get_service(db, current_user)
+    old_submittal = svc.get_submittal(submittal_id)
+    old_status = str(old_submittal.status) if old_submittal and old_submittal.status else None
     result = svc.approve_submittal(submittal_id, body.action, body.comments)
     if not result:
         raise HTTPException(status_code=404, detail="Submittal not found")
     if "error" in result:
         raise HTTPException(status_code=400, detail=result["error"])
+    try:
+        from addons.agcm.services.realtime_events import agcm_realtime
+        updated = svc.get_submittal(submittal_id)
+        if updated and old_status:
+            new_status = str(updated.status) if updated.status else None
+            if new_status and old_status != new_status:
+                await agcm_realtime.submittal_status_changed(db, updated, old_status, new_status)
+    except Exception:
+        pass
     return result
 
 
