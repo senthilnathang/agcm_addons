@@ -1,0 +1,1 @@
+from addons.agcm_submittal.services.submittal_service import SubmittalService

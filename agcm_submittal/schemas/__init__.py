@@ -1,0 +1,15 @@
+from addons.agcm_submittal.schemas.submittal import (
+    SubmittalCreate,
+    SubmittalUpdate,
+    SubmittalResponse,
+    SubmittalDetail,
+    SubmittalPackageCreate,
+    SubmittalPackageResponse,
+    SubmittalTypeCreate,
+    SubmittalTypeResponse,
+    SubmittalLabelCreate,
+    SubmittalLabelResponse,
+    ApproverCreate,
+    ApproverResponse,
+    ApproveAction,
+)

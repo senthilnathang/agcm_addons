@@ -32,6 +32,23 @@ This is a FastVue addon module for construction project daily activity logging. 
 - Import API functions from `#/api/agcm`
 - Import `requestClient` from `#/api/request`
 
+### Pagination
+- All paginated API endpoints MUST use `page_size: int = Query(20, ge=1, le=200)` (import `Query` from `fastapi`)
+- Services should also enforce `page_size = min(page_size, 200)` as a safety net
+- Frontend MUST NEVER request `page_size` greater than 200 — the API will reject with 422
+- For project/user dropdowns use `page_size: 200` (the max), NOT 500 or unbounded
+
+### Enum Columns
+- New modules MUST use `Enum(MyEnum, values_callable=lambda e: [m.value for m in e])` so PostgreSQL stores lowercase values (e.g. `"in_progress"` not `"IN_PROGRESS"`)
+- Do NOT add `values_callable` to existing base `agcm` module enums — they already use uppercase member names in the DB
+- When passing enum values in seed scripts or API, use the lowercase string value (e.g. `"in_progress"`)
+
+### Child Module Menus
+- Child modules (agcm_rfi, agcm_finance, etc.) MUST NOT re-declare the "Construction" parent menu
+- Instead, use `"parent": "agcm"` on each menu item to attach to the existing Construction menu
+- For Settings sub-items, use `"parent": "agcm.settings"`
+- Only the base `agcm` module declares the root `{"name": "Construction", "path": "/agcm"}` menu
+
 ### Photo Storage
 - Photos stored via core documents module (not binary blobs)
 - Upload via multipart `POST /photos/upload`

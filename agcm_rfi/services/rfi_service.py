@@ -1,0 +1,292 @@
+"""RFI service - business logic for RFIs and responses"""
+
+import logging
+import re
+from datetime import date
+from typing import List, Optional
+
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from addons.agcm_rfi.models.rfi import RFI, RFILabel, agcm_rfi_label_rel, agcm_rfi_assignees
+from addons.agcm_rfi.models.rfi_response import RFIResponse
+from addons.agcm_rfi.schemas.rfi import RFICreate, RFIUpdate, RFIResponseCreate, RFIResponseUpdate
+
+logger = logging.getLogger(__name__)
+
+SEQUENCE_PREFIX = "RFI"
+SEQUENCE_PADDING = 5
+
+
+def _next_rfi_sequence(db: Session, company_id: int) -> str:
+    last = (
+        db.query(RFI.sequence_name)
+        .filter(RFI.company_id == company_id, RFI.sequence_name.isnot(None))
+        .order_by(RFI.id.desc())
+        .first()
+    )
+    num = 1
+    if last and last[0]:
+        match = re.search(r'(\d+)$', last[0])
+        if match:
+            num = int(match.group(1)) + 1
+    return f"{SEQUENCE_PREFIX}{num:0{SEQUENCE_PADDING}d}"
+
+
+class RFIService:
+    """Handles RFI CRUD, status workflow, and response management."""
+
+    def __init__(self, db: Session, company_id: int, user_id: int):
+        self.db = db
+        self.company_id = company_id
+        self.user_id = user_id
+
+    # --- RFI CRUD ---
+
+    def list_rfis(
+        self,
+        project_id: Optional[int] = None,
+        status: Optional[str] = None,
+        priority: Optional[str] = None,
+        search: Optional[str] = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict:
+        page_size = min(page_size, 200)
+        query = self.db.query(RFI).filter(RFI.company_id == self.company_id)
+
+        if project_id:
+            query = query.filter(RFI.project_id == project_id)
+        if status:
+            query = query.filter(RFI.status == status)
+        if priority:
+            query = query.filter(RFI.priority == priority)
+        if search:
+            term = f"%{search}%"
+            query = query.filter(
+                (RFI.subject.ilike(term)) | (RFI.sequence_name.ilike(term))
+            )
+
+        total = query.count()
+        skip = (page - 1) * page_size
+        items = query.order_by(RFI.id.desc()).offset(skip).limit(page_size).all()
+
+        return {"items": items, "total": total, "page": page, "page_size": page_size}
+
+    def get_rfi(self, rfi_id: int) -> Optional[RFI]:
+        return (
+            self.db.query(RFI)
+            .filter(RFI.id == rfi_id, RFI.company_id == self.company_id)
+            .first()
+        )
+
+    def get_rfi_detail(self, rfi_id: int) -> Optional[dict]:
+        rfi = self.get_rfi(rfi_id)
+        if not rfi:
+            return None
+
+        response_count = (
+            self.db.query(func.count(RFIResponse.id))
+            .filter(RFIResponse.rfi_id == rfi_id)
+            .scalar() or 0
+        )
+
+        responses = (
+            self.db.query(RFIResponse)
+            .filter(RFIResponse.rfi_id == rfi_id)
+            .order_by(RFIResponse.created_at)
+            .all()
+        )
+
+        response_dicts = [
+            {
+                "id": r.id,
+                "rfi_id": r.rfi_id,
+                "parent_id": r.parent_id,
+                "content": r.content,
+                "is_official_response": r.is_official_response,
+                "responded_by": r.responded_by,
+                "created_at": r.created_at,
+                "updated_at": r.updated_at,
+            }
+            for r in responses
+        ]
+
+        return {
+            **{c.key: getattr(rfi, c.key) for c in rfi.__table__.columns},
+            "assignee_ids": [u.id for u in rfi.assignees],
+            "label_ids": [l.id for l in rfi.labels],
+            "labels": [{"id": l.id, "name": l.name, "color": l.color} for l in rfi.labels],
+            "response_count": response_count,
+            "responses": response_dicts,
+        }
+
+    def create_rfi(self, data: RFICreate) -> RFI:
+        rfi = RFI(
+            company_id=self.company_id,
+            sequence_name=_next_rfi_sequence(self.db, self.company_id),
+            subject=data.subject,
+            question=data.question,
+            priority=data.priority or "medium",
+            status=data.status or "draft",
+            schedule_impact_days=data.schedule_impact_days or 0,
+            cost_impact=data.cost_impact or 0.0,
+            due_date=data.due_date,
+            project_id=data.project_id,
+            created_by_user_id=self.user_id,
+            created_by=self.user_id,
+        )
+        self.db.add(rfi)
+        self.db.flush()
+
+        if data.assignee_ids:
+            self._sync_assignees(rfi.id, set(data.assignee_ids))
+        if data.label_ids:
+            self._sync_labels(rfi.id, set(data.label_ids))
+
+        self.db.commit()
+        self.db.refresh(rfi)
+        return rfi
+
+    def update_rfi(self, rfi_id: int, data: RFIUpdate) -> Optional[RFI]:
+        rfi = self.get_rfi(rfi_id)
+        if not rfi:
+            return None
+
+        update_data = data.model_dump(exclude_unset=True)
+        assignee_ids = update_data.pop("assignee_ids", None)
+        label_ids = update_data.pop("label_ids", None)
+
+        for key, value in update_data.items():
+            setattr(rfi, key, value)
+        rfi.updated_by = self.user_id
+
+        if assignee_ids is not None:
+            self._sync_assignees(rfi.id, set(assignee_ids))
+        if label_ids is not None:
+            self._sync_labels(rfi.id, set(label_ids))
+
+        self.db.commit()
+        self.db.refresh(rfi)
+        return rfi
+
+    def delete_rfi(self, rfi_id: int) -> bool:
+        rfi = self.get_rfi(rfi_id)
+        if not rfi:
+            return False
+        self.db.delete(rfi)
+        self.db.commit()
+        return True
+
+    def close_rfi(self, rfi_id: int) -> Optional[RFI]:
+        rfi = self.get_rfi(rfi_id)
+        if not rfi:
+            return None
+        rfi.status = "closed"
+        rfi.closed_date = date.today()
+        rfi.updated_by = self.user_id
+        self.db.commit()
+        self.db.refresh(rfi)
+        return rfi
+
+    def reopen_rfi(self, rfi_id: int) -> Optional[RFI]:
+        rfi = self.get_rfi(rfi_id)
+        if not rfi:
+            return None
+        rfi.status = "open"
+        rfi.closed_date = None
+        rfi.updated_by = self.user_id
+        self.db.commit()
+        self.db.refresh(rfi)
+        return rfi
+
+    # --- Responses ---
+
+    def create_response(self, rfi_id: int, data: RFIResponseCreate) -> Optional[RFIResponse]:
+        rfi = self.get_rfi(rfi_id)
+        if not rfi:
+            return None
+
+        resp = RFIResponse(
+            company_id=self.company_id,
+            rfi_id=rfi_id,
+            parent_id=data.parent_id,
+            content=data.content,
+            is_official_response=data.is_official_response or False,
+            responded_by=self.user_id,
+        )
+        self.db.add(resp)
+
+        # Auto-advance status if still draft/open
+        if rfi.status in ("draft", "open"):
+            rfi.status = "in_progress"
+
+        self.db.commit()
+        self.db.refresh(resp)
+        return resp
+
+    def update_response(self, response_id: int, data: RFIResponseUpdate) -> Optional[RFIResponse]:
+        resp = (
+            self.db.query(RFIResponse)
+            .filter(RFIResponse.id == response_id, RFIResponse.company_id == self.company_id)
+            .first()
+        )
+        if not resp:
+            return None
+
+        update_data = data.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr(resp, key, value)
+
+        self.db.commit()
+        self.db.refresh(resp)
+        return resp
+
+    # --- Labels ---
+
+    def list_labels(self) -> List[RFILabel]:
+        return (
+            self.db.query(RFILabel)
+            .filter(RFILabel.company_id == self.company_id)
+            .order_by(RFILabel.name)
+            .all()
+        )
+
+    def create_label(self, name: str, color: str = "#1890ff") -> RFILabel:
+        label = RFILabel(name=name, color=color, company_id=self.company_id)
+        self.db.add(label)
+        self.db.commit()
+        self.db.refresh(label)
+        return label
+
+    def delete_label(self, label_id: int) -> bool:
+        label = (
+            self.db.query(RFILabel)
+            .filter(RFILabel.id == label_id, RFILabel.company_id == self.company_id)
+            .first()
+        )
+        if not label:
+            return False
+        self.db.delete(label)
+        self.db.commit()
+        return True
+
+    # --- M2M helpers ---
+
+    def _sync_assignees(self, rfi_id: int, user_ids: set):
+        self.db.execute(
+            agcm_rfi_assignees.delete().where(agcm_rfi_assignees.c.rfi_id == rfi_id)
+        )
+        for uid in user_ids:
+            self.db.execute(
+                agcm_rfi_assignees.insert().values(rfi_id=rfi_id, user_id=uid)
+            )
+
+    def _sync_labels(self, rfi_id: int, label_ids: set):
+        self.db.execute(
+            agcm_rfi_label_rel.delete().where(agcm_rfi_label_rel.c.rfi_id == rfi_id)
+        )
+        for lid in label_ids:
+            self.db.execute(
+                agcm_rfi_label_rel.insert().values(rfi_id=rfi_id, label_id=lid)
+            )
