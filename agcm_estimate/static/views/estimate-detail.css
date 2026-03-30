@@ -1,0 +1,51 @@
+/* estimate-detail.css — companion styles for estimate-detail.vue */
+.estimate-summary-cards {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.estimate-summary-cards .ant-card {
+  flex: 1;
+  border-top: 3px solid #1890ff;
+}
+.estimate-summary-cards .ant-card:nth-child(2) {
+  border-top-color: #722ed1;
+}
+.estimate-summary-cards .ant-card:nth-child(3) {
+  border-top-color: #fa8c16;
+}
+.estimate-summary-cards .ant-card:nth-child(4) {
+  border-top-color: #52c41a;
+}
+.summary-card-value {
+  font-size: 24px;
+  font-weight: 600;
+}
+.group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+.group-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.group-subtotal {
+  color: #888;
+  font-weight: 500;
+}
+.inline-edit-cell {
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  min-width: 60px;
+  min-height: 24px;
+}
+.inline-edit-cell:hover {
+  background: #f0f0f0;
+}
+.notes-section {
+  margin-top: 24px;
+}
