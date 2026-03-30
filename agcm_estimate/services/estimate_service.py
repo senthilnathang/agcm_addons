@@ -274,6 +274,10 @@ class EstimateService:
         return True
 
     def create_assembly_item(self, data: AssemblyItemCreate, assembly_id: int) -> AssemblyItem:
+        # Verify assembly belongs to this company (IDOR protection)
+        assembly = self.get_assembly(assembly_id)
+        if not assembly:
+            raise ValueError("Assembly not found or access denied")
         item = AssemblyItem(
             assembly_id=assembly_id,
             company_id=self.company_id,
@@ -349,9 +353,8 @@ class EstimateService:
         if not estimate:
             return None
 
-        line_item_count = self.db.query(func.count(EstimateLineItem.id)).filter(
-            EstimateLineItem.estimate_id == estimate_id
-        ).scalar() or 0
+        # Count line items from already-loaded relationships (no extra query)
+        line_item_count = sum(len(g.line_items) for g in estimate.groups)
 
         groups_data = []
         for group in estimate.groups:
@@ -433,38 +436,27 @@ class EstimateService:
         if not estimate:
             return None
 
-        # 1. Recalculate each line item
-        line_items = self.db.query(EstimateLineItem).filter(
-            EstimateLineItem.estimate_id == estimate_id
-        ).all()
-
+        # 1. Recalculate each line item using already-loaded relationships
         subtotal_cost = 0.0
         subtotal_price = 0.0
         tax_base = 0.0
 
-        for li in line_items:
-            li.total_cost = li.quantity * li.unit_cost
-            li.unit_price = li.unit_cost * (1 + (li.markup_pct or 0) / 100)
-            li.total_price = li.quantity * li.unit_price
-            subtotal_cost += li.total_cost
-            subtotal_price += li.total_price
-            if li.taxable:
-                tax_base += li.total_price
-
-        # 2. Update group subtotals
         for group in estimate.groups:
-            group_total = sum(
-                li.total_cost for li in group.line_items
-            )
+            group_total = 0.0
+            for li in group.line_items:
+                li.total_cost = li.quantity * li.unit_cost
+                li.unit_price = li.unit_cost * (1 + (li.markup_pct or 0) / 100)
+                li.total_price = li.quantity * li.unit_price
+                subtotal_cost += li.total_cost
+                subtotal_price += li.total_price
+                group_total += li.total_cost
+                if li.taxable:
+                    tax_base += li.total_price
+            # 2. Update group subtotals
             group.subtotal = group_total
 
-        # 3. Calculate markups (ordered by display_order)
-        markups = (
-            self.db.query(EstimateMarkup)
-            .filter(EstimateMarkup.estimate_id == estimate_id)
-            .order_by(EstimateMarkup.display_order)
-            .all()
-        )
+        # 3. Calculate markups (already loaded via selectin relationship)
+        markups = sorted(estimate.markups, key=lambda m: m.display_order or 0)
 
         markup_total = 0.0
         running_base = subtotal_price
@@ -665,6 +657,18 @@ class EstimateService:
         self, estimate_id: int, group_id: int, assembly_id: int, quantity_multiplier: float = 1.0,
     ) -> list:
         """Expand assembly items into estimate line items within a group."""
+        # Verify estimate belongs to this company (IDOR protection)
+        estimate = self.get_estimate(estimate_id)
+        if not estimate:
+            return []
+        # Verify group belongs to this estimate and company
+        group = self.db.query(EstimateGroup).filter(
+            EstimateGroup.id == group_id,
+            EstimateGroup.estimate_id == estimate_id,
+            EstimateGroup.company_id == self.company_id,
+        ).first()
+        if not group:
+            return []
         assembly = self.get_assembly(assembly_id)
         if not assembly:
             return []
@@ -749,6 +753,10 @@ class EstimateService:
     # =========================================================================
 
     def create_group(self, data: EstimateGroupCreate) -> EstimateGroup:
+        # Verify estimate belongs to this company (IDOR protection)
+        estimate = self.get_estimate(data.estimate_id)
+        if not estimate:
+            raise ValueError("Estimate not found or access denied")
         group = EstimateGroup(
             estimate_id=data.estimate_id,
             company_id=self.company_id,
@@ -793,6 +801,19 @@ class EstimateService:
     # =========================================================================
 
     def create_line_item(self, data: EstimateLineItemCreate) -> EstimateLineItem:
+        # Verify estimate belongs to this company (IDOR protection)
+        estimate = self.get_estimate(data.estimate_id)
+        if not estimate:
+            raise ValueError("Estimate not found or access denied")
+        # Verify group belongs to this estimate
+        group = self.db.query(EstimateGroup).filter(
+            EstimateGroup.id == data.group_id,
+            EstimateGroup.estimate_id == data.estimate_id,
+            EstimateGroup.company_id == self.company_id,
+        ).first()
+        if not group:
+            raise ValueError("Group not found or does not belong to this estimate")
+
         unit_price = data.unit_price
         if unit_price is None:
             unit_price = data.unit_cost * (1 + (data.markup_pct or 0) / 100)
@@ -861,6 +882,10 @@ class EstimateService:
     # =========================================================================
 
     def create_markup(self, data: EstimateMarkupCreate) -> EstimateMarkup:
+        # Verify estimate belongs to this company (IDOR protection)
+        estimate = self.get_estimate(data.estimate_id)
+        if not estimate:
+            raise ValueError("Estimate not found or access denied")
         markup = EstimateMarkup(
             estimate_id=data.estimate_id,
             company_id=self.company_id,
@@ -1107,6 +1132,13 @@ class EstimateService:
             TakeoffMeasurement.company_id == self.company_id,
         ).first()
         if not m:
+            return None
+        # Verify line item belongs to this company (IDOR protection)
+        li = self.db.query(EstimateLineItem).filter(
+            EstimateLineItem.id == line_item_id,
+            EstimateLineItem.company_id == self.company_id,
+        ).first()
+        if not li:
             return None
         m.estimate_line_item_id = line_item_id
         self.db.commit()

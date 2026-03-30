@@ -25,7 +25,7 @@ def _get_service(db: Session, current_user) -> EstimateService:
 async def list_assemblies(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
-    category: Optional[str] = Query(None),
+    category: Optional[str] = Query(None, max_length=100),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
 ):
@@ -100,7 +100,10 @@ async def create_assembly_item(
 ):
     """Add an item to an assembly."""
     svc = _get_service(db, current_user)
-    item = svc.create_assembly_item(data, assembly_id)
+    try:
+        item = svc.create_assembly_item(data, assembly_id)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return AssemblyItemResponse.model_validate(item).model_dump()
 
 

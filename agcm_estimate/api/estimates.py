@@ -33,7 +33,7 @@ async def list_estimates(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     project_id: Optional[int] = Query(None),
-    status: Optional[str] = Query(None),
+    status: Optional[str] = Query(None, max_length=50),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
 ):
@@ -183,7 +183,10 @@ async def create_group(
 ):
     """Create a new estimate group."""
     svc = _get_service(db, current_user)
-    group = svc.create_group(data)
+    try:
+        group = svc.create_group(data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return EstimateGroupResponse.model_validate(group).model_dump()
 
 
@@ -227,7 +230,10 @@ async def create_line_item(
 ):
     """Create a new estimate line item (auto-recalculates estimate)."""
     svc = _get_service(db, current_user)
-    li = svc.create_line_item(data)
+    try:
+        li = svc.create_line_item(data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return EstimateLineItemResponse.model_validate(li).model_dump()
 
 
@@ -271,7 +277,10 @@ async def create_markup(
 ):
     """Add a markup to an estimate."""
     svc = _get_service(db, current_user)
-    markup = svc.create_markup(data)
+    try:
+        markup = svc.create_markup(data)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     return EstimateMarkupResponse.model_validate(markup).model_dump()
 
 

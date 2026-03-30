@@ -1,5 +1,6 @@
 """API routes for Proposals."""
 
+import html as html_mod
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -26,7 +27,7 @@ async def list_proposals(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     project_id: Optional[int] = Query(None),
-    status: Optional[str] = Query(None),
+    status: Optional[str] = Query(None, max_length=50),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
 ):
@@ -149,9 +150,10 @@ async def get_proposal_pdf(
     # Get estimate detail for the proposal
     est_detail = svc.get_estimate_detail(proposal.estimate_id)
 
+    esc = html_mod.escape
     html = f"""<!DOCTYPE html>
 <html>
-<head><title>Proposal {proposal.sequence_name}</title>
+<head><title>Proposal {esc(proposal.sequence_name or '')}</title>
 <style>
 body {{ font-family: Arial, sans-serif; margin: 40px; }}
 h1 {{ color: #1a1a1a; }}
@@ -162,14 +164,14 @@ th {{ background-color: #f5f5f5; }}
 .total-row {{ font-weight: bold; background-color: #fafafa; }}
 </style></head>
 <body>
-<h1>Proposal: {proposal.name}</h1>
-<p><strong>Ref:</strong> {proposal.sequence_name}</p>
-<p><strong>Client:</strong> {proposal.client_name}</p>
-<p><strong>Valid Until:</strong> {proposal.valid_until or 'N/A'}</p>
+<h1>Proposal: {esc(proposal.name)}</h1>
+<p><strong>Ref:</strong> {esc(proposal.sequence_name or '')}</p>
+<p><strong>Client:</strong> {esc(proposal.client_name)}</p>
+<p><strong>Valid Until:</strong> {esc(str(proposal.valid_until) if proposal.valid_until else 'N/A')}</p>
 
 <div class="section">
 <h2>Scope of Work</h2>
-<p>{proposal.scope_of_work or 'N/A'}</p>
+<p>{esc(proposal.scope_of_work or 'N/A')}</p>
 </div>
 
 <div class="section">
@@ -184,18 +186,18 @@ th {{ background-color: #f5f5f5; }}
 </div>
 
 <div class="section">
-<h2>Terms & Conditions</h2>
-<p>{proposal.terms_and_conditions or 'N/A'}</p>
+<h2>Terms &amp; Conditions</h2>
+<p>{esc(proposal.terms_and_conditions or 'N/A')}</p>
 </div>
 
 <div class="section">
 <h2>Exclusions</h2>
-<p>{proposal.exclusions or 'N/A'}</p>
+<p>{esc(proposal.exclusions or 'N/A')}</p>
 </div>
 
 <div class="section">
 <h2>Payment Schedule</h2>
-<p>{proposal.payment_schedule or 'N/A'}</p>
+<p>{esc(proposal.payment_schedule or 'N/A')}</p>
 </div>
 </body></html>"""
 

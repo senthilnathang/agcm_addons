@@ -85,8 +85,8 @@ async def list_cost_items(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
     catalog_id: Optional[int] = Query(None),
-    item_type: Optional[str] = Query(None),
-    search: Optional[str] = Query(None),
+    item_type: Optional[str] = Query(None, max_length=50),
+    search: Optional[str] = Query(None, max_length=200),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
 ):

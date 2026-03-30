@@ -126,6 +126,13 @@ _addon_models = [
     ("agcm_progress_estimation", _model_path("agcm_progress", "estimation.py")),
     ("agcm_progress_scurve", _model_path("agcm_progress", "scurve.py")),
     ("agcm_progress_project_image", _model_path("agcm_progress", "project_image.py")),
+    # agcm_estimate
+    ("agcm_estimate_cost_catalog", _model_path("agcm_estimate", "cost_catalog.py")),
+    ("agcm_estimate_assembly", _model_path("agcm_estimate", "assembly.py")),
+    ("agcm_estimate_estimate", _model_path("agcm_estimate", "estimate.py")),
+    ("agcm_estimate_estimate_markup", _model_path("agcm_estimate", "estimate_markup.py")),
+    ("agcm_estimate_proposal", _model_path("agcm_estimate", "proposal.py")),
+    ("agcm_estimate_takeoff", _model_path("agcm_estimate", "takeoff.py")),
 ]
 
 for mod_name, mod_path in _core_models + _base_models + _addon_models:
