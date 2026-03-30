@@ -1,0 +1,1 @@
+"""AGCM Procurement Schemas"""

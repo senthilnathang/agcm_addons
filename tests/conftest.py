@@ -133,6 +133,10 @@ _addon_models = [
     ("agcm_estimate_estimate_markup", _model_path("agcm_estimate", "estimate_markup.py")),
     ("agcm_estimate_proposal", _model_path("agcm_estimate", "proposal.py")),
     ("agcm_estimate_takeoff", _model_path("agcm_estimate", "takeoff.py")),
+    # agcm_procurement
+    ("agcm_procurement_purchase_order", _model_path("agcm_procurement", "purchase_order.py")),
+    ("agcm_procurement_subcontract", _model_path("agcm_procurement", "subcontract.py")),
+    ("agcm_procurement_vendor_bill", _model_path("agcm_procurement", "vendor_bill.py")),
 ]
 
 for mod_name, mod_path in _core_models + _base_models + _addon_models:
