@@ -166,6 +166,317 @@ from addons.agcm.models.weather import Weather, WeatherForecast
 from addons.agcm.models.lookups import InspectionType, AccidentType, ViolationType
 
 
+def _render_overview_canvas(
+    log, project, manpower_lines, notes_lines, inspection_lines,
+    accident_lines, visitor_lines, safety_lines, delay_lines,
+    deficiency_lines, photo_lines, forecast_lines,
+    weather_code_labels, esc,
+):
+    """Render the Overview Canvas — a graphical dashboard page inserted after the title."""
+
+    # ── Compute metrics ──
+    total_workers = sum(m.number_of_workers or 0 for m in manpower_lines)
+    total_hours = sum(m.total_hours or 0 for m in manpower_lines)
+    total_inspections = len(inspection_lines)
+    total_visitors = len(visitor_lines)
+    total_safety = len(safety_lines) + len(accident_lines)
+    total_delays = len(delay_lines)
+    total_deficiencies = len(deficiency_lines)
+    total_notes = len(notes_lines)
+    total_photos = len(photo_lines)
+
+    # Weather average
+    temps = [f.temperature for f in forecast_lines if f.temperature]
+    avg_temp = round(sum(temps) / len(temps), 1) if temps else 0
+    humidities = [f.humidity for f in forecast_lines if f.humidity]
+    avg_humidity = round(sum(humidities) / len(humidities), 1) if humidities else 0
+    winds = [f.wind for f in forecast_lines if f.wind]
+    avg_wind = round(sum(winds) / len(winds), 1) if winds else 0
+    weather_dominant = ""
+    if forecast_lines:
+        codes = [f.weather_code for f in forecast_lines if f.weather_code]
+        if codes:
+            from collections import Counter
+            most_common = Counter(codes).most_common(1)[0][0]
+            weather_dominant = weather_code_labels.get(most_common, "")
+
+    # ── Activity distribution for donut chart (SVG) ──
+    activities = [
+        ("Manpower", len(manpower_lines), "#1890ff"),
+        ("Notes", total_notes, "#722ed1"),
+        ("Inspections", total_inspections, "#13c2c2"),
+        ("Visitors", total_visitors, "#52c41a"),
+        ("Safety", total_safety, "#ff4d4f"),
+        ("Delays", total_delays, "#faad14"),
+        ("Deficiencies", total_deficiencies, "#fa541c"),
+        ("Photos", total_photos, "#2f54eb"),
+    ]
+    activity_total = sum(a[1] for a in activities)
+
+    # Build SVG donut chart (pure inline SVG — no JS needed for PDF)
+    donut_svg = _build_donut_svg(activities, activity_total)
+
+    # Build temperature bar chart SVG
+    temp_svg = _build_temp_bar_svg(forecast_lines, weather_code_labels)
+
+    # Build inspection result bar
+    pass_count = sum(1 for i in inspection_lines if (i.result or "").lower() in ("pass", "passed"))
+    fail_count = sum(1 for i in inspection_lines if (i.result or "").lower() in ("fail", "failed"))
+    other_count = total_inspections - pass_count - fail_count
+    inspection_bar = _build_inspection_bar(pass_count, fail_count, other_count, total_inspections)
+
+    # ── Build HTML ──
+    html = f'''
+<!-- ════════ OVERVIEW CANVAS ════════ -->
+<div style="page-break-after: always; padding-top: 8px;">
+  <h4 style="font-size: 14px; color: #1a1a1a; border-bottom: 2px solid #1890ff; padding-bottom: 4px; margin: 0 0 12px 0;">
+    Daily Overview Dashboard
+  </h4>
+
+  <!-- KPI Cards Row -->
+  <table style="width: 100%; border-collapse: separate; border-spacing: 8px 0; margin-bottom: 14px;">
+    <tr>
+      <td style="width: 16.6%; background: #f0f5ff; border: 1px solid #d6e4ff; border-radius: 6px; padding: 10px 12px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 700; color: #1890ff;">{total_workers}</div>
+        <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Workers</div>
+      </td>
+      <td style="width: 16.6%; background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 6px; padding: 10px 12px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 700; color: #52c41a;">{total_hours:.0f}</div>
+        <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Total Hours</div>
+      </td>
+      <td style="width: 16.6%; background: #e6fffb; border: 1px solid #87e8de; border-radius: 6px; padding: 10px 12px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 700; color: #13c2c2;">{total_inspections}</div>
+        <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Inspections</div>
+      </td>
+      <td style="width: 16.6%; background: #fff2e8; border: 1px solid #ffbb96; border-radius: 6px; padding: 10px 12px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 700; color: #fa541c;">{total_deficiencies}</div>
+        <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Deficiencies</div>
+      </td>
+      <td style="width: 16.6%; background: #fff1f0; border: 1px solid #ffa39e; border-radius: 6px; padding: 10px 12px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 700; color: #ff4d4f;">{total_safety}</div>
+        <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Safety Issues</div>
+      </td>
+      <td style="width: 16.6%; background: #f9f0ff; border: 1px solid #d3adf7; border-radius: 6px; padding: 10px 12px; text-align: center;">
+        <div style="font-size: 22px; font-weight: 700; color: #722ed1;">{total_photos}</div>
+        <div style="font-size: 9px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;">Photos</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Weather Strip -->
+  <table style="width: 100%; background: #fafafa; border: 1px solid #e8e8e8; border-radius: 6px; padding: 8px 12px; margin-bottom: 14px; border-collapse: collapse;">
+    <tr>
+      <td style="width: 25%; padding: 6px 10px; border: none;">
+        <span style="font-size: 9px; color: #999; text-transform: uppercase;">Weather</span><br/>
+        <span style="font-size: 13px; font-weight: 600; color: #333;">{esc(weather_dominant) or 'N/A'}</span>
+      </td>
+      <td style="width: 25%; padding: 6px 10px; border: none;">
+        <span style="font-size: 9px; color: #999; text-transform: uppercase;">Avg Temperature</span><br/>
+        <span style="font-size: 13px; font-weight: 600; color: #333;">{avg_temp}&deg;F</span>
+      </td>
+      <td style="width: 25%; padding: 6px 10px; border: none;">
+        <span style="font-size: 9px; color: #999; text-transform: uppercase;">Avg Humidity</span><br/>
+        <span style="font-size: 13px; font-weight: 600; color: #333;">{avg_humidity}%</span>
+      </td>
+      <td style="width: 25%; padding: 6px 10px; border: none;">
+        <span style="font-size: 9px; color: #999; text-transform: uppercase;">Avg Wind</span><br/>
+        <span style="font-size: 13px; font-weight: 600; color: #333;">{avg_wind} mph</span>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Charts Row: Activity Donut + Temperature Bars -->
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 14px;">
+    <tr>
+      <td style="width: 45%; vertical-align: top; padding-right: 12px;">
+        <div style="border: 1px solid #e8e8e8; border-radius: 6px; padding: 10px;">
+          <div style="font-size: 11px; font-weight: 600; color: #333; margin-bottom: 8px;">Activity Distribution</div>
+          {donut_svg}
+        </div>
+      </td>
+      <td style="width: 55%; vertical-align: top;">
+        <div style="border: 1px solid #e8e8e8; border-radius: 6px; padding: 10px;">
+          <div style="font-size: 11px; font-weight: 600; color: #333; margin-bottom: 8px;">Temperature &amp; Conditions</div>
+          {temp_svg}
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Inspection Results Bar -->
+  {inspection_bar}
+
+  <!-- Quick Summary Table -->
+  <table style="width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 10px;">
+    <tr style="background: #fafafa;">
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8; font-weight: 600; width: 50%;">Project</td>
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8;">{esc(project.name)}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8; font-weight: 600;">Report Date</td>
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8;">{log.date.strftime('%B %d, %Y') if log.date else ''}</td>
+    </tr>
+    <tr style="background: #fafafa;">
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8; font-weight: 600;">Location</td>
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8;">{esc(project.city or '')} {esc(project.state or '')}</td>
+    </tr>
+    <tr>
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8; font-weight: 600;">Status</td>
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8;">{esc(str(project.status).replace("_", " ").title() if project.status else "")}</td>
+    </tr>
+    <tr style="background: #fafafa;">
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8; font-weight: 600;">Total Entities Logged</td>
+      <td style="padding: 5px 8px; border: 1px solid #e8e8e8;">{activity_total} items across {sum(1 for a in activities if a[1] > 0)} categories</td>
+    </tr>
+  </table>
+</div>
+'''
+    return html
+
+
+def _build_donut_svg(activities, total):
+    """Build an inline SVG donut chart for activity distribution."""
+    if total == 0:
+        return '<div style="text-align:center;color:#999;padding:20px;">No activities recorded</div>'
+
+    cx, cy, r = 90, 90, 70
+    inner_r = 45
+    svg_parts = [f'<svg viewBox="0 0 280 180" width="280" height="180" xmlns="http://www.w3.org/2000/svg">']
+
+    # Draw arcs
+    import math
+    start_angle = -90  # Start from top
+    for name, count, color in activities:
+        if count == 0:
+            continue
+        pct = count / total
+        end_angle = start_angle + pct * 360
+
+        # Convert to radians
+        s_rad = math.radians(start_angle)
+        e_rad = math.radians(end_angle)
+
+        # Outer arc points
+        x1 = cx + r * math.cos(s_rad)
+        y1 = cy + r * math.sin(s_rad)
+        x2 = cx + r * math.cos(e_rad)
+        y2 = cy + r * math.sin(e_rad)
+
+        # Inner arc points
+        x3 = cx + inner_r * math.cos(e_rad)
+        y3 = cy + inner_r * math.sin(e_rad)
+        x4 = cx + inner_r * math.cos(s_rad)
+        y4 = cy + inner_r * math.sin(s_rad)
+
+        large_arc = 1 if pct > 0.5 else 0
+
+        path = (
+            f'M {x1:.1f},{y1:.1f} '
+            f'A {r},{r} 0 {large_arc},1 {x2:.1f},{y2:.1f} '
+            f'L {x3:.1f},{y3:.1f} '
+            f'A {inner_r},{inner_r} 0 {large_arc},0 {x4:.1f},{y4:.1f} Z'
+        )
+        svg_parts.append(f'<path d="{path}" fill="{color}" stroke="#fff" stroke-width="1"/>')
+        start_angle = end_angle
+
+    # Center text
+    svg_parts.append(f'<text x="{cx}" y="{cy - 5}" text-anchor="middle" font-size="18" font-weight="700" fill="#333">{total}</text>')
+    svg_parts.append(f'<text x="{cx}" y="{cy + 10}" text-anchor="middle" font-size="8" fill="#999">TOTAL</text>')
+
+    # Legend (right side)
+    ly = 10
+    for name, count, color in activities:
+        if count == 0:
+            continue
+        svg_parts.append(f'<rect x="190" y="{ly}" width="10" height="10" rx="2" fill="{color}"/>')
+        svg_parts.append(f'<text x="204" y="{ly + 9}" font-size="9" fill="#555">{name} ({count})</text>')
+        ly += 16
+
+    svg_parts.append('</svg>')
+    return '\n'.join(svg_parts)
+
+
+def _build_temp_bar_svg(forecast_lines, weather_code_labels):
+    """Build inline SVG bar chart for hourly temperature."""
+    if not forecast_lines:
+        return '<div style="text-align:center;color:#999;padding:20px;">No forecast data</div>'
+
+    w, h = 320, 140
+    bar_w = 36
+    gap = 6
+    max_temp = max((f.temperature or 0) for f in forecast_lines) or 100
+    min_temp = min((f.temperature or 0) for f in forecast_lines) or 0
+    temp_range = max(max_temp - min_temp, 1)
+
+    svg = [f'<svg viewBox="0 0 {w} {h}" width="{w}" height="{h}" xmlns="http://www.w3.org/2000/svg">']
+
+    # Baseline
+    base_y = h - 25
+
+    for i, f in enumerate(forecast_lines[:6]):
+        x = 10 + i * (bar_w + gap)
+        temp = f.temperature or 0
+        bar_h = max(((temp - min_temp) / temp_range) * (base_y - 15), 4)
+        y = base_y - bar_h
+
+        # Bar color based on weather code
+        code_colors = {1: "#87CEEB", 2: "#B0C4DE", 3: "#4682B4", 4: "#2F4F8F", 5: "#1a1a4e"}
+        color = code_colors.get(f.weather_code, "#87CEEB")
+
+        svg.append(f'<rect x="{x}" y="{y:.0f}" width="{bar_w}" height="{bar_h:.0f}" rx="3" fill="{color}"/>')
+
+        # Temperature label on bar
+        svg.append(f'<text x="{x + bar_w/2}" y="{y - 3:.0f}" text-anchor="middle" font-size="9" font-weight="600" fill="#333">{temp:.0f}°</text>')
+
+        # Time label below
+        interval = str(f.time_interval or "")
+        label = ""
+        if "T" in interval:
+            hour = int(interval.split("T")[1].split(":")[0])
+            label = f"{hour}:00" if hour < 13 else f"{hour-12} PM"
+            if hour < 12:
+                label = f"{hour} AM"
+            elif hour == 12:
+                label = "12 PM"
+        svg.append(f'<text x="{x + bar_w/2}" y="{base_y + 12}" text-anchor="middle" font-size="8" fill="#888">{label}</text>')
+
+        # Weather icon text below time
+        code_label = weather_code_labels.get(f.weather_code, "")
+        svg.append(f'<text x="{x + bar_w/2}" y="{base_y + 22}" text-anchor="middle" font-size="7" fill="#aaa">{code_label}</text>')
+
+    # Baseline
+    svg.append(f'<line x1="5" y1="{base_y}" x2="{w-5}" y2="{base_y}" stroke="#ddd" stroke-width="1"/>')
+
+    svg.append('</svg>')
+    return '\n'.join(svg)
+
+
+def _build_inspection_bar(pass_count, fail_count, other_count, total):
+    """Build a horizontal stacked bar showing inspection results."""
+    if total == 0:
+        return ''
+
+    pass_pct = (pass_count / total * 100) if total else 0
+    fail_pct = (fail_count / total * 100) if total else 0
+    other_pct = (other_count / total * 100) if total else 0
+
+    return f'''
+  <div style="border: 1px solid #e8e8e8; border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+    <div style="font-size: 11px; font-weight: 600; color: #333; margin-bottom: 6px;">Inspection Results</div>
+    <div style="display: flex; height: 22px; border-radius: 4px; overflow: hidden; background: #f5f5f5;">
+      {'<div style="width:' + f'{pass_pct:.1f}' + '%;background:#52c41a;"></div>' if pass_count else ''}
+      {'<div style="width:' + f'{fail_pct:.1f}' + '%;background:#ff4d4f;"></div>' if fail_count else ''}
+      {'<div style="width:' + f'{other_pct:.1f}' + '%;background:#faad14;"></div>' if other_count else ''}
+    </div>
+    <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 9px; color: #666;">
+      <span>&#9679; Pass: {pass_count} ({pass_pct:.0f}%)</span>
+      <span style="color:#ff4d4f;">&#9679; Fail: {fail_count} ({fail_pct:.0f}%)</span>
+      <span style="color:#faad14;">&#9679; Other: {other_count} ({other_pct:.0f}%)</span>
+    </div>
+  </div>
+'''
+
+
 def _render_report_html(db, log, project, current_user):
     """Render the daily log report as HTML matching the Odoo PDF layout exactly."""
 
@@ -384,6 +695,19 @@ def _render_report_html(db, log, project, current_user):
 <!-- ════════ TITLE ════════ -->
 <div class="report-title">Site Observation Report:&nbsp;&nbsp;{esc(report_date_formatted)}</div>
 ''')
+
+    # ═══════════════════════════════════════════════════════════════════
+    # OVERVIEW CANVAS — graphical dashboard page after title
+    # ═══════════════════════════════════════════════════════════════════
+    h.append(_render_overview_canvas(
+        log=log, project=project,
+        manpower_lines=manpower_lines, notes_lines=notes_lines,
+        inspection_lines=inspection_lines, accident_lines=accident_lines,
+        visitor_lines=visitor_lines, safety_lines=safety_lines,
+        delay_lines=delay_lines, deficiency_lines=deficiency_lines,
+        photo_lines=photo_lines, forecast_lines=forecast_lines,
+        weather_code_labels=weather_code_labels, esc=esc,
+    ))
 
     # --- Weather Forecast Snapshot ---
     if forecast_lines:
@@ -630,6 +954,180 @@ async def export_daily_log_html(
 # Periodic Project Report — multiple daily logs in one document
 # =========================================================================
 
+def _render_project_dashboard(db, project, logs, esc):
+    """Render a project-level executive dashboard page for the periodic report."""
+    from sqlalchemy import func
+
+    log_ids = [l.id for l in logs]
+    if not log_ids:
+        return ''
+
+    # Aggregate metrics across all logs
+    total_mp = db.query(func.sum(ManPower.number_of_workers)).filter(ManPower.dailylog_id.in_(log_ids)).scalar() or 0
+    total_hours = db.query(func.sum(ManPower.total_hours)).filter(ManPower.dailylog_id.in_(log_ids)).scalar() or 0
+    total_notes = db.query(func.count(Notes.id)).filter(Notes.dailylog_id.in_(log_ids)).scalar() or 0
+    total_inspections = db.query(func.count(Inspection.id)).filter(Inspection.dailylog_id.in_(log_ids)).scalar() or 0
+    total_visitors = db.query(func.count(Visitor.id)).filter(Visitor.dailylog_id.in_(log_ids)).scalar() or 0
+    total_safety = db.query(func.count(SafetyViolation.id)).filter(SafetyViolation.dailylog_id.in_(log_ids)).scalar() or 0
+    total_accidents = db.query(func.count(Accident.id)).filter(Accident.dailylog_id.in_(log_ids)).scalar() or 0
+    total_delays = db.query(func.count(Delay.id)).filter(Delay.dailylog_id.in_(log_ids)).scalar() or 0
+    total_deficiencies = db.query(func.count(Deficiency.id)).filter(Deficiency.dailylog_id.in_(log_ids)).scalar() or 0
+    total_photos = db.query(func.count(Photo.id)).filter(Photo.dailylog_id.in_(log_ids)).scalar() or 0
+
+    # Manpower trend by log date (for bar chart)
+    mp_by_date = db.query(
+        DailyActivityLog.date,
+        func.sum(ManPower.number_of_workers),
+        func.sum(ManPower.total_hours),
+    ).join(ManPower, ManPower.dailylog_id == DailyActivityLog.id).filter(
+        DailyActivityLog.id.in_(log_ids)
+    ).group_by(DailyActivityLog.date).order_by(DailyActivityLog.date).all()
+
+    # Build manpower trend SVG
+    mp_trend_svg = _build_manpower_trend_svg(mp_by_date)
+
+    # Activity breakdown for project
+    activities = [
+        ("Manpower Entries", db.query(func.count(ManPower.id)).filter(ManPower.dailylog_id.in_(log_ids)).scalar() or 0, "#1890ff"),
+        ("Notes", total_notes, "#722ed1"),
+        ("Inspections", total_inspections, "#13c2c2"),
+        ("Visitors", total_visitors, "#52c41a"),
+        ("Safety Issues", total_safety + total_accidents, "#ff4d4f"),
+        ("Delays", total_delays, "#faad14"),
+        ("Deficiencies", total_deficiencies, "#fa541c"),
+        ("Photos", total_photos, "#2f54eb"),
+    ]
+    act_total = sum(a[1] for a in activities)
+    donut_svg = _build_donut_svg(activities, act_total)
+
+    # Inspection pass/fail across period
+    pass_c = db.query(func.count(Inspection.id)).filter(
+        Inspection.dailylog_id.in_(log_ids),
+        func.lower(Inspection.result).in_(["pass", "passed"]),
+    ).scalar() or 0
+    fail_c = db.query(func.count(Inspection.id)).filter(
+        Inspection.dailylog_id.in_(log_ids),
+        func.lower(Inspection.result).in_(["fail", "failed"]),
+    ).scalar() or 0
+    other_c = total_inspections - pass_c - fail_c
+    inspection_bar = _build_inspection_bar(pass_c, fail_c, other_c, total_inspections)
+
+    date_range = ""
+    if logs:
+        d1 = min(l.date for l in logs if l.date)
+        d2 = max(l.date for l in logs if l.date)
+        date_range = f"{d1.strftime('%b %d')} — {d2.strftime('%b %d, %Y')}" if d1 and d2 else ""
+
+    return f'''
+<div class="page-break"></div>
+
+<!-- ════════ PROJECT EXECUTIVE DASHBOARD ════════ -->
+<div style="padding-top: 10px;">
+  <h3 style="font-size: 16px; color: #1a1a1a; border-bottom: 2px solid #1890ff; padding-bottom: 4px; margin: 0 0 16px 0;">
+    Project Executive Summary
+  </h3>
+  <p style="font-size: 11px; color: #666; margin: 0 0 14px 0;">
+    {esc(project.name)} &mdash; {esc(date_range)} &mdash; {len(logs)} Daily Log(s)
+  </p>
+
+  <!-- KPI Cards -->
+  <table style="width: 100%; border-collapse: separate; border-spacing: 6px 0; margin-bottom: 14px;">
+    <tr>
+      <td style="background: #f0f5ff; border: 1px solid #d6e4ff; border-radius: 6px; padding: 10px; text-align: center;">
+        <div style="font-size: 24px; font-weight: 700; color: #1890ff;">{len(logs)}</div>
+        <div style="font-size: 8px; color: #888; text-transform: uppercase;">Daily Logs</div>
+      </td>
+      <td style="background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 6px; padding: 10px; text-align: center;">
+        <div style="font-size: 24px; font-weight: 700; color: #52c41a;">{int(total_mp)}</div>
+        <div style="font-size: 8px; color: #888; text-transform: uppercase;">Workers</div>
+      </td>
+      <td style="background: #e6fffb; border: 1px solid #87e8de; border-radius: 6px; padding: 10px; text-align: center;">
+        <div style="font-size: 24px; font-weight: 700; color: #13c2c2;">{int(total_hours):,}</div>
+        <div style="font-size: 8px; color: #888; text-transform: uppercase;">Total Hours</div>
+      </td>
+      <td style="background: #fff7e6; border: 1px solid #ffe58f; border-radius: 6px; padding: 10px; text-align: center;">
+        <div style="font-size: 24px; font-weight: 700; color: #faad14;">{total_inspections}</div>
+        <div style="font-size: 8px; color: #888; text-transform: uppercase;">Inspections</div>
+      </td>
+      <td style="background: #fff1f0; border: 1px solid #ffa39e; border-radius: 6px; padding: 10px; text-align: center;">
+        <div style="font-size: 24px; font-weight: 700; color: #ff4d4f;">{total_safety + total_accidents}</div>
+        <div style="font-size: 8px; color: #888; text-transform: uppercase;">Safety Issues</div>
+      </td>
+      <td style="background: #f9f0ff; border: 1px solid #d3adf7; border-radius: 6px; padding: 10px; text-align: center;">
+        <div style="font-size: 24px; font-weight: 700; color: #722ed1;">{total_photos}</div>
+        <div style="font-size: 8px; color: #888; text-transform: uppercase;">Photos</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Charts Row -->
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+    <tr>
+      <td style="width: 40%; vertical-align: top; padding-right: 10px;">
+        <div style="border: 1px solid #e8e8e8; border-radius: 6px; padding: 10px;">
+          <div style="font-size: 11px; font-weight: 600; color: #333; margin-bottom: 6px;">Activity Breakdown</div>
+          {donut_svg}
+        </div>
+      </td>
+      <td style="width: 60%; vertical-align: top;">
+        <div style="border: 1px solid #e8e8e8; border-radius: 6px; padding: 10px;">
+          <div style="font-size: 11px; font-weight: 600; color: #333; margin-bottom: 6px;">Manpower Trend</div>
+          {mp_trend_svg}
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  {inspection_bar}
+</div>
+'''
+
+
+def _build_manpower_trend_svg(mp_by_date):
+    """Build a bar chart SVG showing daily manpower over time."""
+    if not mp_by_date:
+        return '<div style="text-align:center;color:#999;padding:20px;">No manpower data</div>'
+
+    import math
+    w, h = 360, 130
+    margin_left, margin_bottom = 35, 30
+    chart_w = w - margin_left - 10
+    chart_h = h - margin_bottom - 10
+
+    max_workers = max(row[1] or 0 for row in mp_by_date) or 1
+    n = len(mp_by_date)
+    bar_w = max(3, min(20, (chart_w - n) / n))
+
+    svg = [f'<svg viewBox="0 0 {w} {h}" width="{w}" height="{h}" xmlns="http://www.w3.org/2000/svg">']
+
+    # Y-axis labels
+    for i in range(5):
+        y = 5 + (chart_h / 4) * i
+        val = int(max_workers - (max_workers / 4) * i)
+        svg.append(f'<text x="{margin_left - 4}" y="{y + 3}" text-anchor="end" font-size="7" fill="#999">{val}</text>')
+        svg.append(f'<line x1="{margin_left}" y1="{y}" x2="{w - 10}" y2="{y}" stroke="#f0f0f0" stroke-width="0.5"/>')
+
+    # Bars
+    for i, (dt, workers, hours) in enumerate(mp_by_date):
+        x = margin_left + 2 + i * (bar_w + 1)
+        workers = workers or 0
+        bar_h = max(1, (workers / max_workers) * chart_h)
+        y = 5 + chart_h - bar_h
+
+        svg.append(f'<rect x="{x:.1f}" y="{y:.1f}" width="{bar_w:.1f}" height="{bar_h:.1f}" rx="1" fill="#1890ff" opacity="0.8"/>')
+
+        # Date label (show every Nth)
+        if n <= 15 or i % max(1, n // 10) == 0:
+            label = dt.strftime('%m/%d') if dt else ''
+            svg.append(f'<text x="{x + bar_w/2:.1f}" y="{h - 5}" text-anchor="middle" font-size="6" fill="#999" transform="rotate(-45,{x + bar_w/2:.1f},{h - 5})">{label}</text>')
+
+    # Baseline
+    svg.append(f'<line x1="{margin_left}" y1="{5 + chart_h}" x2="{w - 10}" y2="{5 + chart_h}" stroke="#ddd" stroke-width="1"/>')
+
+    svg.append('</svg>')
+    return '\n'.join(svg)
+
+
 @router.get("/reports/periodic")
 async def periodic_project_report(
     project_id: int = Query(...),
@@ -733,9 +1231,12 @@ async def periodic_project_report(
 </div>
 
 '''
+
+    # ═══════ PROJECT EXECUTIVE DASHBOARD — after cover, before daily logs ═══════
+    combined += _render_project_dashboard(db, project, logs, esc)
+
     for i, page in enumerate(all_pages):
-        if i > 0:
-            combined += '<div class="page-break"></div>\n'
+        combined += '<div class="page-break"></div>\n'
         combined += page + '\n'
 
     combined += '</body></html>'
