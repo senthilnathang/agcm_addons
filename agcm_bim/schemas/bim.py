@@ -241,3 +241,86 @@ class BIMModelSummary(BaseModel):
     levels: Dict[str, int] = {}      # level -> count
     materials: Dict[str, int] = {}   # material -> count
     disciplines: Dict[str, int] = {} # discipline -> count
+
+
+# ─── BIM 3D Annotations ────────────────────────────────────────────────────
+
+class BIMAnnotationCreate(BaseModel):
+    project_id: int
+    model_id: Optional[int] = None
+    world_pos_x: float = 0
+    world_pos_y: float = 0
+    world_pos_z: float = 0
+    eye_x: Optional[float] = None
+    eye_y: Optional[float] = None
+    eye_z: Optional[float] = None
+    look_x: Optional[float] = None
+    look_y: Optional[float] = None
+    look_z: Optional[float] = None
+    up_x: Optional[float] = 0
+    up_y: Optional[float] = 1
+    up_z: Optional[float] = 0
+    entity_id: Optional[str] = None
+    title: str = Field(..., max_length=255)
+    description: Optional[str] = None
+    priority: Optional[str] = Field("medium", pattern=r"^(low|medium|high|critical)$")
+    status: Optional[str] = Field("open", pattern=r"^(open|in_progress|resolved)$")
+    assigned_to: Optional[int] = None
+    linked_entity_type: Optional[str] = None
+    linked_entity_id: Optional[int] = None
+
+
+class BIMAnnotationUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    title: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = None
+    priority: Optional[str] = Field(None, pattern=r"^(low|medium|high|critical)$")
+    status: Optional[str] = Field(None, pattern=r"^(open|in_progress|resolved)$")
+    assigned_to: Optional[int] = None
+    world_pos_x: Optional[float] = None
+    world_pos_y: Optional[float] = None
+    world_pos_z: Optional[float] = None
+    eye_x: Optional[float] = None
+    eye_y: Optional[float] = None
+    eye_z: Optional[float] = None
+    look_x: Optional[float] = None
+    look_y: Optional[float] = None
+    look_z: Optional[float] = None
+    up_x: Optional[float] = None
+    up_y: Optional[float] = None
+    up_z: Optional[float] = None
+    entity_id: Optional[str] = None
+    linked_entity_type: Optional[str] = None
+    linked_entity_id: Optional[int] = None
+
+
+class BIMAnnotationResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    company_id: int
+    project_id: int
+    model_id: Optional[int] = None
+    world_pos_x: float = 0
+    world_pos_y: float = 0
+    world_pos_z: float = 0
+    eye_x: Optional[float] = None
+    eye_y: Optional[float] = None
+    eye_z: Optional[float] = None
+    look_x: Optional[float] = None
+    look_y: Optional[float] = None
+    look_z: Optional[float] = None
+    up_x: Optional[float] = None
+    up_y: Optional[float] = None
+    up_z: Optional[float] = None
+    entity_id: Optional[str] = None
+    title: str
+    description: Optional[str] = None
+    priority: str = "medium"
+    status: str = "open"
+    assigned_to: Optional[int] = None
+    linked_entity_type: Optional[str] = None
+    linked_entity_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None

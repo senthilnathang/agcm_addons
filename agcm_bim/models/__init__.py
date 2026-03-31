@@ -10,6 +10,7 @@ from addons.agcm_bim.models.clash_detection import (
     ClashResult,
 )
 from addons.agcm_bim.models.bim_element import BIMElement
+from addons.agcm_bim.models.annotation import BIMAnnotation3D
 
 __all__ = [
     # Enums
@@ -23,4 +24,5 @@ __all__ = [
     "ClashTest",
     "ClashResult",
     "BIMElement",
+    "BIMAnnotation3D",
 ]

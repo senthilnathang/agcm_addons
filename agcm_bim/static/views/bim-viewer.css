@@ -1,11 +1,2 @@
-/* BIM Viewer styles */
-.bim-viewer-placeholder {
-  width: 100%;
-  height: 220px;
-  border: 2px dashed #d9d9d9;
-  border-radius: 8px;
-  background: #fafafa;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+/* BIM Viewer Phase 2 styles — companion CSS for bim-viewer.vue */
+/* Most styles are scoped in the SFC; this file exists for the vue3-sfc-loader convention */

@@ -107,6 +107,11 @@ Building Information Modeling module for construction projects.
         "agcm_bim.clash.create",
         "agcm_bim.clash.run",
         "agcm_bim.clash.resolve",
+        "agcm_bim.annotation.view",
+        "agcm_bim.annotation.create",
+        "agcm_bim.annotation.edit",
+        "agcm_bim.annotation.delete",
+        "agcm_bim.annotation.resolve",
     ],
 
     "access_rights": [
@@ -131,6 +136,18 @@ Building Information Modeling module for construction projects.
         {
             "name": "agcm_bim.clash.user",
             "model": "agcm_bim.agcm_clash_tests",
+            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "groups": ["base.group_user"],
+        },
+        {
+            "name": "agcm_bim.annotation.manager",
+            "model": "agcm_bim.agcm_bim_annotations",
+            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "groups": ["base.group_manager"],
+        },
+        {
+            "name": "agcm_bim.annotation.user",
+            "model": "agcm_bim.agcm_bim_annotations",
             "permissions": {"read": True, "write": True, "create": True, "delete": False},
             "groups": ["base.group_user"],
         },
