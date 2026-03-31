@@ -14,8 +14,15 @@ from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin
 
 class ProjectStatus(str, enum.Enum):
     NEW = "new"
+    PRECONSTRUCTION = "preconstruction"
+    BIDDING = "bidding"
+    AWARDED = "awarded"
     IN_PROGRESS = "inprogress"
+    PUNCH_LIST = "punch_list"
+    CLOSEOUT = "closeout"
     COMPLETED = "completed"
+    WARRANTY = "warranty"
+    ARCHIVED = "archived"
 
 
 class ProjectOffice(str, enum.Enum):

@@ -469,8 +469,59 @@ class PortalService:
         if bp:
             bp.status = "awarded"
 
+        # Auto-create draft subcontract from awarded bid
+        subcontract_id = None
+        try:
+            from addons.agcm_procurement.models.subcontract import Subcontract
+            import re as _re
+
+            # Generate next SC sequence
+            last = (
+                self.db.query(Subcontract.sequence_name)
+                .filter(Subcontract.company_id == self.company_id)
+                .filter(Subcontract.sequence_name.isnot(None))
+                .order_by(Subcontract.id.desc())
+                .first()
+            )
+            sc_num = 1
+            if last and last[0]:
+                match = _re.search(r'(\d+)$', last[0])
+                if match:
+                    sc_num = int(match.group(1)) + 1
+            sc_seq = f"SC{sc_num:05d}"
+
+            project_id = bp.project_id if bp else None
+            sc = Subcontract(
+                company_id=self.company_id,
+                project_id=project_id,
+                sequence_name=sc_seq,
+                vendor_name=sub.vendor_name,
+                status="draft",
+                scope_of_work=sub.scope_description,
+                original_amount=sub.total_amount or 0,
+                revised_amount=sub.total_amount or 0,
+                approved_cos=0,
+                billed_to_date=0,
+                paid_to_date=0,
+                balance_remaining=sub.total_amount or 0,
+                retainage_pct=5.0,
+                retainage_held=0,
+                retainage_released=0,
+                created_by=self.user_id,
+            )
+            self.db.add(sc)
+            self.db.flush()
+            subcontract_id = sc.id
+            logger.info("Auto-created subcontract %s from bid award %s", sc_seq, sub.id)
+        except ImportError:
+            logger.debug("agcm_procurement not installed — skipping subcontract creation")
+        except Exception as e:
+            logger.warning("Failed to auto-create subcontract from bid award: %s", e)
+
         self.db.commit()
         self.db.refresh(sub)
+        # Attach subcontract_id for the API response
+        sub._subcontract_id = subcontract_id
         return sub
 
     # =========================================================================

@@ -201,6 +201,40 @@ class ChangeOrderService:
         co.approved_date = date.today()
         co.approved_by = self.user_id
         co.updated_by = self.user_id
+
+        # Update budget with change order cost impact
+        try:
+            from addons.agcm_finance.models.budget import Budget
+
+            if co.project_id and co.cost_impact:
+                # Find existing "Change Orders" budget line
+                budget_line = (
+                    self.db.query(Budget)
+                    .filter(
+                        Budget.project_id == co.project_id,
+                        Budget.company_id == self.company_id,
+                        Budget.description.ilike("%Approved Change Orders%"),
+                    )
+                    .first()
+                )
+                if budget_line:
+                    budget_line.committed_amount = (budget_line.committed_amount or 0) + co.cost_impact
+                else:
+                    budget_line = Budget(
+                        project_id=co.project_id,
+                        cost_code_id=None,
+                        description="Approved Change Orders",
+                        planned_amount=0,
+                        actual_amount=0,
+                        committed_amount=co.cost_impact,
+                        company_id=self.company_id,
+                    )
+                    self.db.add(budget_line)
+        except ImportError:
+            logger.debug("agcm_finance not installed — skipping budget update for CO")
+        except Exception as e:
+            logger.warning("Failed to update budget for change order: %s", e)
+
         self.db.commit()
         self.db.refresh(co)
         return co

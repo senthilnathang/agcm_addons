@@ -30,6 +30,8 @@ from addons.agcm.models.safety_violation import SafetyViolation
 from addons.agcm.models.delay import Delay
 from addons.agcm.models.deficiency import Deficiency
 from addons.agcm.models.photo import Photo
+from addons.agcm.models.entity_attachment import agcm_entity_attachments
+from addons.agcm.models.comment import EntityComment
 
 __all__ = [
     # Lookups
@@ -61,4 +63,7 @@ __all__ = [
     "Delay",
     "Deficiency",
     "Photo",
+    # Generic cross-module
+    "agcm_entity_attachments",
+    "EntityComment",
 ]

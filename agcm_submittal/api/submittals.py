@@ -3,9 +3,12 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import insert, delete, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, get_effective_company_id
+from addons.agcm.models.entity_attachment import agcm_entity_attachments
 
 from addons.agcm_submittal.schemas.submittal import (
     ApproveAction,
@@ -267,3 +270,67 @@ async def delete_label(
     svc = _get_service(db, current_user)
     if not svc.delete_label(label_id):
         raise HTTPException(status_code=404, detail="Label not found")
+
+
+# ---------------------------------------------------------------------------
+# Attachments
+# ---------------------------------------------------------------------------
+
+class AttachDocumentBody(BaseModel):
+    document_id: int
+
+
+@router.get("/submittals/{submittal_id}/attachments")
+async def list_submittal_attachments(
+    submittal_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """List documents attached to a submittal."""
+    company_id = get_effective_company_id(current_user, db)
+    stmt = select(agcm_entity_attachments).where(
+        agcm_entity_attachments.c.entity_type == "submittal",
+        agcm_entity_attachments.c.entity_id == submittal_id,
+        agcm_entity_attachments.c.company_id == company_id,
+    )
+    rows = db.execute(stmt).mappings().all()
+    return [dict(r) for r in rows]
+
+
+@router.post("/submittals/{submittal_id}/attachments", status_code=201)
+async def attach_document_to_submittal(
+    submittal_id: int,
+    body: AttachDocumentBody,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Attach a document to a submittal."""
+    company_id = get_effective_company_id(current_user, db)
+    stmt = insert(agcm_entity_attachments).values(
+        entity_type="submittal",
+        entity_id=submittal_id,
+        document_id=body.document_id,
+        company_id=company_id,
+    )
+    db.execute(stmt)
+    db.commit()
+    return {"message": "Document attached", "document_id": body.document_id, "submittal_id": submittal_id}
+
+
+@router.delete("/submittals/{submittal_id}/attachments/{document_id}", status_code=204)
+async def detach_document_from_submittal(
+    submittal_id: int,
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Detach a document from a submittal."""
+    company_id = get_effective_company_id(current_user, db)
+    stmt = delete(agcm_entity_attachments).where(
+        agcm_entity_attachments.c.entity_type == "submittal",
+        agcm_entity_attachments.c.entity_id == submittal_id,
+        agcm_entity_attachments.c.document_id == document_id,
+        agcm_entity_attachments.c.company_id == company_id,
+    )
+    db.execute(stmt)
+    db.commit()

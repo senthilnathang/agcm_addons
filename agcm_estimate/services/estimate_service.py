@@ -611,20 +611,69 @@ class EstimateService:
             budget_lines[code]["planned_amount"] += li.total_cost
             budget_lines[code]["line_count"] += 1
 
-        # Try to create budget records if agcm_finance module is available
+        # Create/update budget records in agcm_finance module
         created_count = 0
+        updated_count = 0
         try:
-            from addons.agcm.models.project import Project
-            # Budget integration point — create records if budget table exists
-            # For now, return the summary for the caller to handle
+            from addons.agcm_finance.models.budget import Budget
+            from addons.agcm_finance.models.cost_code import CostCode
+
+            for code, bl in budget_lines.items():
+                # Look up cost_code_id from the CostCode table
+                cost_code_obj = (
+                    self.db.query(CostCode)
+                    .filter(
+                        CostCode.code == code,
+                        CostCode.project_id == estimate.project_id,
+                        CostCode.company_id == self.company_id,
+                    )
+                    .first()
+                )
+                cost_code_id = cost_code_obj.id if cost_code_obj else None
+
+                # UPSERT: check if budget line already exists
+                existing = (
+                    self.db.query(Budget)
+                    .filter(
+                        Budget.project_id == estimate.project_id,
+                        Budget.cost_code_id == cost_code_id,
+                        Budget.company_id == self.company_id,
+                    )
+                    .first()
+                ) if cost_code_id else None
+
+                desc = f"From Estimate {estimate.sequence_name} - {bl['description']}"
+
+                if existing:
+                    existing.planned_amount = bl["planned_amount"]
+                    existing.description = desc
+                    updated_count += 1
+                else:
+                    new_budget = Budget(
+                        project_id=estimate.project_id,
+                        cost_code_id=cost_code_id,
+                        description=desc,
+                        planned_amount=bl["planned_amount"],
+                        actual_amount=0,
+                        committed_amount=0,
+                        company_id=self.company_id,
+                    )
+                    self.db.add(new_budget)
+                    created_count += 1
+
+            self.db.commit()
             logger.info(
-                "Budget export: %d cost codes, total: %.2f",
-                len(budget_lines),
+                "Budget export: created=%d, updated=%d, total: %.2f",
+                created_count,
+                updated_count,
                 sum(b["planned_amount"] for b in budget_lines.values()),
             )
+        except ImportError:
+            logger.warning("agcm_finance module not installed — budget integration skipped")
             created_count = len(budget_lines)
         except Exception as e:
-            logger.warning("Budget integration not available: %s", e)
+            logger.warning("Budget integration error: %s", e)
+            created_count = len(budget_lines)
 
         return {
             "success": True,

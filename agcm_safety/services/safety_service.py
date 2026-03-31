@@ -379,8 +379,39 @@ class SafetyService:
         insp.overall_result = overall_result
         insp.completed_date = date.today()
         insp.updated_by = self.user_id
+
+        # Auto-create punch list items for failed inspection items
+        punch_count = 0
+        if overall_result in ("fail", "conditional"):
+            failed_items = (
+                self.db.query(InspectionItem)
+                .filter(
+                    InspectionItem.inspection_id == inspection_id,
+                    InspectionItem.result == "fail",
+                )
+                .all()
+            )
+            for item in failed_items:
+                punch = PunchListItem(
+                    company_id=self.company_id,
+                    sequence_name=_next_sequence(self.db, PunchListItem, self.company_id),
+                    project_id=insp.project_id,
+                    title=f"Inspection #{insp.sequence_name}: {item.description}",
+                    description=item.notes or "",
+                    status="open",
+                    priority="high",
+                    location=insp.location,
+                    notes="Auto-created from failed inspection item",
+                    created_by=self.user_id,
+                )
+                self.db.add(punch)
+                self.db.flush()  # ensure next sequence picks up the new record
+                punch_count += 1
+
         self.db.commit()
         self.db.refresh(insp)
+        # Attach punch_count to the returned object for the API layer
+        insp._punch_count = punch_count
         return insp
 
     def delete_inspection(self, inspection_id: int) -> bool:

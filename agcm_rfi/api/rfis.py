@@ -3,9 +3,12 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
+from sqlalchemy import insert, delete, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, get_effective_company_id
+from addons.agcm.models.entity_attachment import agcm_entity_attachments
 
 from addons.agcm_rfi.schemas.rfi import (
     RFICreate, RFIUpdate, RFIResponseSchema, RFIDetail,
@@ -144,6 +147,69 @@ async def create_rfi_response(
     except Exception:
         pass
     return result
+
+
+# --- Attachments ---
+
+
+class AttachDocumentBody(BaseModel):
+    document_id: int
+
+
+@router.get("/rfis/{rfi_id}/attachments")
+async def list_rfi_attachments(
+    rfi_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """List documents attached to an RFI."""
+    company_id = get_effective_company_id(current_user, db)
+    stmt = select(agcm_entity_attachments).where(
+        agcm_entity_attachments.c.entity_type == "rfi",
+        agcm_entity_attachments.c.entity_id == rfi_id,
+        agcm_entity_attachments.c.company_id == company_id,
+    )
+    rows = db.execute(stmt).mappings().all()
+    return [dict(r) for r in rows]
+
+
+@router.post("/rfis/{rfi_id}/attachments", status_code=201)
+async def attach_document_to_rfi(
+    rfi_id: int,
+    body: AttachDocumentBody,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Attach a document to an RFI."""
+    company_id = get_effective_company_id(current_user, db)
+    stmt = insert(agcm_entity_attachments).values(
+        entity_type="rfi",
+        entity_id=rfi_id,
+        document_id=body.document_id,
+        company_id=company_id,
+    )
+    db.execute(stmt)
+    db.commit()
+    return {"message": "Document attached", "document_id": body.document_id, "rfi_id": rfi_id}
+
+
+@router.delete("/rfis/{rfi_id}/attachments/{document_id}", status_code=204)
+async def detach_document_from_rfi(
+    rfi_id: int,
+    document_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Detach a document from an RFI."""
+    company_id = get_effective_company_id(current_user, db)
+    stmt = delete(agcm_entity_attachments).where(
+        agcm_entity_attachments.c.entity_type == "rfi",
+        agcm_entity_attachments.c.entity_id == rfi_id,
+        agcm_entity_attachments.c.document_id == document_id,
+        agcm_entity_attachments.c.company_id == company_id,
+    )
+    db.execute(stmt)
+    db.commit()
 
 
 @router.put("/rfi-responses/{response_id}", response_model=RFIResponseResponseSchema)
