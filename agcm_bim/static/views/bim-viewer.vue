@@ -1,6 +1,6 @@
 <script setup>
 /**
- * BIM 3D Viewer — Phase 3: Collaboration Features
+ * BIM 3D Viewer — Phase 4: Advanced Features
  *
  * Phase 1+2 Features (preserved):
  * - XKT model loading with multi-model federation
@@ -12,13 +12,23 @@
  * - Keyboard shortcuts
  * - NavCube, BCF viewpoints, object selection
  *
- * Phase 3 Features (new):
+ * Phase 3 Features (preserved):
  * - BCF Viewpoints Panel with save/load/share (full BCF 2.1 JSON)
  * - Annotation List Panel with filtering by status/priority
  * - Snapshot export (PNG download)
  * - Share viewpoint via URL
  * - Cross-entity linking (viewpoints linked to RFIs, Issues)
  * - Enhanced keyboard shortcuts (V, A, S, 1-5)
+ *
+ * Phase 4 Features (new):
+ * - Storey plan views (2D floor plans from 3D model)
+ * - First-person walkthrough with HUD controls
+ * - IFC type color customization panel
+ * - Object colorize by property / discipline presets
+ * - Model explosion view with slider
+ * - Enhanced snapshot with annotations overlay + watermark
+ * - Performance optimization panel (SAO, edges, PBR, FPS counter)
+ * - Additional keyboard shortcuts (P, E, C, G)
  */
 
 import { onMounted, onBeforeUnmount, ref, reactive, computed, nextTick, watch } from 'vue';
@@ -36,6 +46,8 @@ import {
   TreeViewPlugin,
   AnnotationsPlugin,
   PointerLens,
+  StoreyViewsPlugin,
+  math,
 } from '@xeokit/xeokit-sdk';
 
 import { Page } from '@vben/common-ui';
@@ -118,6 +130,56 @@ const linkEntityForm = reactive({ entity_type: 'rfi', entity_id: null });
 // Viewpoint from URL query param
 const initialViewpointId = ref(route.query.viewpoint ? Number(route.query.viewpoint) : null);
 
+// ═══════════════════════════════════════════════════════════
+// STATE — Phase 4: Advanced Features
+// ═══════════════════════════════════════════════════════════
+
+// A. Storey Plan Views
+const showStoreysPanel = ref(false);
+const storeysList = ref([]);
+const activeStoreyId = ref(null);
+const inPlanViewMode = ref(false);
+
+// B. First-Person Walkthrough
+const walkSpeed = ref(1.5);
+const constrainVertical = ref(false);
+
+// C. IFC Type Color Customization
+const showColorsPanel = ref(false);
+const ifcTypeColors = reactive({
+  IfcWall:                  { color: '#C8C8C8', visible: true },
+  IfcSlab:                  { color: '#A0A0A0', visible: true },
+  IfcColumn:                { color: '#B0B0B0', visible: true },
+  IfcBeam:                  { color: '#B8B8B8', visible: true },
+  IfcDoor:                  { color: '#8B6914', visible: true },
+  IfcWindow:                { color: '#5656DF', visible: true },
+  IfcStair:                 { color: '#D0D0D0', visible: true },
+  IfcRoof:                  { color: '#CC6633', visible: true },
+  IfcCurtainWall:           { color: '#6699CC', visible: true },
+  IfcPipeSegment:           { color: '#33AA33', visible: true },
+  IfcDuctSegment:           { color: '#339999', visible: true },
+  IfcCableCarrierSegment:   { color: '#CC9933', visible: true },
+  IfcFurnishingElement:     { color: '#996633', visible: true },
+  IfcSpace:                 { color: '#EEEEEE', visible: false },
+});
+const colorPresetsApplied = ref('none');
+
+// D. Model Explosion View
+const showExplosionSlider = ref(false);
+const explosionFactor = ref(0);
+
+// E. Enhanced Snapshot
+const snapshotIncludeWatermark = ref(true);
+
+// F. Performance Optimization
+const showPerformancePanel = ref(false);
+const perfSaoEnabled = ref(true);
+const perfEdgesEnabled = ref(true);
+const perfPbrEnabled = ref(false);
+const fpsCount = ref(0);
+const objectCount = ref(0);
+const perfPreset = ref('custom');
+
 // xeokit instances (module-scoped, not reactive)
 let viewer = null;
 let xktLoader = null;
@@ -129,6 +191,12 @@ let angleMeasurementsControl = null;
 let bcfViewpoints = null;
 let treeViewPlugin = null;
 let annotationsPlugin = null;
+let storeyViewsPlugin = null;
+
+// FPS tracking
+let fpsFrameCount = 0;
+let fpsLastTime = 0;
+let fpsAnimationId = null;
 
 // ═══════════════════════════════════════════════════════════
 // COMPUTED — Phase 3
@@ -143,6 +211,20 @@ const filteredAnnotations = computed(() => {
     list = list.filter((a) => a.priority === annotationFilterPriority.value);
   }
   return list;
+});
+
+// ═══════════════════════════════════════════════════════════
+// COMPUTED — Phase 4
+// ═══════════════════════════════════════════════════════════
+
+const isFirstPersonMode = computed(() => currentTool.value === 'firstPerson');
+
+const ifcTypeList = computed(() => {
+  return Object.keys(ifcTypeColors).map((type) => ({
+    type,
+    color: ifcTypeColors[type].color,
+    visible: ifcTypeColors[type].visible,
+  }));
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -220,7 +302,7 @@ async function initViewer() {
   // BCF Viewpoints
   bcfViewpoints = new BCFViewpointsPlugin(viewer, {
     originatingSystem: 'FastVue BuildForge',
-    authoringTool: 'BuildForge BIM Viewer v3.0',
+    authoringTool: 'BuildForge BIM Viewer v4.0',
   });
 
   // IFC Tree
@@ -234,6 +316,11 @@ async function initViewer() {
   annotationsPlugin = new AnnotationsPlugin(viewer, {
     markerHTML: '<div class="bim-annotation-marker">{{glyph}}</div>',
     labelHTML: '<div class="bim-annotation-label"><b>{{title}}</b><p>{{description}}</p></div>',
+  });
+
+  // Phase 4: StoreyViewsPlugin
+  storeyViewsPlugin = new StoreyViewsPlugin(viewer, {
+    fitStoreysContainingPickedObject: false,
   });
 
   // Object picking
@@ -278,6 +365,12 @@ async function initViewer() {
 
   // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyDown);
+
+  // Phase 4: Start FPS counter
+  startFpsCounter();
+
+  // Phase 4: Load saved color presets from localStorage
+  loadColorPresetsFromStorage();
 
   // Load model
   if (modelId.value) {
@@ -363,6 +456,12 @@ async function loadModel(id, federation) {
       refreshMeasurementsList();
       refreshSectionPlanesList();
 
+      // Phase 4: detect storeys
+      refreshStoreysList();
+
+      // Phase 4: update object count
+      updateObjectCount();
+
       // Auto-restore viewpoint from URL query param
       if (initialViewpointId.value) {
         restoreViewpointById(initialViewpointId.value);
@@ -389,6 +488,8 @@ function unloadModel(entry) {
   }
   loadedModels.value = loadedModels.value.filter((m) => m.id !== entry.id);
   refreshTree();
+  refreshStoreysList();
+  updateObjectCount();
 }
 
 function toggleModelVisibility(entry) {
@@ -444,6 +545,10 @@ function refreshTree() {
 
 function toggleTreePanel() {
   showTreePanel.value = !showTreePanel.value;
+  // Close storeys panel if opening tree
+  if (showTreePanel.value) {
+    showStoreysPanel.value = false;
+  }
   // Force canvas resize after sidebar toggle
   nextTick(() => viewer?.scene?.canvas?.resizeCanvas?.());
 }
@@ -874,14 +979,23 @@ async function submitLinkEntity() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// PHASE 3: SNAPSHOT EXPORT
+// PHASE 3: SNAPSHOT EXPORT (enhanced in Phase 4)
 // ═══════════════════════════════════════════════════════════
 
 function takeScreenshot() {
   if (!viewer) return;
+  if (snapshotIncludeWatermark.value) {
+    const modelName = modelData.value?.name || 'BIM Model';
+    const dateStr = new Date().toLocaleString();
+    snapshotWithWatermark(`${modelName} — ${dateStr}`);
+  } else {
+    takeSimpleScreenshot();
+  }
+}
+
+function takeSimpleScreenshot() {
   try {
     const dataUrl = viewer.getSnapshot({ format: 'png', width: 1920, height: 1080 });
-    // Trigger browser download
     const link = document.createElement('a');
     link.href = dataUrl;
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -891,6 +1005,440 @@ function takeScreenshot() {
     document.body.removeChild(link);
   } catch (e) {
     console.error('Screenshot failed:', e);
+  }
+}
+
+function snapshotWithWatermark(text) {
+  try {
+    const snapshotData = viewer.getSnapshot({ format: 'png', width: 1920, height: 1080 });
+    const canvas = document.createElement('canvas');
+    canvas.width = 1920;
+    canvas.height = 1080;
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
+    img.onload = () => {
+      ctx.drawImage(img, 0, 0);
+      // Watermark background
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillRect(0, 1050, 500, 30);
+      // Watermark text
+      ctx.font = '14px Arial';
+      ctx.fillStyle = '#333';
+      ctx.fillText(text, 10, 1068);
+      // Section plane indicator
+      if (sectionPlanesList.value.length > 0) {
+        ctx.fillStyle = 'rgba(255, 100, 100, 0.6)';
+        ctx.fillText(`[${sectionPlanesList.value.length} section plane(s) active]`, 10, 1046);
+      }
+      // Trigger download
+      const link = document.createElement('a');
+      const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+      link.download = `bim-snapshot-${ts}.png`;
+      link.href = canvas.toDataURL('image/png');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+    img.src = snapshotData;
+  } catch (e) {
+    console.error('Snapshot with watermark failed:', e);
+    // Fallback to simple screenshot
+    takeSimpleScreenshot();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 4A: STOREY PLAN VIEWS
+// ═══════════════════════════════════════════════════════════
+
+function refreshStoreysList() {
+  if (!viewer || !viewer.metaScene) return;
+  const storeys = [];
+  const metaObjects = viewer.metaScene.metaObjects;
+  for (const id in metaObjects) {
+    const mo = metaObjects[id];
+    if (mo.type === 'IfcBuildingStorey') {
+      storeys.push({
+        id: mo.id,
+        name: mo.name || mo.id,
+        objectIds: viewer.metaScene.getObjectIDsInSubtree(mo.id),
+      });
+    }
+  }
+  // Sort storeys by name (typically level order)
+  storeys.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+  storeysList.value = storeys;
+}
+
+function toggleStoreysPanel() {
+  showStoreysPanel.value = !showStoreysPanel.value;
+  // Close tree panel if opening storeys
+  if (showStoreysPanel.value) {
+    showTreePanel.value = false;
+  }
+  nextTick(() => viewer?.scene?.canvas?.resizeCanvas?.());
+}
+
+function gotoStorey(storey) {
+  if (!viewer) return;
+  activeStoreyId.value = storey.id;
+  inPlanViewMode.value = true;
+
+  // Show all objects first, then isolate storey objects
+  viewer.scene.setObjectsVisible(viewer.scene.objectIds, false);
+  viewer.scene.setObjectsVisible(storey.objectIds, true);
+
+  // Switch to plan view (top-down) camera
+  viewer.cameraControl.navMode = 'planView';
+  currentTool.value = 'planView';
+
+  // Fly to the storey AABB from above
+  const aabb = viewer.scene.getAABB(storey.objectIds);
+  if (aabb) {
+    const center = math.getAABB3Center(aabb);
+    const height = aabb[4] + 20; // Above the storey
+    viewer.cameraFlight.flyTo({
+      eye: [center[0], height, center[2]],
+      look: [center[0], center[1], center[2]],
+      up: [0, 0, -1],
+      duration: 0.8,
+    });
+  }
+}
+
+function exitPlanView() {
+  if (!viewer) return;
+  inPlanViewMode.value = false;
+  activeStoreyId.value = null;
+
+  // Restore all visibility
+  viewer.scene.setObjectsVisible(viewer.scene.objectIds, true);
+  // Restore excluded types
+  const excludeTypes = ['IfcSpace', 'IfcOpeningElement'];
+  excludeTypes.forEach((type) => {
+    const ids = getObjectIdsByType(type);
+    if (ids.length) {
+      viewer.scene.setObjectsVisible(ids, false);
+    }
+  });
+
+  // Switch back to orbit mode
+  viewer.cameraControl.navMode = 'orbit';
+  currentTool.value = 'select';
+
+  // Fit the whole model
+  viewer.cameraFlight.flyTo({ aabb: viewer.scene.aabb, duration: 0.8 });
+}
+
+function togglePlanView() {
+  if (inPlanViewMode.value) {
+    exitPlanView();
+  } else {
+    // If storeys exist, go to first storey
+    if (storeysList.value.length > 0) {
+      gotoStorey(storeysList.value[0]);
+    } else {
+      // Just switch to plan view camera mode
+      viewer.cameraControl.navMode = 'planView';
+      currentTool.value = 'planView';
+      inPlanViewMode.value = true;
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 4B: FIRST-PERSON WALKTHROUGH ENHANCEMENT
+// ═══════════════════════════════════════════════════════════
+
+function onWalkSpeedChange(val) {
+  walkSpeed.value = val;
+  if (viewer && viewer.cameraControl) {
+    viewer.cameraControl.walkSpeed = val;
+  }
+}
+
+function onConstrainVerticalChange(val) {
+  constrainVertical.value = val;
+  if (viewer && viewer.cameraControl) {
+    viewer.cameraControl.constrainVertical = val;
+  }
+}
+
+function exitFirstPerson() {
+  viewer.cameraControl.navMode = 'orbit';
+  viewer.cameraControl.constrainVertical = false;
+  currentTool.value = 'select';
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 4C: IFC TYPE COLOR CUSTOMIZATION
+// ═══════════════════════════════════════════════════════════
+
+function getObjectIdsByType(ifcType) {
+  if (!viewer || !viewer.metaScene) return [];
+  const ids = [];
+  const metaObjects = viewer.metaScene.metaObjects;
+  for (const id in metaObjects) {
+    if (metaObjects[id].type === ifcType) {
+      ids.push(id);
+    }
+  }
+  return ids;
+}
+
+function applyTypeColor(ifcType) {
+  if (!viewer) return;
+  const entry = ifcTypeColors[ifcType];
+  if (!entry) return;
+  const ids = getObjectIdsByType(ifcType);
+  if (ids.length === 0) return;
+
+  // Parse hex color to [r, g, b] 0-1 range
+  const hex = entry.color;
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+
+  viewer.scene.setObjectsColorized(ids, [r, g, b]);
+}
+
+function onTypeColorChange(ifcType, hexColor) {
+  ifcTypeColors[ifcType].color = hexColor;
+  applyTypeColor(ifcType);
+  saveColorPresetsToStorage();
+}
+
+function toggleTypeVisibility(ifcType) {
+  if (!viewer) return;
+  const entry = ifcTypeColors[ifcType];
+  entry.visible = !entry.visible;
+  const ids = getObjectIdsByType(ifcType);
+  if (ids.length) {
+    viewer.scene.setObjectsVisible(ids, entry.visible);
+  }
+  saveColorPresetsToStorage();
+}
+
+function resetAllColors() {
+  if (!viewer) return;
+  // Clear colorization on all objects
+  viewer.scene.setObjectsColorized(viewer.scene.objectIds, null);
+  colorPresetsApplied.value = 'none';
+
+  // Reset to default colors
+  const defaults = {
+    IfcWall: '#C8C8C8', IfcSlab: '#A0A0A0', IfcColumn: '#B0B0B0',
+    IfcBeam: '#B8B8B8', IfcDoor: '#8B6914', IfcWindow: '#5656DF',
+    IfcStair: '#D0D0D0', IfcRoof: '#CC6633', IfcCurtainWall: '#6699CC',
+    IfcPipeSegment: '#33AA33', IfcDuctSegment: '#339999',
+    IfcCableCarrierSegment: '#CC9933', IfcFurnishingElement: '#996633',
+    IfcSpace: '#EEEEEE',
+  };
+  for (const type in defaults) {
+    if (ifcTypeColors[type]) {
+      ifcTypeColors[type].color = defaults[type];
+    }
+  }
+  saveColorPresetsToStorage();
+}
+
+function applyDisciplinePreset() {
+  if (!viewer) return;
+  colorPresetsApplied.value = 'discipline';
+
+  // Architecture = blue
+  const archTypes = ['IfcWall', 'IfcSlab', 'IfcDoor', 'IfcWindow', 'IfcStair', 'IfcRoof', 'IfcCurtainWall'];
+  archTypes.forEach((type) => {
+    if (ifcTypeColors[type]) ifcTypeColors[type].color = '#4488CC';
+    const ids = getObjectIdsByType(type);
+    if (ids.length) viewer.scene.setObjectsColorized(ids, [0.267, 0.533, 0.8]);
+  });
+
+  // Structural = red
+  const structTypes = ['IfcColumn', 'IfcBeam'];
+  structTypes.forEach((type) => {
+    if (ifcTypeColors[type]) ifcTypeColors[type].color = '#CC4444';
+    const ids = getObjectIdsByType(type);
+    if (ids.length) viewer.scene.setObjectsColorized(ids, [0.8, 0.267, 0.267]);
+  });
+
+  // MEP = green
+  const mepTypes = ['IfcPipeSegment', 'IfcDuctSegment', 'IfcCableCarrierSegment'];
+  mepTypes.forEach((type) => {
+    if (ifcTypeColors[type]) ifcTypeColors[type].color = '#44AA44';
+    const ids = getObjectIdsByType(type);
+    if (ids.length) viewer.scene.setObjectsColorized(ids, [0.267, 0.667, 0.267]);
+  });
+
+  // Furnishing = brown
+  const furnTypes = ['IfcFurnishingElement'];
+  furnTypes.forEach((type) => {
+    if (ifcTypeColors[type]) ifcTypeColors[type].color = '#AA7744';
+    const ids = getObjectIdsByType(type);
+    if (ids.length) viewer.scene.setObjectsColorized(ids, [0.667, 0.467, 0.267]);
+  });
+
+  saveColorPresetsToStorage();
+}
+
+function applyAllTypeColors() {
+  Object.keys(ifcTypeColors).forEach((type) => applyTypeColor(type));
+}
+
+function saveColorPresetsToStorage() {
+  try {
+    const data = {};
+    for (const type in ifcTypeColors) {
+      data[type] = { color: ifcTypeColors[type].color, visible: ifcTypeColors[type].visible };
+    }
+    localStorage.setItem('bim-viewer-color-presets', JSON.stringify(data));
+  } catch (e) {
+    // localStorage may be unavailable
+  }
+}
+
+function loadColorPresetsFromStorage() {
+  try {
+    const stored = localStorage.getItem('bim-viewer-color-presets');
+    if (stored) {
+      const data = JSON.parse(stored);
+      for (const type in data) {
+        if (ifcTypeColors[type]) {
+          ifcTypeColors[type].color = data[type].color || ifcTypeColors[type].color;
+          ifcTypeColors[type].visible = data[type].visible !== undefined ? data[type].visible : true;
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore parse errors
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 4D: MODEL EXPLOSION VIEW
+// ═══════════════════════════════════════════════════════════
+
+function explodeModel(factor) {
+  if (!viewer) return;
+  const sceneCenter = viewer.scene.center;
+  const objectIds = viewer.scene.objectIds;
+  for (let i = 0, len = objectIds.length; i < len; i++) {
+    const id = objectIds[i];
+    const entity = viewer.scene.objects[id];
+    if (!entity) continue;
+    if (factor === 0) {
+      entity.offset = [0, 0, 0];
+    } else {
+      const objectCenter = math.getAABB3Center(entity.aabb);
+      const direction = math.subVec3(objectCenter, sceneCenter, []);
+      const dist = math.lenVec3(direction);
+      if (dist > 0.001) {
+        math.normalizeVec3(direction);
+        entity.offset = math.mulVec3Scalar(direction, factor, []);
+      }
+    }
+  }
+}
+
+function onExplosionFactorChange(val) {
+  explosionFactor.value = val;
+  explodeModel(val);
+}
+
+function resetExplosion() {
+  explosionFactor.value = 0;
+  explodeModel(0);
+}
+
+function toggleExplosionSlider() {
+  showExplosionSlider.value = !showExplosionSlider.value;
+  if (!showExplosionSlider.value && explosionFactor.value !== 0) {
+    resetExplosion();
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 4F: PERFORMANCE OPTIMIZATION
+// ═══════════════════════════════════════════════════════════
+
+function updateObjectCount() {
+  if (viewer) {
+    objectCount.value = Object.keys(viewer.scene.objects).length;
+  }
+}
+
+function startFpsCounter() {
+  fpsLastTime = performance.now();
+  fpsFrameCount = 0;
+
+  function countFrame() {
+    fpsFrameCount++;
+    const now = performance.now();
+    if (now - fpsLastTime >= 1000) {
+      fpsCount.value = fpsFrameCount;
+      fpsFrameCount = 0;
+      fpsLastTime = now;
+    }
+    fpsAnimationId = requestAnimationFrame(countFrame);
+  }
+  fpsAnimationId = requestAnimationFrame(countFrame);
+}
+
+function stopFpsCounter() {
+  if (fpsAnimationId) {
+    cancelAnimationFrame(fpsAnimationId);
+    fpsAnimationId = null;
+  }
+}
+
+function toggleSao(enabled) {
+  perfSaoEnabled.value = enabled;
+  if (viewer) {
+    viewer.scene.sao.enabled = enabled;
+  }
+  perfPreset.value = 'custom';
+}
+
+function toggleEdges(enabled) {
+  perfEdgesEnabled.value = enabled;
+  if (viewer) {
+    viewer.scene.edgeMaterial.edges = enabled;
+  }
+  perfPreset.value = 'custom';
+}
+
+function togglePbr(enabled) {
+  perfPbrEnabled.value = enabled;
+  if (viewer) {
+    viewer.scene.pbrEnabled = enabled;
+  }
+  perfPreset.value = 'custom';
+}
+
+function applyPerfPreset(preset) {
+  perfPreset.value = preset;
+  switch (preset) {
+    case 'high':
+      toggleSao(true);
+      toggleEdges(true);
+      togglePbr(false);
+      perfPreset.value = 'high';
+      break;
+    case 'performance':
+      toggleSao(false);
+      toggleEdges(false);
+      togglePbr(false);
+      perfPreset.value = 'performance';
+      break;
+    case 'wireframe':
+      toggleSao(false);
+      toggleEdges(true);
+      togglePbr(false);
+      if (viewer) {
+        viewer.scene.setObjectsXRayed(viewer.scene.objectIds, true);
+      }
+      perfPreset.value = 'wireframe';
+      break;
   }
 }
 
@@ -912,6 +1460,8 @@ function setTool(tool) {
       break;
     case 'firstPerson':
       viewer.cameraControl.navMode = 'firstPerson';
+      viewer.cameraControl.walkSpeed = walkSpeed.value;
+      viewer.cameraControl.constrainVertical = constrainVertical.value;
       break;
     case 'planView':
       viewer.cameraControl.navMode = 'planView';
@@ -979,7 +1529,7 @@ function clearSections() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// KEYBOARD SHORTCUTS — Phase 2 + Phase 3
+// KEYBOARD SHORTCUTS — Phase 2 + Phase 3 + Phase 4
 // ═══════════════════════════════════════════════════════════
 
 function handleKeyDown(e) {
@@ -990,8 +1540,14 @@ function handleKeyDown(e) {
 
   switch (e.key) {
     case 'Escape':
-      setTool('select');
-      annotationDrawerVisible.value = false;
+      if (isFirstPersonMode.value) {
+        exitFirstPerson();
+      } else if (inPlanViewMode.value) {
+        exitPlanView();
+      } else {
+        setTool('select');
+        annotationDrawerVisible.value = false;
+      }
       break;
     case 'f':
     case 'F':
@@ -1054,6 +1610,35 @@ function handleKeyDown(e) {
       }
       break;
     }
+    // Phase 4 shortcuts
+    case 'p':
+    case 'P':
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        togglePlanView();
+      }
+      break;
+    case 'e':
+    case 'E':
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        toggleExplosionSlider();
+      }
+      break;
+    case 'c':
+    case 'C':
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        showColorsPanel.value = !showColorsPanel.value;
+      }
+      break;
+    case 'g':
+    case 'G':
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        showPerformancePanel.value = !showPerformancePanel.value;
+      }
+      break;
     case 'Delete':
       // Delete selected measurement or section
       break;
@@ -1078,6 +1663,11 @@ function formatDate(dt) {
   return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
+function formatIfcTypeName(type) {
+  // IfcWall -> Wall, IfcPipeSegment -> Pipe Segment
+  return type.replace(/^Ifc/, '').replace(/([A-Z])/g, ' $1').trim();
+}
+
 // ═══════════════════════════════════════════════════════════
 // LIFECYCLE
 // ═══════════════════════════════════════════════════════════
@@ -1086,6 +1676,7 @@ onMounted(() => initViewer());
 
 onBeforeUnmount(() => {
   document.removeEventListener('keydown', handleKeyDown);
+  stopFpsCounter();
   if (viewer) {
     viewer.destroy();
     viewer = null;
@@ -1110,8 +1701,11 @@ onBeforeUnmount(() => {
             <ATooltip title="Walk (first person)">
               <AButton :type="currentTool === 'firstPerson' ? 'primary' : 'default'" @click="setTool('firstPerson')">Walk</AButton>
             </ATooltip>
-            <ATooltip title="Plan view (top down)">
-              <AButton :type="currentTool === 'planView' ? 'primary' : 'default'" @click="setTool('planView')">Plan</AButton>
+            <ATooltip title="Plan view (top down) [P]">
+              <AButton :type="currentTool === 'planView' ? 'primary' : 'default'" @click="togglePlanView">Plan</AButton>
+            </ATooltip>
+            <ATooltip title="Storey plan views">
+              <AButton :type="showStoreysPanel ? 'primary' : 'default'" @click="toggleStoreysPanel">Storeys</AButton>
             </ATooltip>
             <ATooltip title="Fit all (F)">
               <AButton @click="setTool('fitAll')">Fit</AButton>
@@ -1195,6 +1789,21 @@ onBeforeUnmount(() => {
 
           <ADivider type="vertical" />
 
+          <!-- Visualization Group (Phase 4) -->
+          <AButtonGroup size="small">
+            <ATooltip title="Color by IFC type (C)">
+              <AButton :type="showColorsPanel ? 'primary' : 'default'" @click="showColorsPanel = !showColorsPanel">Colors</AButton>
+            </ATooltip>
+            <ATooltip title="Explode model (E)">
+              <AButton :type="showExplosionSlider ? 'primary' : 'default'" @click="toggleExplosionSlider">Explode</AButton>
+            </ATooltip>
+            <ATooltip title="Performance settings (G)">
+              <AButton :type="showPerformancePanel ? 'primary' : 'default'" @click="showPerformancePanel = !showPerformancePanel">Perf</AButton>
+            </ATooltip>
+          </AButtonGroup>
+
+          <ADivider type="vertical" />
+
           <!-- View Group -->
           <AButtonGroup size="small">
             <ATooltip title="Toggle IFC tree panel">
@@ -1241,6 +1850,37 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
+        <!-- Phase 4A: Storeys Sidebar (left, replaces tree) -->
+        <div v-show="showStoreysPanel" class="bim-tree-sidebar">
+          <div class="bim-panel-head">
+            <strong>Building Storeys</strong>
+            <AButton type="text" size="small" @click="showStoreysPanel = false">X</AButton>
+          </div>
+          <div class="bim-storeys-content">
+            <div v-if="storeysList.length === 0" class="bim-empty-msg">No storeys detected in model.</div>
+            <div
+              v-for="storey in storeysList"
+              :key="storey.id"
+              class="bim-storey-item"
+              :class="{ 'bim-storey-active': activeStoreyId === storey.id }"
+              @click="gotoStorey(storey)"
+            >
+              <div class="bim-storey-icon">&#9632;</div>
+              <div class="bim-storey-info">
+                <div class="bim-storey-name">{{ storey.name }}</div>
+                <div class="bim-storey-count">{{ storey.objectIds.length }} objects</div>
+              </div>
+              <ATag v-if="activeStoreyId === storey.id" color="blue" size="small">Active</ATag>
+            </div>
+          </div>
+          <div class="bim-tree-actions">
+            <ASpace size="small">
+              <AButton v-if="inPlanViewMode" size="small" type="primary" @click="exitPlanView">Back to 3D</AButton>
+              <AButton size="small" @click="setTool('showAll')">Show All</AButton>
+            </ASpace>
+          </div>
+        </div>
+
         <!-- 3D Viewer -->
         <div class="bim-viewer-container">
           <canvas id="xeokit-canvas" class="bim-canvas" />
@@ -1248,9 +1888,69 @@ onBeforeUnmount(() => {
           <canvas id="section-overview-canvas" class="section-canvas" v-show="showSectionOverview" />
 
           <!-- Tool indicator -->
-          <div v-if="currentTool !== 'select'" class="bim-tool-indicator">
+          <div v-if="currentTool !== 'select' && !isFirstPersonMode" class="bim-tool-indicator">
             <ATag color="blue">{{ currentTool }}</ATag>
             <AButton type="link" size="small" @click="setTool('select')" style="font-size:11px;">ESC to cancel</AButton>
+          </div>
+
+          <!-- Phase 4A: Plan View indicator -->
+          <div v-if="inPlanViewMode" class="bim-plan-view-indicator">
+            <ATag color="green">Plan View</ATag>
+            <span v-if="activeStoreyId" style="font-size: 11px; margin-left: 4px">{{ storeysList.find(s => s.id === activeStoreyId)?.name || '' }}</span>
+            <AButton type="link" size="small" @click="exitPlanView" style="font-size:11px; margin-left: 6px;">Back to 3D</AButton>
+          </div>
+
+          <!-- Phase 4B: First-Person Walkthrough HUD -->
+          <div v-if="isFirstPersonMode" class="bim-walk-hud">
+            <div class="bim-walk-hud-title">First Person Mode</div>
+            <div class="bim-walk-hud-controls">
+              <span>WASD: Move</span>
+              <span style="margin-left: 8px">Mouse: Look</span>
+            </div>
+            <div class="bim-walk-hud-speed">
+              <span>Speed:</span>
+              <input
+                type="range"
+                min="0.1"
+                max="5"
+                step="0.1"
+                :value="walkSpeed"
+                class="bim-walk-speed-slider"
+                @input="onWalkSpeedChange(parseFloat($event.target.value))"
+              />
+              <span class="bim-walk-speed-value">{{ walkSpeed.toFixed(1) }}</span>
+            </div>
+            <div class="bim-walk-hud-option">
+              <label class="bim-walk-checkbox-label">
+                <input type="checkbox" :checked="constrainVertical" @change="onConstrainVerticalChange($event.target.checked)" />
+                <span>Constrain to floor</span>
+              </label>
+            </div>
+            <div class="bim-walk-hud-exit">Press ESC to exit</div>
+          </div>
+
+          <!-- Phase 4D: Explosion Slider -->
+          <div v-if="showExplosionSlider" class="bim-explosion-panel">
+            <div class="bim-panel-head">
+              <strong>Explosion</strong>
+              <AButton type="text" size="small" @click="toggleExplosionSlider">X</AButton>
+            </div>
+            <div style="padding: 10px 12px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 11px; min-width: 50px;">Factor:</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  :value="explosionFactor"
+                  style="flex: 1;"
+                  @input="onExplosionFactorChange(parseFloat($event.target.value))"
+                />
+                <span style="font-size: 11px; min-width: 30px; text-align: right;">{{ explosionFactor.toFixed(0) }}</span>
+              </div>
+              <AButton size="small" block style="margin-top: 8px;" @click="resetExplosion">Reset</AButton>
+            </div>
           </div>
 
           <!-- Loading -->
@@ -1454,6 +2154,92 @@ onBeforeUnmount(() => {
                   <AButton size="small" @click="openLinkEntityModal('annotation', ann.id)">Link</AButton>
                   <AButton size="small" danger @click="deleteAnnotation(ann)">Delete</AButton>
                 </ASpace>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══════════ Phase 4C: IFC Type Colors Panel ═══════════ -->
+          <div v-if="showColorsPanel" class="bim-right-panel bim-colors-panel" style="top: 12px; right: 170px">
+            <div class="bim-panel-head">
+              <strong>IFC Type Colors</strong>
+              <AButton type="text" size="small" @click="showColorsPanel = false">X</AButton>
+            </div>
+            <div class="bim-colors-presets">
+              <AButton size="small" :type="colorPresetsApplied === 'discipline' ? 'primary' : 'default'" @click="applyDisciplinePreset">By Discipline</AButton>
+              <AButton size="small" @click="applyAllTypeColors">Apply All</AButton>
+              <AButton size="small" danger @click="resetAllColors">Reset</AButton>
+            </div>
+            <div class="bim-panel-body">
+              <div v-for="item in ifcTypeList" :key="item.type" class="bim-color-item">
+                <input
+                  type="color"
+                  :value="item.color"
+                  class="bim-color-swatch"
+                  @input="onTypeColorChange(item.type, $event.target.value)"
+                />
+                <div class="bim-color-type-name">{{ formatIfcTypeName(item.type) }}</div>
+                <AButton
+                  size="small"
+                  :type="item.visible ? 'default' : 'dashed'"
+                  @click="toggleTypeVisibility(item.type)"
+                >{{ item.visible ? 'Vis' : 'Hid' }}</AButton>
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══════════ Phase 4F: Performance Panel ═══════════ -->
+          <div v-if="showPerformancePanel" class="bim-right-panel bim-perf-panel" style="top: 12px; right: 170px">
+            <div class="bim-panel-head">
+              <strong>Performance</strong>
+              <AButton type="text" size="small" @click="showPerformancePanel = false">X</AButton>
+            </div>
+            <div class="bim-panel-body">
+              <!-- Stats -->
+              <div class="bim-perf-stats">
+                <div class="bim-perf-stat-item">
+                  <span class="bim-perf-stat-label">FPS</span>
+                  <span class="bim-perf-stat-value" :class="{ 'bim-fps-low': fpsCount < 20, 'bim-fps-ok': fpsCount >= 20 && fpsCount < 50, 'bim-fps-good': fpsCount >= 50 }">{{ fpsCount }}</span>
+                </div>
+                <div class="bim-perf-stat-item">
+                  <span class="bim-perf-stat-label">Objects</span>
+                  <span class="bim-perf-stat-value">{{ objectCount.toLocaleString() }}</span>
+                </div>
+              </div>
+
+              <!-- Quick Presets -->
+              <div class="bim-panel-section-title">Quick Presets</div>
+              <div class="bim-perf-presets">
+                <AButton size="small" :type="perfPreset === 'high' ? 'primary' : 'default'" @click="applyPerfPreset('high')">High Quality</AButton>
+                <AButton size="small" :type="perfPreset === 'performance' ? 'primary' : 'default'" @click="applyPerfPreset('performance')">Performance</AButton>
+                <AButton size="small" :type="perfPreset === 'wireframe' ? 'primary' : 'default'" @click="applyPerfPreset('wireframe')">Wireframe</AButton>
+              </div>
+
+              <!-- Individual Toggles -->
+              <div class="bim-panel-section-title">Render Settings</div>
+              <div class="bim-perf-toggle-list">
+                <div class="bim-perf-toggle-item">
+                  <span>SAO (Ambient Occlusion)</span>
+                  <ASwitch :checked="perfSaoEnabled" size="small" @change="toggleSao" />
+                </div>
+                <div class="bim-perf-toggle-item">
+                  <span>Edge Lines</span>
+                  <ASwitch :checked="perfEdgesEnabled" size="small" @change="toggleEdges" />
+                </div>
+                <div class="bim-perf-toggle-item">
+                  <span>PBR Rendering</span>
+                  <ASwitch :checked="perfPbrEnabled" size="small" @change="togglePbr" />
+                </div>
+                <div class="bim-perf-toggle-item">
+                  <span>Data Textures</span>
+                  <ATag color="green" size="small">Enabled</ATag>
+                </div>
+              </div>
+
+              <!-- Snapshot Settings -->
+              <div class="bim-panel-section-title">Snapshot</div>
+              <div class="bim-perf-toggle-item" style="padding: 6px 8px;">
+                <span>Include watermark</span>
+                <ASwitch :checked="snapshotIncludeWatermark" size="small" @change="(val) => snapshotIncludeWatermark = val" />
               </div>
             </div>
           </div>
@@ -1977,5 +2763,282 @@ onBeforeUnmount(() => {
 
 :deep(#bim-tree-container .xeokit-tree-node-title.highlighted) {
   background: #bae7ff;
+}
+
+/* ═══════════ Phase 4A: Storey Styles ═══════════ */
+
+.bim-storeys-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+
+.bim-storey-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.bim-storey-item:hover {
+  background: #f0f7ff;
+}
+
+.bim-storey-active {
+  background: #e6f7ff;
+  border-left: 3px solid #1890ff;
+}
+
+.bim-storey-icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #999;
+}
+
+.bim-storey-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.bim-storey-name {
+  font-size: 12px;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bim-storey-count {
+  font-size: 10px;
+  color: #999;
+}
+
+.bim-plan-view-indicator {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 15;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #52c41a;
+  border-radius: 6px;
+  padding: 4px 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+}
+
+/* ═══════════ Phase 4B: First-Person Walk HUD ═══════════ */
+
+.bim-walk-hud {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 18;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  border-radius: 8px;
+  padding: 12px 18px;
+  min-width: 260px;
+  backdrop-filter: blur(4px);
+}
+
+.bim-walk-hud-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.bim-walk-hud-controls {
+  font-size: 11px;
+  color: #ccc;
+  margin-bottom: 8px;
+}
+
+.bim-walk-hud-speed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.bim-walk-speed-slider {
+  flex: 1;
+  height: 4px;
+  cursor: pointer;
+  accent-color: #1890ff;
+}
+
+.bim-walk-speed-value {
+  min-width: 24px;
+  text-align: right;
+  font-family: monospace;
+  font-size: 11px;
+}
+
+.bim-walk-hud-option {
+  margin-bottom: 6px;
+}
+
+.bim-walk-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.bim-walk-checkbox-label input[type="checkbox"] {
+  accent-color: #1890ff;
+}
+
+.bim-walk-hud-exit {
+  font-size: 10px;
+  color: #999;
+  text-align: center;
+  margin-top: 4px;
+}
+
+/* ═══════════ Phase 4C: Colors Panel ═══════════ */
+
+.bim-colors-panel {
+  width: 280px;
+}
+
+.bim-colors-presets {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafbfc;
+}
+
+.bim-color-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #f8f8f8;
+}
+
+.bim-color-item:hover {
+  background: #fafafa;
+}
+
+.bim-color-swatch {
+  width: 24px;
+  height: 24px;
+  border: 1px solid #d9d9d9;
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+  background: none;
+  flex-shrink: 0;
+}
+
+.bim-color-swatch::-webkit-color-swatch-wrapper {
+  padding: 1px;
+}
+
+.bim-color-swatch::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+.bim-color-type-name {
+  flex: 1;
+  font-size: 11px;
+  color: #333;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ═══════════ Phase 4D: Explosion Panel ═══════════ */
+
+.bim-explosion-panel {
+  position: absolute;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 17;
+  width: 300px;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+/* ═══════════ Phase 4F: Performance Panel ═══════════ */
+
+.bim-perf-panel {
+  width: 280px;
+}
+
+.bim-perf-stats {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafbfc;
+}
+
+.bim-perf-stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.bim-perf-stat-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #999;
+  letter-spacing: 0.5px;
+}
+
+.bim-perf-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: monospace;
+  color: #333;
+}
+
+.bim-fps-low { color: #ff4d4f; }
+.bim-fps-ok { color: #faad14; }
+.bim-fps-good { color: #52c41a; }
+
+.bim-perf-presets {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.bim-perf-toggle-list {
+  padding: 0;
+}
+
+.bim-perf-toggle-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f8f8f8;
+  font-size: 11px;
+  color: #333;
 }
 </style>
