@@ -61,6 +61,19 @@ class BIMModel(Base, TimestampMixin, AuditMixin):
     file_name = Column(String(255), nullable=True)
     file_size = Column(Integer, nullable=True)  # bytes
 
+    # Converted XKT file (for xeokit viewer)
+    xkt_file_url = Column(String(500), nullable=True)  # path to converted .xkt
+    file_size_xkt = Column(Integer, nullable=True)  # XKT file size in bytes
+
+    # Federation transforms (for multi-model positioning)
+    position_x = Column(Float, default=0, nullable=True)
+    position_y = Column(Float, default=0, nullable=True)
+    position_z = Column(Float, default=0, nullable=True)
+    rotation_x = Column(Float, default=0, nullable=True)
+    rotation_y = Column(Float, default=0, nullable=True)
+    rotation_z = Column(Float, default=0, nullable=True)
+    scale_factor = Column(Float, default=1.0, nullable=True)
+
     # Processing
     status = Column(
         Enum(BIMModelStatus, values_callable=lambda e: [m.value for m in e]),

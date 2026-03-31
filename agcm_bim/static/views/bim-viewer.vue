@@ -1,53 +1,36 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue';
+/**
+ * BIM 3D Viewer — xeokit SDK integration for construction model visualization.
+ *
+ * Features (Phase 1 MVP):
+ * - XKT model loading from backend API
+ * - NavCube orientation widget
+ * - Object selection with property inspector
+ * - Camera modes: orbit, first-person, plan view
+ * - Section planes (cross-section cuts)
+ * - Distance and angle measurements
+ * - X-ray, isolate, show all
+ * - BCF viewpoint save
+ * - Fit all / fit selected
+ */
+
+import { onMounted, onBeforeUnmount, ref, nextTick } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import {
+  Viewer,
+  XKTLoaderPlugin,
+  NavCubePlugin,
+  SectionPlanesPlugin,
+  DistanceMeasurementsPlugin,
+  DistanceMeasurementsMouseControl,
+  AngleMeasurementsPlugin,
+  AngleMeasurementsMouseControl,
+  BCFViewpointsPlugin,
+  PointerLens,
+} from '@xeokit/xeokit-sdk';
 
 import { Page } from '@vben/common-ui';
-
-import {
-  Badge,
-  Button,
-  Card,
-  Col,
-  Descriptions,
-  DescriptionsItem,
-  Divider,
-  Empty,
-  Input,
-  List,
-  ListItem,
-  ListItemMeta,
-  message,
-  Modal,
-  Row,
-  Space,
-  Spin,
-  Statistic,
-  Table,
-  Tabs,
-  TabPane,
-  Tag,
-  Tooltip,
-  Typography,
-  TypographyText,
-  TypographyTitle,
-} from 'ant-design-vue';
-import {
-  AimOutlined,
-  AppstoreOutlined,
-  CameraOutlined,
-  DeleteOutlined,
-  EnvironmentOutlined,
-  EyeOutlined,
-  FileOutlined,
-  HistoryOutlined,
-  InfoCircleOutlined,
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined,
-} from '@ant-design/icons-vue';
-
 import { requestClient } from '#/api/request';
-import { useRoute, useRouter } from 'vue-router';
 
 defineOptions({ name: 'AGCMBIMViewer' });
 
@@ -55,284 +38,311 @@ const route = useRoute();
 const router = useRouter();
 const BASE = '/agcm_bim';
 
+const modelId = ref(route.query.id ? Number(route.query.id) : null);
+const modelData = ref(null);
 const loading = ref(true);
-const model = ref(null);
-const viewpoints = ref([]);
-const summary = ref(null);
-const activeTab = ref('info');
+const loadProgress = ref(0);
+const currentTool = ref('select');
+const selectedObject = ref(null);
+const showProperties = ref(false);
+const showSectionOverview = ref(false);
 
-// Viewpoint create
-const showCreateVP = ref(false);
-const vpForm = ref({ name: '', description: '' });
+// xeokit instances (module-scoped, not reactive)
+let viewer = null;
+let xktLoader = null;
+let sectionPlanes = null;
+let distanceMeasurements = null;
+let distanceMeasurementsControl = null;
+let angleMeasurements = null;
+let angleMeasurementsControl = null;
+let bcfViewpoints = null;
 
-// Element search
-const elementSearch = ref({ ifc_type: '', name: '', level: '' });
-const elements = ref([]);
-const elementsTotal = ref(0);
-const elementsPage = ref(1);
-const elementsLoading = ref(false);
+// ═══════════════════════════════════════════════════════════
+// VIEWER INIT
+// ═══════════════════════════════════════════════════════════
 
-const statusColors = {
-  uploading: 'processing',
-  processing: 'warning',
-  ready: 'success',
-  failed: 'error',
-  archived: 'default',
-};
+async function initViewer() {
+  await nextTick();
 
-function formatSize(bytes) {
-  if (!bytes) return '-';
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / 1048576).toFixed(1) + ' MB';
+  // Create Viewer bound to canvas
+  viewer = new Viewer({
+    canvasId: 'xeokit-canvas',
+    transparent: true,
+    dtxEnabled: true,
+    saoEnabled: true,
+    pbrEnabled: false,
+    edges: true,
+    entityOffsetsEnabled: true,
+    pickSurfacePrecisionEnabled: true,
+  });
+
+  // Camera defaults
+  viewer.camera.eye = [-3.93, 2.85, 27.01];
+  viewer.camera.look = [4.40, 3.72, 8.89];
+  viewer.camera.up = [-0.01, 0.99, 0.03];
+  viewer.cameraControl.navMode = 'orbit';
+  viewer.cameraControl.followPointer = true;
+
+  // XKT Loader with IFC defaults
+  xktLoader = new XKTLoaderPlugin(viewer, {
+    objectDefaults: {
+      IfcSpace: { visible: false, pickable: false },
+      IfcWindow: { colorize: [0.337, 0.304, 0.871], opacity: 0.3 },
+      IfcOpeningElement: { visible: false, pickable: false },
+    },
+  });
+
+  // NavCube
+  new NavCubePlugin(viewer, {
+    canvasId: 'navcube-canvas',
+    visible: true,
+    cameraFly: true,
+    cameraFitFOV: 45,
+    cameraFlyDuration: 0.5,
+  });
+
+  // Section Planes
+  sectionPlanes = new SectionPlanesPlugin(viewer, {
+    overviewCanvasId: 'section-overview-canvas',
+    overviewVisible: true,
+  });
+
+  // Distance Measurements
+  distanceMeasurements = new DistanceMeasurementsPlugin(viewer, {
+    defaultLabelsVisible: true, defaultAxisVisible: true, defaultColor: '#00BBFF',
+  });
+  distanceMeasurementsControl = new DistanceMeasurementsMouseControl(distanceMeasurements, {
+    pointerLens: new PointerLens(viewer), snapToVertex: true, snapToEdge: true,
+  });
+
+  // Angle Measurements
+  angleMeasurements = new AngleMeasurementsPlugin(viewer, {
+    defaultColor: '#FF4444', defaultLabelsVisible: true,
+  });
+  angleMeasurementsControl = new AngleMeasurementsMouseControl(angleMeasurements, {
+    pointerLens: new PointerLens(viewer), snapToVertex: true, snapToEdge: true,
+  });
+
+  // BCF Viewpoints
+  bcfViewpoints = new BCFViewpointsPlugin(viewer, {
+    originatingSystem: 'FastVue BuildForge',
+    authoringTool: 'BuildForge BIM Viewer v1.0',
+  });
+
+  // Object picking
+  viewer.cameraControl.on('picked', (pickResult) => {
+    if (!pickResult || !pickResult.entity) { selectedObject.value = null; showProperties.value = false; return; }
+    const entity = pickResult.entity;
+    const metaObject = viewer.metaScene.metaObjects[entity.id];
+    entity.selected = !entity.selected;
+    selectedObject.value = {
+      entityId: entity.id,
+      name: metaObject?.name || entity.id,
+      type: metaObject?.type || 'Unknown',
+      properties: metaObject?.propertySetDicts || {},
+    };
+    showProperties.value = true;
+  });
+
+  viewer.cameraControl.on('pickedNothing', () => {
+    viewer.scene.setObjectsSelected(viewer.scene.selectedObjectIds, false);
+    selectedObject.value = null;
+    showProperties.value = false;
+  });
+
+  // Resize handler
+  const container = document.querySelector('.bim-viewer-container');
+  if (container) {
+    new ResizeObserver(() => viewer?.scene?.canvas?.resizeCanvas?.()).observe(container);
+  }
+
+  // Load model
+  if (modelId.value) await loadModel(modelId.value);
+  else loading.value = false;
 }
 
-async function fetchModel() {
-  const id = route.query.id;
-  if (!id) { router.push('/agcm/bim/models'); return; }
+// ═══════════════════════════════════════════════════════════
+// MODEL LOADING
+// ═══════════════════════════════════════════════════════════
+
+async function loadModel(id) {
   loading.value = true;
+  loadProgress.value = 10;
   try {
-    model.value = await requestClient.get(`${BASE}/models/${id}`);
-    // Fetch viewpoints
-    const vpData = await requestClient.get(`${BASE}/viewpoints`, { params: { model_id: id } });
-    viewpoints.value = vpData.items || [];
-    // Fetch summary
-    try {
-      summary.value = await requestClient.get(`${BASE}/models/${id}/summary`);
-    } catch { summary.value = null; }
-  } catch {
-    message.error('Failed to load model');
-    router.push('/agcm/bim/models');
-  } finally { loading.value = false; }
+    const data = await requestClient.get(`${BASE}/models/${id}`);
+    modelData.value = data;
+    loadProgress.value = 30;
+
+    const sceneModel = xktLoader.load({
+      id: `model-${id}`,
+      src: `/api/v1${BASE}/models/${id}/xkt`,
+      edges: true, saoEnabled: true, dtxEnabled: true,
+      rotation: [data.rotation_x || 0, data.rotation_y || 0, data.rotation_z || 0],
+      scale: [data.scale_factor || 1, data.scale_factor || 1, data.scale_factor || 1],
+      position: [data.position_x || 0, data.position_y || 0, data.position_z || 0],
+      excludeTypes: ['IfcSpace', 'IfcOpeningElement'],
+    });
+    loadProgress.value = 60;
+
+    sceneModel.on('loaded', () => {
+      loadProgress.value = 100;
+      loading.value = false;
+      viewer.cameraFlight.flyTo({ aabb: sceneModel.aabb, duration: 1 });
+    });
+    sceneModel.on('error', (err) => { loading.value = false; console.error('XKT load error:', err); });
+  } catch (e) {
+    loading.value = false;
+    console.error('Model load failed:', e);
+  }
 }
 
-async function fetchElements() {
-  const id = route.query.id;
-  if (!id) return;
-  elementsLoading.value = true;
-  try {
-    const params = { page: elementsPage.value, page_size: 50 };
-    if (elementSearch.value.ifc_type) params.ifc_type = elementSearch.value.ifc_type;
-    if (elementSearch.value.name) params.name = elementSearch.value.name;
-    if (elementSearch.value.level) params.level = elementSearch.value.level;
+// ═══════════════════════════════════════════════════════════
+// TOOL SWITCHING
+// ═══════════════════════════════════════════════════════════
 
-    const data = await requestClient.get(`${BASE}/models/${id}/elements`, { params });
-    elements.value = data.items || [];
-    elementsTotal.value = data.total || 0;
-  } catch { message.error('Failed to search elements'); }
-  finally { elementsLoading.value = false; }
+function setTool(tool) {
+  distanceMeasurementsControl?.deactivate();
+  angleMeasurementsControl?.deactivate();
+  sectionPlanes?.hideControl();
+
+  switch (tool) {
+    case 'orbit': viewer.cameraControl.navMode = 'orbit'; break;
+    case 'firstPerson': viewer.cameraControl.navMode = 'firstPerson'; break;
+    case 'planView': viewer.cameraControl.navMode = 'planView'; break;
+    case 'measureDistance': distanceMeasurementsControl.activate(); break;
+    case 'measureAngle': angleMeasurementsControl.activate(); break;
+    case 'section':
+      sectionPlanes.createSectionPlane({ pos: viewer.camera.look.slice(), dir: [0, -1, 0], active: true });
+      showSectionOverview.value = true;
+      break;
+    case 'xray':
+      viewer.scene.setObjectsXRayed(viewer.scene.objectIds, true);
+      if (viewer.scene.selectedObjectIds.length) viewer.scene.setObjectsXRayed(viewer.scene.selectedObjectIds, false);
+      break;
+    case 'isolate':
+      if (selectedObject.value) {
+        const ids = viewer.metaScene.getObjectIDsInSubtree(selectedObject.value.entityId);
+        viewer.scene.setObjectsVisible(viewer.scene.objectIds, false);
+        viewer.scene.setObjectsVisible(ids, true);
+        viewer.cameraFlight.flyTo({ aabb: viewer.scene.getAABB(ids), duration: 0.5 });
+      }
+      break;
+    case 'showAll':
+      viewer.scene.setObjectsVisible(viewer.scene.objectIds, true);
+      viewer.scene.setObjectsXRayed(viewer.scene.objectIds, false);
+      viewer.scene.setObjectsSelected(viewer.scene.objectIds, false);
+      break;
+    case 'fitAll':
+      viewer.cameraFlight.flyTo({ aabb: viewer.scene.aabb, duration: 0.5 });
+      break;
+  }
+  currentTool.value = tool;
 }
 
-async function createViewpoint() {
-  if (!vpForm.value.name) { message.warning('Name is required'); return; }
+async function saveViewpoint() {
+  if (!bcfViewpoints) return;
+  const vp = bcfViewpoints.getViewpoint({ spacesVisible: false, openingsVisible: false, snapshot: true, defaultInvisible: true });
   try {
     await requestClient.post(`${BASE}/viewpoints`, {
-      model_id: parseInt(route.query.id),
-      name: vpForm.value.name,
-      description: vpForm.value.description,
-      camera_position: JSON.stringify({ x: 0, y: 0, z: 10, rx: 0, ry: 0, rz: 0, fov: 60 }),
-      camera_target: JSON.stringify({ x: 0, y: 0, z: 0 }),
+      model_id: modelId.value,
+      name: `Viewpoint ${new Date().toLocaleString()}`,
+      camera_position: JSON.stringify(vp.perspective_camera || vp.orthographic_camera || {}),
+      camera_target: JSON.stringify({ x: viewer.camera.look[0], y: viewer.camera.look[1], z: viewer.camera.look[2] }),
+      annotations: JSON.stringify(vp),
     });
-    message.success('Viewpoint saved');
-    showCreateVP.value = false;
-    vpForm.value = { name: '', description: '' };
-    fetchModel();
-  } catch { message.error('Failed to save viewpoint'); }
+  } catch (e) { console.error('Save viewpoint failed:', e); }
 }
 
-async function deleteViewpoint(vpId) {
-  try {
-    await requestClient.delete(`${BASE}/viewpoints/${vpId}`);
-    message.success('Viewpoint deleted');
-    fetchModel();
-  } catch { message.error('Failed to delete viewpoint'); }
-}
+function clearMeasurements() { distanceMeasurements?.clear(); angleMeasurements?.clear(); }
+function clearSections() { sectionPlanes?.clear(); showSectionOverview.value = false; }
 
-const summaryTypes = computed(() => {
-  if (!summary.value?.types) return [];
-  return Object.entries(summary.value.types)
-    .sort((a, b) => b[1] - a[1])
-    .map(([type, count]) => ({ type, count }));
-});
+// ═══════════════════════════════════════════════════════════
+// LIFECYCLE
+// ═══════════════════════════════════════════════════════════
 
-const summaryLevels = computed(() => {
-  if (!summary.value?.levels) return [];
-  return Object.entries(summary.value.levels)
-    .sort((a, b) => b[1] - a[1])
-    .map(([level, count]) => ({ level, count }));
-});
-
-onMounted(() => {
-  fetchModel();
-});
+onMounted(() => initViewer());
+onBeforeUnmount(() => { if (viewer) { viewer.destroy(); viewer = null; } });
 </script>
 
 <template>
-  <Page title="BIM Model Viewer" description="View model details, viewpoints, and element data">
-    <Spin :spinning="loading">
-      <div v-if="model">
-        <!-- Header -->
-        <Card class="mb-4">
-          <Row :gutter="24">
-            <Col :span="16">
-              <div class="flex items-center gap-3 mb-2">
-                <Tag color="blue">{{ model.sequence_name }}</Tag>
-                <TypographyTitle :level="4" style="margin: 0">{{ model.name }}</TypographyTitle>
-                <Badge :status="statusColors[model.status] || 'default'" :text="model.status" />
-              </div>
-              <TypographyText v-if="model.description" type="secondary">{{ model.description }}</TypographyText>
-              <Descriptions :column="3" size="small" class="mt-3">
-                <DescriptionsItem label="Discipline">
-                  <Tag v-if="model.discipline" :color="{ architectural: 'blue', structural: 'red', mep: 'green', civil: 'orange', composite: 'purple' }[model.discipline]">{{ model.discipline }}</Tag>
-                  <span v-else>-</span>
-                </DescriptionsItem>
-                <DescriptionsItem label="Format">{{ model.file_format ? model.file_format.toUpperCase() : '-' }}</DescriptionsItem>
-                <DescriptionsItem label="File">{{ model.file_name || '-' }} ({{ formatSize(model.file_size) }})</DescriptionsItem>
-                <DescriptionsItem label="Version">v{{ model.version }}{{ model.is_current ? ' (current)' : '' }}</DescriptionsItem>
-                <DescriptionsItem label="Elements">{{ model.element_count.toLocaleString() }}</DescriptionsItem>
-                <DescriptionsItem label="Viewpoints">{{ model.viewpoint_count || 0 }}</DescriptionsItem>
-              </Descriptions>
-            </Col>
-            <Col :span="8">
-              <!-- 3D Viewer Placeholder -->
-              <div class="bim-viewer-placeholder">
-                <div class="flex flex-col items-center justify-center h-full text-gray-400">
-                  <AppstoreOutlined style="font-size: 48px" />
-                  <p class="mt-2">3D Viewer</p>
-                  <p class="text-xs">Integrate xeokit SDK for IFC viewing</p>
-                </div>
-              </div>
-            </Col>
-          </Row>
-        </Card>
-
-        <!-- Tabs -->
-        <Card>
-          <Tabs v-model:activeKey="activeTab">
-            <!-- Info Tab -->
-            <TabPane key="info" tab="Model Info">
-              <Row :gutter="16">
-                <Col :span="8">
-                  <Statistic title="Total Elements" :value="model.element_count" />
-                </Col>
-                <Col :span="8">
-                  <Statistic title="IFC Types" :value="summaryTypes.length" />
-                </Col>
-                <Col :span="8">
-                  <Statistic title="Levels" :value="summaryLevels.length" />
-                </Col>
-              </Row>
-              <Divider />
-              <Row :gutter="24">
-                <Col :span="12">
-                  <h4>Element Types</h4>
-                  <Table :data-source="summaryTypes" :pagination="false" size="small" row-key="type">
-                    <Table.Column title="IFC Type" dataIndex="type" key="type" />
-                    <Table.Column title="Count" dataIndex="count" key="count" width="100" />
-                  </Table>
-                </Col>
-                <Col :span="12">
-                  <h4>Levels</h4>
-                  <Table :data-source="summaryLevels" :pagination="false" size="small" row-key="level">
-                    <Table.Column title="Level" dataIndex="level" key="level" />
-                    <Table.Column title="Elements" dataIndex="count" key="count" width="100" />
-                  </Table>
-                </Col>
-              </Row>
-            </TabPane>
-
-            <!-- Viewpoints Tab -->
-            <TabPane key="viewpoints" tab="Viewpoints">
-              <div class="mb-3 flex justify-between items-center">
-                <span>{{ viewpoints.length }} viewpoint(s)</span>
-                <Button type="primary" size="small" @click="showCreateVP = true"><template #icon><PlusOutlined /></template>Save Viewpoint</Button>
-              </div>
-              <List v-if="viewpoints.length > 0" :data-source="viewpoints" size="small">
-                <template #renderItem="{ item }">
-                  <ListItem>
-                    <ListItemMeta :title="item.name" :description="item.description || 'No description'">
-                      <template #avatar>
-                        <CameraOutlined style="font-size: 20px; color: #1890ff" />
-                      </template>
-                    </ListItemMeta>
-                    <template #actions>
-                      <Tooltip v-if="item.entity_type" :title="`Linked to ${item.entity_type} #${item.entity_id}`">
-                        <Tag color="blue">{{ item.entity_type }}</Tag>
-                      </Tooltip>
-                      <Button type="link" size="small" danger @click="deleteViewpoint(item.id)"><DeleteOutlined /></Button>
-                    </template>
-                  </ListItem>
-                </template>
-              </List>
-              <Empty v-else description="No viewpoints saved yet" />
-            </TabPane>
-
-            <!-- Elements Tab -->
-            <TabPane key="elements" tab="Elements">
-              <div class="mb-3 flex flex-wrap items-center gap-3">
-                <Input v-model:value="elementSearch.ifc_type" placeholder="IFC Type (e.g. IfcWall)" style="width: 180px" allow-clear />
-                <Input v-model:value="elementSearch.name" placeholder="Name" style="width: 180px" allow-clear />
-                <Input v-model:value="elementSearch.level" placeholder="Level" style="width: 140px" allow-clear />
-                <Button @click="fetchElements"><template #icon><SearchOutlined /></template>Search</Button>
-              </div>
-              <Table
-                :data-source="elements"
-                :loading="elementsLoading"
-                row-key="id"
-                size="small"
-                :pagination="{ current: elementsPage, pageSize: 50, total: elementsTotal, showTotal: (t) => `${t} elements` }"
-                @change="(p) => { elementsPage = p.current; fetchElements(); }"
-              >
-                <Table.Column title="GlobalId" dataIndex="global_id" key="global_id" width="200" />
-                <Table.Column title="Type" dataIndex="ifc_type" key="ifc_type" width="140" />
-                <Table.Column title="Name" dataIndex="name" key="name" />
-                <Table.Column title="Level" dataIndex="level" key="level" width="120" />
-                <Table.Column title="Material" dataIndex="material" key="material" width="150" />
-              </Table>
-            </TabPane>
-
-            <!-- Version History Tab -->
-            <TabPane key="versions" tab="Versions">
-              <Table :data-source="model.version_history || []" row-key="id" size="small" :pagination="false">
-                <Table.Column title="Version" dataIndex="version" key="version" width="100">
-                  <template #default="{ record }">
-                    v{{ record.version }}
-                    <Tag v-if="record.is_current" color="green" size="small">current</Tag>
-                  </template>
-                </Table.Column>
-                <Table.Column title="Name" dataIndex="name" key="name" />
-                <Table.Column title="Created" dataIndex="created_at" key="created_at" width="160">
-                  <template #default="{ record }">
-                    {{ record.created_at ? new Date(record.created_at).toLocaleDateString() : '-' }}
-                  </template>
-                </Table.Column>
-                <Table.Column title="" key="actions" width="80">
-                  <template #default="{ record }">
-                    <Button type="link" size="small" @click="router.push({ path: '/agcm/bim/viewer', query: { id: record.id } })">
-                      <EyeOutlined />
-                    </Button>
-                  </template>
-                </Table.Column>
-              </Table>
-            </TabPane>
-          </Tabs>
-        </Card>
+  <Page title="BIM 3D Viewer" description="Interactive 3D model viewer powered by xeokit">
+    <div class="bim-page">
+      <!-- Toolbar -->
+      <div class="bim-toolbar">
+        <ASpace wrap>
+          <AButton size="small" @click="router.push('/agcm/bim/models')">Back</AButton>
+          <ADivider type="vertical" />
+          <ATooltip title="Orbit"><AButton size="small" :type="currentTool==='orbit'?'primary':'default'" @click="setTool('orbit')">Orbit</AButton></ATooltip>
+          <ATooltip title="Walk"><AButton size="small" :type="currentTool==='firstPerson'?'primary':'default'" @click="setTool('firstPerson')">Walk</AButton></ATooltip>
+          <ATooltip title="Plan"><AButton size="small" :type="currentTool==='planView'?'primary':'default'" @click="setTool('planView')">Plan</AButton></ATooltip>
+          <ADivider type="vertical" />
+          <ATooltip title="Distance"><AButton size="small" :type="currentTool==='measureDistance'?'primary':'default'" @click="setTool('measureDistance')">Distance</AButton></ATooltip>
+          <ATooltip title="Angle"><AButton size="small" :type="currentTool==='measureAngle'?'primary':'default'" @click="setTool('measureAngle')">Angle</AButton></ATooltip>
+          <ATooltip title="Section Cut"><AButton size="small" @click="setTool('section')">Section</AButton></ATooltip>
+          <ADivider type="vertical" />
+          <AButton size="small" @click="setTool('xray')">X-Ray</AButton>
+          <AButton size="small" @click="setTool('isolate')">Isolate</AButton>
+          <AButton size="small" @click="setTool('showAll')">Show All</AButton>
+          <AButton size="small" @click="setTool('fitAll')">Fit</AButton>
+          <ADivider type="vertical" />
+          <AButton size="small" @click="saveViewpoint">Save View</AButton>
+          <AButton size="small" @click="clearMeasurements">Clear Measures</AButton>
+          <AButton size="small" @click="clearSections">Clear Sections</AButton>
+        </ASpace>
       </div>
-      <Empty v-else-if="!loading" description="Model not found" />
-    </Spin>
 
-    <!-- Create Viewpoint Modal -->
-    <Modal v-model:open="showCreateVP" title="Save Viewpoint" @ok="createViewpoint" ok-text="Save">
-      <div class="flex flex-col gap-3 py-2">
-        <div>
-          <label class="mb-1 block text-sm font-medium">Name *</label>
-          <Input v-model:value="vpForm.name" placeholder="e.g. Level 2 MEP Overview" />
+      <!-- Viewer -->
+      <div class="bim-viewer-container">
+        <canvas id="xeokit-canvas" class="bim-canvas" />
+        <canvas id="navcube-canvas" class="navcube-canvas" />
+        <canvas id="section-overview-canvas" class="section-canvas" v-show="showSectionOverview" />
+
+        <!-- Loading -->
+        <div v-if="loading" class="bim-loading">
+          <ASpin size="large" />
+          <div style="margin-top:12px;font-size:13px;color:#555;">Loading model... {{ loadProgress }}%</div>
+          <AProgress :percent="loadProgress" :show-info="false" style="width:200px;margin-top:8px;" />
         </div>
-        <div>
-          <label class="mb-1 block text-sm font-medium">Description</label>
-          <Input v-model:value="vpForm.description" placeholder="Optional" />
+
+        <!-- Properties -->
+        <div v-if="showProperties && selectedObject" class="bim-props">
+          <div class="bim-props-head"><strong>{{ selectedObject.name }}</strong><AButton type="text" size="small" @click="showProperties=false">X</AButton></div>
+          <div class="bim-props-body">
+            <div class="prop-r"><span class="prop-l">Entity ID</span><span class="prop-v" style="font-family:monospace;">{{ selectedObject.entityId }}</span></div>
+            <div class="prop-r"><span class="prop-l">IFC Type</span><ATag color="blue" size="small">{{ selectedObject.type }}</ATag></div>
+            <template v-if="selectedObject.properties">
+              <template v-for="(propSet, setName) in selectedObject.properties" :key="setName">
+                <div style="font-size:10px;font-weight:600;color:#555;margin-top:6px;border-top:1px solid #f0f0f0;padding-top:4px;">{{ setName }}</div>
+                <div v-for="(val, key) in propSet" :key="key" class="prop-r"><span class="prop-l">{{ key }}</span><span class="prop-v">{{ val }}</span></div>
+              </template>
+            </template>
+          </div>
+        </div>
+
+        <!-- Model info badge -->
+        <div v-if="modelData" class="bim-info">
+          <strong>{{ modelData.name }}</strong>
+          <span style="color:#999;font-size:10px;margin-left:6px;">.{{ modelData.file_format }}</span>
+          <ATag :color="modelData.status==='ready'?'green':'orange'" size="small" style="margin-left:6px;">{{ modelData.status }}</ATag>
         </div>
       </div>
-    </Modal>
+    </div>
   </Page>
 </template>
+
+<style scoped>
+.bim-page { display: flex; flex-direction: column; height: calc(100vh - 120px); }
+.bim-toolbar { padding: 6px 12px; background: #fafafa; border-bottom: 1px solid #e8e8e8; flex-shrink: 0; overflow-x: auto; }
+.bim-viewer-container { position: relative; flex: 1; overflow: hidden; background: linear-gradient(135deg, #e8edf2, #f5f5f5, #ffffff); }
+.bim-canvas { width: 100%; height: 100%; display: block; }
+.navcube-canvas { position: absolute; top: 12px; right: 12px; width: 150px; height: 150px; z-index: 10; }
+.section-canvas { position: absolute; bottom: 12px; right: 12px; width: 200px; height: 200px; z-index: 10; border: 1px solid #ccc; border-radius: 6px; background: #fff; }
+.bim-loading { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(255,255,255,0.88); z-index: 20; }
+.bim-props { position: absolute; top: 12px; right: 170px; width: 280px; max-height: calc(100% - 24px); background: #fff; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); z-index: 15; overflow-y: auto; }
+.bim-props-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1px solid #f0f0f0; background: #fafafa; font-size: 12px; }
+.bim-props-body { padding: 8px 12px; font-size: 11px; }
+.prop-r { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #f8f8f8; }
+.prop-l { color: #888; font-size: 10px; }
+.prop-v { color: #333; font-size: 10px; max-width: 160px; word-break: break-all; }
+.bim-info { position: absolute; top: 12px; left: 12px; background: rgba(255,255,255,0.92); border: 1px solid #e0e0e0; border-radius: 6px; padding: 6px 12px; z-index: 15; font-size: 12px; display: flex; align-items: center; }
+</style>
