@@ -341,12 +341,34 @@ class BIMService:
             visible_elements=data.visible_elements,
             hidden_elements=data.hidden_elements,
             annotations=data.annotations,
+            bcf_data=data.bcf_data,
             screenshot_url=data.screenshot_url,
+            snapshot_url=data.snapshot_url,
+            snapshot_base64=data.snapshot_base64,
             entity_type=data.entity_type,
             entity_id=data.entity_id,
+            linked_rfi_id=data.linked_rfi_id,
+            linked_issue_id=data.linked_issue_id,
+            tags=data.tags,
             created_by=self.user_id,
         )
         self.db.add(vp)
+        self.db.commit()
+        self.db.refresh(vp)
+        return vp
+
+    def link_viewpoint_to_entity(self, viewpoint_id: int, entity_type: str, entity_id: int) -> Optional[BIMViewpoint]:
+        """Link a viewpoint to an entity (rfi, issue, etc.)."""
+        vp = self.get_viewpoint(viewpoint_id)
+        if not vp:
+            return None
+        vp.entity_type = entity_type
+        vp.entity_id = entity_id
+        # Also set convenience FK if applicable
+        if entity_type == "rfi":
+            vp.linked_rfi_id = entity_id
+        elif entity_type == "issue":
+            vp.linked_issue_id = entity_id
         self.db.commit()
         self.db.refresh(vp)
         return vp

@@ -1,8 +1,8 @@
 <script setup>
 /**
- * BIM 3D Viewer — Phase 2: Full BIM Tools
+ * BIM 3D Viewer — Phase 3: Collaboration Features
  *
- * Features:
+ * Phase 1+2 Features (preserved):
  * - XKT model loading with multi-model federation
  * - IFC Tree Panel (spatial hierarchy browser)
  * - Section Planes Panel with interactive controls
@@ -11,6 +11,14 @@
  * - Enhanced toolbar with grouped tools
  * - Keyboard shortcuts
  * - NavCube, BCF viewpoints, object selection
+ *
+ * Phase 3 Features (new):
+ * - BCF Viewpoints Panel with save/load/share (full BCF 2.1 JSON)
+ * - Annotation List Panel with filtering by status/priority
+ * - Snapshot export (PNG download)
+ * - Share viewpoint via URL
+ * - Cross-entity linking (viewpoints linked to RFIs, Issues)
+ * - Enhanced keyboard shortcuts (V, A, S, 1-5)
  */
 
 import { onMounted, onBeforeUnmount, ref, reactive, computed, nextTick, watch } from 'vue';
@@ -40,7 +48,7 @@ const router = useRouter();
 const BASE = '/agcm_bim';
 
 // ═══════════════════════════════════════════════════════════
-// STATE
+// STATE — Phase 1+2
 // ═══════════════════════════════════════════════════════════
 
 const modelId = ref(route.query.id ? Number(route.query.id) : null);
@@ -88,6 +96,28 @@ const availableModels = ref([]);
 const loadedModels = ref([]);
 const loadingAdditionalModel = ref(false);
 
+// ═══════════════════════════════════════════════════════════
+// STATE — Phase 3: Collaboration
+// ═══════════════════════════════════════════════════════════
+
+const showViewpointsPanel = ref(false);
+const viewpointsList = ref([]);
+const loadingViewpoints = ref(false);
+const savingViewpoint = ref(false);
+const viewpointNameInput = ref('');
+
+// Annotation filtering
+const annotationFilterStatus = ref('all');
+const annotationFilterPriority = ref('all');
+
+// Link entity modal
+const linkEntityModalVisible = ref(false);
+const linkEntityTarget = ref(null); // { type: 'viewpoint'|'annotation', id: ... }
+const linkEntityForm = reactive({ entity_type: 'rfi', entity_id: null });
+
+// Viewpoint from URL query param
+const initialViewpointId = ref(route.query.viewpoint ? Number(route.query.viewpoint) : null);
+
 // xeokit instances (module-scoped, not reactive)
 let viewer = null;
 let xktLoader = null;
@@ -99,6 +129,21 @@ let angleMeasurementsControl = null;
 let bcfViewpoints = null;
 let treeViewPlugin = null;
 let annotationsPlugin = null;
+
+// ═══════════════════════════════════════════════════════════
+// COMPUTED — Phase 3
+// ═══════════════════════════════════════════════════════════
+
+const filteredAnnotations = computed(() => {
+  let list = annotationsList.value;
+  if (annotationFilterStatus.value !== 'all') {
+    list = list.filter((a) => a.status === annotationFilterStatus.value);
+  }
+  if (annotationFilterPriority.value !== 'all') {
+    list = list.filter((a) => a.priority === annotationFilterPriority.value);
+  }
+  return list;
+});
 
 // ═══════════════════════════════════════════════════════════
 // VIEWER INIT
@@ -175,7 +220,7 @@ async function initViewer() {
   // BCF Viewpoints
   bcfViewpoints = new BCFViewpointsPlugin(viewer, {
     originatingSystem: 'FastVue BuildForge',
-    authoringTool: 'BuildForge BIM Viewer v2.0',
+    authoringTool: 'BuildForge BIM Viewer v3.0',
   });
 
   // IFC Tree
@@ -312,8 +357,17 @@ async function loadModel(id, federation) {
         loadAnnotations();
       }
 
+      // Load saved viewpoints
+      loadViewpoints();
+
       refreshMeasurementsList();
       refreshSectionPlanesList();
+
+      // Auto-restore viewpoint from URL query param
+      if (initialViewpointId.value) {
+        restoreViewpointById(initialViewpointId.value);
+        initialViewpointId.value = null;
+      }
     });
 
     sceneModel.on('error', (err) => {
@@ -661,6 +715,186 @@ function toggleAnnotationsVisible() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// PHASE 3: BCF VIEWPOINTS PANEL
+// ═══════════════════════════════════════════════════════════
+
+async function loadViewpoints() {
+  if (!modelId.value) return;
+  loadingViewpoints.value = true;
+  try {
+    const result = await requestClient.get(`${BASE}/viewpoints`, {
+      params: { model_id: modelId.value, page_size: 100 },
+    });
+    viewpointsList.value = result.items || result || [];
+  } catch (e) {
+    console.error('Failed to load viewpoints:', e);
+  } finally {
+    loadingViewpoints.value = false;
+  }
+}
+
+async function saveCurrentViewpoint() {
+  if (!bcfViewpoints || !modelId.value) return;
+  savingViewpoint.value = true;
+  try {
+    // Get full BCF 2.1 JSON from plugin
+    const bcfData = bcfViewpoints.getViewpoint({
+      spacesVisible: false,
+      openingsVisible: false,
+      snapshot: false,
+      defaultInvisible: true,
+    });
+
+    // Take screenshot
+    let snapshotBase64 = null;
+    try {
+      snapshotBase64 = viewer.getSnapshot({ format: 'png', width: 300, height: 200 });
+    } catch (e) {
+      console.warn('Snapshot capture failed:', e);
+    }
+
+    const name = viewpointNameInput.value.trim() || `Viewpoint ${new Date().toLocaleString()}`;
+
+    const payload = {
+      model_id: modelId.value,
+      name: name,
+      bcf_data: JSON.stringify(bcfData),
+      camera_position: JSON.stringify(bcfData.perspective_camera || bcfData.orthographic_camera || {}),
+      camera_target: JSON.stringify({
+        x: viewer.camera.look[0],
+        y: viewer.camera.look[1],
+        z: viewer.camera.look[2],
+      }),
+      snapshot_base64: snapshotBase64 || null,
+      annotations: JSON.stringify(bcfData),
+    };
+
+    await requestClient.post(`${BASE}/viewpoints`, payload);
+    viewpointNameInput.value = '';
+    await loadViewpoints();
+  } catch (e) {
+    console.error('Save viewpoint failed:', e);
+  } finally {
+    savingViewpoint.value = false;
+  }
+}
+
+async function restoreViewpoint(vp) {
+  if (!bcfViewpoints) return;
+  try {
+    // Parse full BCF data if available
+    const bcfData = vp.bcf_data ? JSON.parse(vp.bcf_data) : null;
+    if (bcfData) {
+      bcfViewpoints.setViewpoint(bcfData, { immediate: false, duration: 0.5 });
+    } else if (vp.camera_position) {
+      // Fallback to simple camera restore
+      const cam = JSON.parse(vp.camera_position);
+      const target = vp.camera_target ? JSON.parse(vp.camera_target) : null;
+      if (cam && target) {
+        viewer.cameraFlight.flyTo({
+          eye: [cam.eye?.x ?? cam.x ?? 0, cam.eye?.y ?? cam.y ?? 0, cam.eye?.z ?? cam.z ?? 0],
+          look: [target.x || 0, target.y || 0, target.z || 0],
+          duration: 0.5,
+        });
+      }
+    }
+  } catch (e) {
+    console.error('Failed to restore viewpoint:', e);
+  }
+}
+
+async function restoreViewpointById(vpId) {
+  try {
+    const vp = await requestClient.get(`${BASE}/viewpoints/${vpId}`);
+    if (vp) {
+      restoreViewpoint(vp);
+    }
+  } catch (e) {
+    console.error('Failed to load viewpoint by ID:', e);
+  }
+}
+
+async function deleteViewpoint(vp) {
+  try {
+    await requestClient.delete(`${BASE}/viewpoints/${vp.id}`);
+    await loadViewpoints();
+  } catch (e) {
+    console.error('Failed to delete viewpoint:', e);
+  }
+}
+
+function copyViewpointLink(vp) {
+  const url = `${window.location.origin}${window.location.pathname}?id=${modelId.value}&viewpoint=${vp.id}`;
+  navigator.clipboard.writeText(url).then(() => {
+    // Brief feedback — could use message API but keeping it simple
+    console.log('Viewpoint link copied to clipboard');
+  }).catch(() => {
+    // Fallback: select-and-copy via temp textarea
+    const ta = document.createElement('textarea');
+    ta.value = url;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 3: LINK ENTITY
+// ═══════════════════════════════════════════════════════════
+
+function openLinkEntityModal(targetType, targetId) {
+  linkEntityTarget.value = { type: targetType, id: targetId };
+  linkEntityForm.entity_type = 'rfi';
+  linkEntityForm.entity_id = null;
+  linkEntityModalVisible.value = true;
+}
+
+async function submitLinkEntity() {
+  if (!linkEntityTarget.value || !linkEntityForm.entity_id) return;
+  const target = linkEntityTarget.value;
+  try {
+    if (target.type === 'viewpoint') {
+      await requestClient.post(`${BASE}/viewpoints/${target.id}/link`, {
+        entity_type: linkEntityForm.entity_type,
+        entity_id: linkEntityForm.entity_id,
+      });
+      await loadViewpoints();
+    } else if (target.type === 'annotation') {
+      await requestClient.put(`${BASE}/annotations/${target.id}`, {
+        linked_entity_type: linkEntityForm.entity_type,
+        linked_entity_id: linkEntityForm.entity_id,
+      });
+      await loadAnnotations();
+    }
+    linkEntityModalVisible.value = false;
+  } catch (e) {
+    console.error('Failed to link entity:', e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 3: SNAPSHOT EXPORT
+// ═══════════════════════════════════════════════════════════
+
+function takeScreenshot() {
+  if (!viewer) return;
+  try {
+    const dataUrl = viewer.getSnapshot({ format: 'png', width: 1920, height: 1080 });
+    // Trigger browser download
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    link.download = `bim-screenshot-${ts}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  } catch (e) {
+    console.error('Screenshot failed:', e);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // TOOL SWITCHING
 // ═══════════════════════════════════════════════════════════
 
@@ -732,31 +966,6 @@ function setTool(tool) {
   refreshMeasurementsList();
 }
 
-async function saveViewpoint() {
-  if (!bcfViewpoints) return;
-  const vp = bcfViewpoints.getViewpoint({
-    spacesVisible: false,
-    openingsVisible: false,
-    snapshot: true,
-    defaultInvisible: true,
-  });
-  try {
-    await requestClient.post(`${BASE}/viewpoints`, {
-      model_id: modelId.value,
-      name: `Viewpoint ${new Date().toLocaleString()}`,
-      camera_position: JSON.stringify(vp.perspective_camera || vp.orthographic_camera || {}),
-      camera_target: JSON.stringify({
-        x: viewer.camera.look[0],
-        y: viewer.camera.look[1],
-        z: viewer.camera.look[2],
-      }),
-      annotations: JSON.stringify(vp),
-    });
-  } catch (e) {
-    console.error('Save viewpoint failed:', e);
-  }
-}
-
 function clearMeasurements() {
   distanceMeasurements?.clear();
   angleMeasurements?.clear();
@@ -770,7 +979,7 @@ function clearSections() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// KEYBOARD SHORTCUTS
+// KEYBOARD SHORTCUTS — Phase 2 + Phase 3
 // ═══════════════════════════════════════════════════════════
 
 function handleKeyDown(e) {
@@ -809,6 +1018,42 @@ function handleKeyDown(e) {
         }
       }
       break;
+    // Phase 3 shortcuts
+    case 'v':
+    case 'V':
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        showViewpointsPanel.value = !showViewpointsPanel.value;
+      }
+      break;
+    case 'a':
+    case 'A':
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        showAnnotationPanel.value = !showAnnotationPanel.value;
+      }
+      break;
+    case 's':
+    case 'S':
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        takeScreenshot();
+      }
+      break;
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+    case '5': {
+      if (!e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        const idx = parseInt(e.key) - 1;
+        if (viewpointsList.value[idx]) {
+          restoreViewpoint(viewpointsList.value[idx]);
+        }
+      }
+      break;
+    }
     case 'Delete':
       // Delete selected measurement or section
       break;
@@ -819,11 +1064,18 @@ function handleKeyDown(e) {
 // HELPERS
 // ═══════════════════════════════════════════════════════════
 
-const priorityColors = { low: 'blue', medium: 'orange', high: 'red', critical: 'magenta' };
-const statusColors = { open: 'orange', in_progress: 'blue', resolved: 'green' };
+const priorityColors = { low: 'default', medium: 'blue', high: 'orange', critical: 'red' };
+const statusColors = { open: 'blue', in_progress: 'orange', resolved: 'green' };
+const entityTypeLabels = { rfi: 'RFI', issue: 'Issue', clash: 'Clash', submittal: 'Submittal' };
 
 function formatDir(dir) {
   return `[${dir.map((v) => v.toFixed(2)).join(', ')}]`;
+}
+
+function formatDate(dt) {
+  if (!dt) return '';
+  const d = new Date(dt);
+  return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -928,11 +1180,23 @@ onBeforeUnmount(() => {
 
           <ADivider type="vertical" />
 
+          <!-- Collaboration Group (Phase 3) -->
+          <AButtonGroup size="small">
+            <ATooltip title="Viewpoints panel (V)">
+              <AButton :type="showViewpointsPanel ? 'primary' : 'default'" @click="showViewpointsPanel = !showViewpointsPanel">Viewpoints</AButton>
+            </ATooltip>
+            <ATooltip title="Annotations panel (A)">
+              <AButton :type="showAnnotationPanel ? 'primary' : 'default'" @click="showAnnotationPanel = !showAnnotationPanel">Annotations</AButton>
+            </ATooltip>
+            <ATooltip title="Export screenshot (S)">
+              <AButton @click="takeScreenshot">Screenshot</AButton>
+            </ATooltip>
+          </AButtonGroup>
+
+          <ADivider type="vertical" />
+
           <!-- View Group -->
           <AButtonGroup size="small">
-            <ATooltip title="Save BCF viewpoint">
-              <AButton @click="saveViewpoint">Save View</AButton>
-            </ATooltip>
             <ATooltip title="Toggle IFC tree panel">
               <AButton :type="showTreePanel ? 'primary' : 'default'" @click="toggleTreePanel">Tree</AButton>
             </ATooltip>
@@ -944,9 +1208,6 @@ onBeforeUnmount(() => {
             </ATooltip>
             <ATooltip title="Measurements panel">
               <AButton :type="showMeasurementPanel ? 'primary' : 'default'" @click="showMeasurementPanel = !showMeasurementPanel; refreshMeasurementsList()">Measures</AButton>
-            </ATooltip>
-            <ATooltip title="Annotations panel">
-              <AButton :type="showAnnotationPanel ? 'primary' : 'default'" @click="showAnnotationPanel = !showAnnotationPanel">Annotations</AButton>
             </ATooltip>
           </AButtonGroup>
 
@@ -1086,7 +1347,7 @@ onBeforeUnmount(() => {
               <template v-if="angleMeasurementsList.length > 0">
                 <div class="bim-panel-section-title">Angle</div>
                 <div v-for="m in angleMeasurementsList" :key="'a-' + m.id" class="bim-list-item">
-                  <div style="flex: 1; font-size: 11px">{{ m.id }}: <strong>{{ m.angle }}°</strong></div>
+                  <div style="flex: 1; font-size: 11px">{{ m.id }}: <strong>{{ m.angle }}deg</strong></div>
                   <AButton size="small" danger @click="deleteAngleMeasurement(m.id)">Del</AButton>
                 </div>
               </template>
@@ -1096,15 +1357,86 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <!-- Annotation Panel -->
+          <!-- ═══════════ Phase 3: BCF Viewpoints Panel ═══════════ -->
+          <div v-if="showViewpointsPanel" class="bim-right-panel bim-viewpoints-panel" style="top: 12px; right: 170px">
+            <div class="bim-panel-head">
+              <strong>Viewpoints</strong>
+              <AButton type="text" size="small" @click="showViewpointsPanel = false">X</AButton>
+            </div>
+            <div class="bim-panel-body">
+              <!-- Save current view -->
+              <div class="bim-vp-save-bar">
+                <AInput
+                  v-model:value="viewpointNameInput"
+                  size="small"
+                  placeholder="Viewpoint name (optional)"
+                  style="flex: 1"
+                  @pressEnter="saveCurrentViewpoint"
+                />
+                <AButton size="small" type="primary" :loading="savingViewpoint" @click="saveCurrentViewpoint">Save View</AButton>
+              </div>
+
+              <div v-if="loadingViewpoints" style="text-align: center; padding: 16px"><ASpin size="small" /></div>
+              <div v-else-if="viewpointsList.length === 0" class="bim-empty-msg">No saved viewpoints. Click "Save View" to create one.</div>
+
+              <div v-for="(vp, idx) in viewpointsList" :key="vp.id" class="bim-vp-item" @click="restoreViewpoint(vp)">
+                <div class="bim-vp-item-thumb">
+                  <img v-if="vp.snapshot_base64" :src="vp.snapshot_base64" class="bim-vp-thumb-img" />
+                  <div v-else class="bim-vp-thumb-placeholder">{{ idx + 1 }}</div>
+                </div>
+                <div class="bim-vp-item-info">
+                  <div class="bim-vp-item-name">{{ vp.name }}</div>
+                  <div class="bim-vp-item-date">{{ formatDate(vp.created_at) }}</div>
+                  <div v-if="vp.entity_type" class="bim-vp-item-entity">
+                    <ATag :color="vp.entity_type === 'rfi' ? 'blue' : vp.entity_type === 'issue' ? 'orange' : 'default'" size="small">
+                      {{ entityTypeLabels[vp.entity_type] || vp.entity_type }} #{{ vp.entity_id }}
+                    </ATag>
+                  </div>
+                  <div v-if="vp.tags" style="margin-top: 2px">
+                    <ATag v-for="tag in vp.tags.split(',')" :key="tag" size="small" style="margin-right: 2px">{{ tag.trim() }}</ATag>
+                  </div>
+                </div>
+                <div class="bim-vp-item-actions" @click.stop>
+                  <ATooltip title="Copy share link">
+                    <AButton size="small" @click="copyViewpointLink(vp)">Link</AButton>
+                  </ATooltip>
+                  <ATooltip title="Link to entity">
+                    <AButton size="small" @click="openLinkEntityModal('viewpoint', vp.id)">Link</AButton>
+                  </ATooltip>
+                  <AButton size="small" danger @click="deleteViewpoint(vp)">Del</AButton>
+                </div>
+              </div>
+
+              <div v-if="viewpointsList.length > 0" class="bim-vp-hint">
+                Press 1-5 to quick-load viewpoints
+              </div>
+            </div>
+          </div>
+
+          <!-- ═══════════ Phase 3: Enhanced Annotation Panel ═══════════ -->
           <div v-if="showAnnotationPanel" class="bim-right-panel" style="top: 12px; right: 170px">
             <div class="bim-panel-head">
               <strong>Annotations</strong>
               <AButton type="text" size="small" @click="showAnnotationPanel = false">X</AButton>
             </div>
+            <div class="bim-ann-filters">
+              <ASelect v-model:value="annotationFilterStatus" size="small" style="width: 100px">
+                <ASelectOption value="all">All Status</ASelectOption>
+                <ASelectOption value="open">Open</ASelectOption>
+                <ASelectOption value="in_progress">In Progress</ASelectOption>
+                <ASelectOption value="resolved">Resolved</ASelectOption>
+              </ASelect>
+              <ASelect v-model:value="annotationFilterPriority" size="small" style="width: 100px">
+                <ASelectOption value="all">All Priority</ASelectOption>
+                <ASelectOption value="low">Low</ASelectOption>
+                <ASelectOption value="medium">Medium</ASelectOption>
+                <ASelectOption value="high">High</ASelectOption>
+                <ASelectOption value="critical">Critical</ASelectOption>
+              </ASelect>
+            </div>
             <div class="bim-panel-body">
-              <div v-if="annotationsList.length === 0" class="bim-empty-msg">No annotations. Use the Annotate tool to add one.</div>
-              <div v-for="ann in annotationsList" :key="ann.id" class="bim-list-item" style="flex-direction: column; align-items: flex-start">
+              <div v-if="filteredAnnotations.length === 0" class="bim-empty-msg">No annotations match filters.</div>
+              <div v-for="ann in filteredAnnotations" :key="ann.id" class="bim-list-item" style="flex-direction: column; align-items: flex-start">
                 <div style="display: flex; justify-content: space-between; width: 100%; align-items: center">
                   <div style="font-size: 11px; font-weight: 500; cursor: pointer" @click="flyToAnnotation(ann)">{{ ann.title }}</div>
                   <ASpace size="small">
@@ -1113,9 +1445,13 @@ onBeforeUnmount(() => {
                   </ASpace>
                 </div>
                 <div v-if="ann.description" style="font-size: 10px; color: #888; margin-top: 2px">{{ ann.description }}</div>
+                <div v-if="ann.linked_entity_type" style="margin-top: 2px">
+                  <ATag color="purple" size="small">{{ entityTypeLabels[ann.linked_entity_type] || ann.linked_entity_type }} #{{ ann.linked_entity_id }}</ATag>
+                </div>
                 <ASpace size="small" style="margin-top: 4px">
                   <AButton size="small" @click="flyToAnnotation(ann)">Fly To</AButton>
                   <AButton v-if="ann.status !== 'resolved'" size="small" type="primary" @click="resolveAnnotation(ann)">Resolve</AButton>
+                  <AButton size="small" @click="openLinkEntityModal('annotation', ann.id)">Link</AButton>
                   <AButton size="small" danger @click="deleteAnnotation(ann)">Delete</AButton>
                 </ASpace>
               </div>
@@ -1221,6 +1557,29 @@ onBeforeUnmount(() => {
           </AListItem>
         </template>
       </AList>
+    </AModal>
+
+    <!-- ═══════════ Phase 3: LINK ENTITY MODAL ═══════════ -->
+    <AModal
+      v-model:open="linkEntityModalVisible"
+      title="Link to Entity"
+      :width="400"
+      @ok="submitLinkEntity"
+      okText="Link"
+    >
+      <AForm layout="vertical">
+        <AFormItem label="Entity Type">
+          <ASelect v-model:value="linkEntityForm.entity_type" style="width: 100%">
+            <ASelectOption value="rfi">RFI</ASelectOption>
+            <ASelectOption value="issue">Issue</ASelectOption>
+            <ASelectOption value="clash">Clash</ASelectOption>
+            <ASelectOption value="submittal">Submittal</ASelectOption>
+          </ASelect>
+        </AFormItem>
+        <AFormItem label="Entity ID" required>
+          <AInputNumber v-model:value="linkEntityForm.entity_id" style="width: 100%" placeholder="Enter entity ID" :min="1" />
+        </AFormItem>
+      </AForm>
     </AModal>
   </Page>
 </template>
@@ -1452,6 +1811,108 @@ onBeforeUnmount(() => {
   font-size: 12px;
   display: flex;
   align-items: center;
+}
+
+/* ═══════════ Phase 3: Viewpoints Panel Styles ═══════════ */
+
+.bim-viewpoints-panel {
+  width: 340px;
+}
+
+.bim-viewpoints-panel .bim-panel-body {
+  max-height: 500px;
+}
+
+.bim-vp-save-bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafbfc;
+}
+
+.bim-vp-item {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid #f5f5f5;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.bim-vp-item:hover {
+  background: #f0f7ff;
+}
+
+.bim-vp-item-thumb {
+  flex-shrink: 0;
+  width: 60px;
+  height: 40px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bim-vp-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.bim-vp-thumb-placeholder {
+  font-size: 16px;
+  font-weight: 700;
+  color: #bbb;
+}
+
+.bim-vp-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.bim-vp-item-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bim-vp-item-date {
+  font-size: 10px;
+  color: #999;
+}
+
+.bim-vp-item-entity {
+  margin-top: 2px;
+}
+
+.bim-vp-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.bim-vp-hint {
+  text-align: center;
+  font-size: 10px;
+  color: #bbb;
+  padding: 6px;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* Phase 3: Annotation Filters */
+.bim-ann-filters {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafbfc;
 }
 
 /* Annotation marker styling (used by AnnotationsPlugin) */

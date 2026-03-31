@@ -53,12 +53,24 @@ class BIMViewpoint(Base, TimestampMixin):
     # Markup annotations (JSON array)
     annotations = Column(Text, nullable=True)       # [{type, x, y, text, color}]
 
-    # Thumbnail
+    # Full BCF 2.1 JSON (replaces simple camera_position for full viewpoint persistence)
+    bcf_data = Column(Text, nullable=True)
+
+    # Thumbnail / snapshot
     screenshot_url = Column(String(500), nullable=True)
+    snapshot_url = Column(String(500), nullable=True)      # PNG screenshot file path
+    snapshot_base64 = Column(Text, nullable=True)           # base64-encoded screenshot for quick display
 
     # Polymorphic entity link
     entity_type = Column(String(100), nullable=True)  # "rfi", "issue", "clash", "submittal"
     entity_id = Column(Integer, nullable=True)
+
+    # Direct entity FK links (convenience, in addition to polymorphic)
+    linked_rfi_id = Column(Integer, nullable=True)
+    linked_issue_id = Column(Integer, nullable=True)
+
+    # Tags for filtering (comma-separated)
+    tags = Column(String(500), nullable=True)
 
     # Creator
     created_by = Column(

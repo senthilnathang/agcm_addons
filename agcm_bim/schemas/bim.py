@@ -69,9 +69,15 @@ class BIMViewpointCreate(BaseModel):
     visible_elements: Optional[str] = None
     hidden_elements: Optional[str] = None
     annotations: Optional[str] = None
+    bcf_data: Optional[str] = None
     screenshot_url: Optional[str] = None
+    snapshot_url: Optional[str] = None
+    snapshot_base64: Optional[str] = None
     entity_type: Optional[str] = None
     entity_id: Optional[int] = None
+    linked_rfi_id: Optional[int] = None
+    linked_issue_id: Optional[int] = None
+    tags: Optional[str] = Field(None, max_length=500)
 
 
 class BIMViewpointUpdate(BaseModel):
@@ -85,9 +91,21 @@ class BIMViewpointUpdate(BaseModel):
     visible_elements: Optional[str] = None
     hidden_elements: Optional[str] = None
     annotations: Optional[str] = None
+    bcf_data: Optional[str] = None
     screenshot_url: Optional[str] = None
+    snapshot_url: Optional[str] = None
+    snapshot_base64: Optional[str] = None
     entity_type: Optional[str] = None
     entity_id: Optional[int] = None
+    linked_rfi_id: Optional[int] = None
+    linked_issue_id: Optional[int] = None
+    tags: Optional[str] = Field(None, max_length=500)
+
+
+class BIMViewpointLinkEntity(BaseModel):
+    """Link a viewpoint to an entity (RFI, Issue, etc.)."""
+    entity_type: str = Field(..., max_length=100)
+    entity_id: int
 
 
 class BIMViewpointResponse(BaseModel):
@@ -104,9 +122,15 @@ class BIMViewpointResponse(BaseModel):
     visible_elements: Optional[str] = None
     hidden_elements: Optional[str] = None
     annotations: Optional[str] = None
+    bcf_data: Optional[str] = None
     screenshot_url: Optional[str] = None
+    snapshot_url: Optional[str] = None
+    snapshot_base64: Optional[str] = None
     entity_type: Optional[str] = None
     entity_id: Optional[int] = None
+    linked_rfi_id: Optional[int] = None
+    linked_issue_id: Optional[int] = None
+    tags: Optional[str] = None
     created_by: Optional[int] = None
     created_at: Optional[datetime] = None
 
