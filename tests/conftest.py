@@ -37,6 +37,14 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production")
 
 from app.db.base import Base  # noqa: E402
 
+# Ensure core User/Company models are registered in Base.metadata so that
+# ForeignKey("users.id") and ForeignKey("companies.id") resolve during create_all.
+try:
+    import app.models.user  # noqa: F401
+    import app.models.company  # noqa: F401
+except ImportError:
+    pass
+
 # ---------------------------------------------------------------------------
 # importlib model loader (same pattern as seed_all_modules.py)
 # ---------------------------------------------------------------------------
@@ -137,6 +145,23 @@ _addon_models = [
     ("agcm_procurement_purchase_order", _model_path("agcm_procurement", "purchase_order.py")),
     ("agcm_procurement_subcontract", _model_path("agcm_procurement", "subcontract.py")),
     ("agcm_procurement_vendor_bill", _model_path("agcm_procurement", "vendor_bill.py")),
+    # agcm_resource
+    ("agcm_resource_worker", _model_path("agcm_resource", "worker.py")),
+    ("agcm_resource_equipment", _model_path("agcm_resource", "equipment.py")),
+    ("agcm_resource_timesheet", _model_path("agcm_resource", "timesheet.py")),
+    ("agcm_resource_equipment_assignment", _model_path("agcm_resource", "equipment_assignment.py")),
+    # agcm_safety
+    ("agcm_safety_checklist", _model_path("agcm_safety", "checklist.py")),
+    ("agcm_safety_inspection", _model_path("agcm_safety", "inspection.py")),
+    ("agcm_safety_punch_list", _model_path("agcm_safety", "punch_list.py")),
+    ("agcm_safety_incident", _model_path("agcm_safety", "incident.py")),
+    # agcm_portal
+    ("agcm_portal_selection", _model_path("agcm_portal", "selection.py")),
+    ("agcm_portal_bid", _model_path("agcm_portal", "bid.py")),
+    ("agcm_portal_config", _model_path("agcm_portal", "portal_config.py")),
+    # agcm_reporting
+    ("agcm_reporting_report", _model_path("agcm_reporting", "report_definition.py")),
+    ("agcm_reporting_dashboard", _model_path("agcm_reporting", "dashboard_widget.py")),
 ]
 
 for mod_name, mod_path in _core_models + _base_models + _addon_models:
@@ -297,6 +322,7 @@ def project_ids(db, company_id, user_id):
     _ensure_company_and_user(db, company_id, user_id)
 
     Project = _loaded_modules["agcm_project"].Project
+    ProjectStatus = _loaded_modules["agcm_project"].ProjectStatus
 
     ids = []
     for i in range(1, 4):
@@ -306,7 +332,7 @@ def project_ids(db, company_id, user_id):
             ref_number=f"TP-{i:04d}",
             start_date=date(2026, 1, 1),
             end_date=date(2026, 12, 31),
-            status="new",
+            status=ProjectStatus.NEW,
             owner_id=user_id,
         )
         db.add(proj)

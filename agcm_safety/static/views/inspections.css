@@ -1,0 +1,14 @@
+/* Inspections view styles */
+.inspection-detail-items {
+  margin-top: 12px;
+}
+.inspection-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+.inspection-item-row:last-child {
+  border-bottom: none;
+}

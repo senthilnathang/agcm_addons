@@ -1,0 +1,10 @@
+/* Incidents view styles */
+.severity-badge-near_miss { background: #d9f7be; color: #389e0d; }
+.severity-badge-first_aid { background: #bae7ff; color: #096dd9; }
+.severity-badge-medical { background: #fff1b8; color: #d48806; }
+.severity-badge-lost_time { background: #ffd8bf; color: #d4380d; }
+.severity-badge-fatality { background: #ffa39e; color: #a8071a; }
+
+.severity-tag {
+  text-transform: capitalize;
+}

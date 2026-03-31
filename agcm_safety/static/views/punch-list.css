@@ -1,0 +1,23 @@
+/* Punch list view styles */
+.punch-stats {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.punch-stat-card {
+  padding: 12px 20px;
+  border-radius: 8px;
+  background: #fafafa;
+  border: 1px solid #f0f0f0;
+  text-align: center;
+  min-width: 100px;
+}
+.punch-stat-card .stat-value {
+  font-size: 24px;
+  font-weight: 600;
+}
+.punch-stat-card .stat-label {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+}
