@@ -21,7 +21,7 @@ class WidgetType(str, enum.Enum):
     STAT_GROUP = "stat_group"
 
 
-class DashboardLayout(Base, TimestampMixin, AuditMixin):
+class AGCMDashboardLayout(Base, TimestampMixin, AuditMixin):
     """Saved dashboard configuration."""
 
     __tablename__ = "agcm_dashboard_layouts"
@@ -48,14 +48,14 @@ class DashboardLayout(Base, TimestampMixin, AuditMixin):
 
     # Relationships
     widgets = relationship(
-        "DashboardWidget",
+        "AGCMDashboardWidget",
         back_populates="layout",
         cascade="all, delete-orphan",
-        order_by="DashboardWidget.display_order",
+        order_by="AGCMDashboardWidget.display_order",
     )
 
 
-class DashboardWidget(Base, TimestampMixin):
+class AGCMDashboardWidget(Base, TimestampMixin):
     """Individual widget within a dashboard layout."""
 
     __tablename__ = "agcm_dashboard_widgets"
@@ -96,4 +96,4 @@ class DashboardWidget(Base, TimestampMixin):
     display_order = Column(Integer, default=0)
 
     # Relationships
-    layout = relationship("DashboardLayout", back_populates="widgets")
+    layout = relationship("AGCMDashboardLayout", back_populates="widgets")

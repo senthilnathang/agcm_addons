@@ -25,7 +25,7 @@ class ReportFormat(str, enum.Enum):
     CSV = "csv"
 
 
-class ReportDefinition(Base, TimestampMixin, AuditMixin):
+class AGCMReportDefinition(Base, TimestampMixin, AuditMixin):
     """Saved report template with column/filter configuration."""
 
     __tablename__ = "agcm_report_definitions"
@@ -70,13 +70,13 @@ class ReportDefinition(Base, TimestampMixin, AuditMixin):
 
     # Relationships
     schedules = relationship(
-        "ReportSchedule",
+        "AGCMReportSchedule",
         back_populates="report",
         cascade="all, delete-orphan",
     )
 
 
-class ReportSchedule(Base, TimestampMixin):
+class AGCMReportSchedule(Base, TimestampMixin):
     """Scheduled report delivery configuration."""
 
     __tablename__ = "agcm_report_schedules"
@@ -114,4 +114,4 @@ class ReportSchedule(Base, TimestampMixin):
     )
 
     # Relationships
-    report = relationship("ReportDefinition", back_populates="schedules")
+    report = relationship("AGCMReportDefinition", back_populates="schedules")

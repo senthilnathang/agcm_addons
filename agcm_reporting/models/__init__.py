@@ -1,23 +1,23 @@
 """AGCM Reporting Models"""
 
 from addons.agcm_reporting.models.report_definition import (
-    ReportDefinition,
-    ReportSchedule,
+    AGCMReportDefinition,
+    AGCMReportSchedule,
     ReportType,
     ReportFormat,
 )
 from addons.agcm_reporting.models.dashboard_widget import (
-    DashboardLayout,
-    DashboardWidget,
+    AGCMDashboardLayout,
+    AGCMDashboardWidget,
     WidgetType,
 )
 
 __all__ = [
-    "ReportDefinition",
-    "ReportSchedule",
+    "AGCMReportDefinition",
+    "AGCMReportSchedule",
     "ReportType",
     "ReportFormat",
-    "DashboardLayout",
-    "DashboardWidget",
+    "AGCMDashboardLayout",
+    "AGCMDashboardWidget",
     "WidgetType",
 ]
