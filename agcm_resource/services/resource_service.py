@@ -5,7 +5,7 @@ from datetime import date
 from typing import Optional
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from addons.agcm_resource.models.worker import Worker
 from addons.agcm_resource.models.equipment import Equipment
@@ -237,7 +237,11 @@ class ResourceService:
         search: Optional[str] = None,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(Timesheet).filter(Timesheet.company_id == self.company_id)
+        query = (
+            self.db.query(Timesheet)
+            .options(joinedload(Timesheet.worker), joinedload(Timesheet.project))
+            .filter(Timesheet.company_id == self.company_id)
+        )
 
         if worker_id:
             query = query.filter(Timesheet.worker_id == worker_id)
@@ -402,8 +406,10 @@ class ResourceService:
         project_id: Optional[int] = None,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(EquipmentAssignment).filter(
-            EquipmentAssignment.company_id == self.company_id,
+        query = (
+            self.db.query(EquipmentAssignment)
+            .options(joinedload(EquipmentAssignment.equipment), joinedload(EquipmentAssignment.project))
+            .filter(EquipmentAssignment.company_id == self.company_id)
         )
 
         if equipment_id:

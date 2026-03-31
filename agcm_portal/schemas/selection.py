@@ -10,14 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class SelectionOptionBase(BaseModel):
     name: str = Field(..., max_length=255)
-    description: Optional[str] = None
-    price: float = 0
-    unit: Optional[str] = None
-    image_url: Optional[str] = None
-    spec_url: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=2000)
+    price: float = Field(0, ge=0, le=99999999.99)
+    unit: Optional[str] = Field(None, max_length=50)
+    image_url: Optional[str] = Field(None, max_length=500)
+    spec_url: Optional[str] = Field(None, max_length=500)
     is_recommended: bool = False
     is_selected: bool = False
-    display_order: int = 0
+    display_order: int = Field(0, ge=0, le=9999)
 
 
 class SelectionOptionCreate(SelectionOptionBase):
@@ -27,15 +27,15 @@ class SelectionOptionCreate(SelectionOptionBase):
 class SelectionOptionUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    name: Optional[str] = None
-    description: Optional[str] = None
-    price: Optional[float] = None
-    unit: Optional[str] = None
-    image_url: Optional[str] = None
-    spec_url: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=2000)
+    price: Optional[float] = Field(None, ge=0, le=99999999.99)
+    unit: Optional[str] = Field(None, max_length=50)
+    image_url: Optional[str] = Field(None, max_length=500)
+    spec_url: Optional[str] = Field(None, max_length=500)
     is_recommended: Optional[bool] = None
     is_selected: Optional[bool] = None
-    display_order: Optional[int] = None
+    display_order: Optional[int] = Field(None, ge=0, le=9999)
 
 
 class SelectionOptionResponse(BaseModel):
@@ -63,16 +63,11 @@ class SelectionBase(BaseModel):
     project_id: int
     name: str = Field(..., max_length=255)
     category: str = Field(..., max_length=100)
-    description: Optional[str] = None
-    location: Optional[str] = None
-    status: Optional[str] = "pending"
+    description: Optional[str] = Field(None, max_length=5000)
+    location: Optional[str] = Field(None, max_length=255)
     due_date: Optional[date] = None
-    decided_date: Optional[date] = None
-    budget_amount: float = 0
-    selected_amount: float = 0
-    budget_impact: float = 0
-    decided_by: Optional[str] = None
-    notes: Optional[str] = None
+    budget_amount: float = Field(0, ge=0, le=99999999.99)
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class SelectionCreate(SelectionBase):
@@ -82,18 +77,13 @@ class SelectionCreate(SelectionBase):
 class SelectionUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    name: Optional[str] = None
-    category: Optional[str] = None
-    description: Optional[str] = None
-    location: Optional[str] = None
-    status: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=255)
+    category: Optional[str] = Field(None, max_length=100)
+    description: Optional[str] = Field(None, max_length=5000)
+    location: Optional[str] = Field(None, max_length=255)
     due_date: Optional[date] = None
-    decided_date: Optional[date] = None
-    budget_amount: Optional[float] = None
-    selected_amount: Optional[float] = None
-    budget_impact: Optional[float] = None
-    decided_by: Optional[str] = None
-    notes: Optional[str] = None
+    budget_amount: Optional[float] = Field(None, ge=0, le=99999999.99)
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class SelectionResponse(BaseModel):

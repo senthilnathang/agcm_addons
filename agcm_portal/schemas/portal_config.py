@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PortalConfigBase(BaseModel):
@@ -15,7 +15,7 @@ class PortalConfigBase(BaseModel):
     show_documents: bool = True
     show_photos: bool = True
     show_daily_logs: bool = False
-    welcome_message: Optional[str] = None
+    welcome_message: Optional[str] = Field(None, max_length=5000)
 
 
 class PortalConfigCreate(PortalConfigBase):
@@ -32,7 +32,7 @@ class PortalConfigUpdate(BaseModel):
     show_documents: Optional[bool] = None
     show_photos: Optional[bool] = None
     show_daily_logs: Optional[bool] = None
-    welcome_message: Optional[str] = None
+    welcome_message: Optional[str] = Field(None, max_length=5000)
 
 
 class PortalConfigResponse(BaseModel):

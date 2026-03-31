@@ -120,13 +120,9 @@ class PortalService:
             category=data.category,
             description=data.description,
             location=data.location,
-            status=data.status or "pending",
+            status="pending",
             due_date=data.due_date,
-            decided_date=data.decided_date,
             budget_amount=data.budget_amount,
-            selected_amount=data.selected_amount,
-            budget_impact=data.budget_impact,
-            decided_by=data.decided_by,
             notes=data.notes,
             created_by=self.user_id,
         )
@@ -347,7 +343,7 @@ class PortalService:
             description=data.description,
             trade=data.trade,
             due_date=data.due_date,
-            status=data.status or "open",
+            status="open",
             notes=data.notes,
             created_by=self.user_id,
         )
@@ -396,13 +392,12 @@ class PortalService:
             vendor_name=data.vendor_name,
             vendor_email=data.vendor_email,
             vendor_phone=data.vendor_phone,
-            status=data.status or "draft",
+            status="draft",
             total_amount=data.total_amount,
             scope_description=data.scope_description,
             exclusions=data.exclusions,
             submitted_date=data.submitted_date,
             document_url=data.document_url,
-            is_awarded=data.is_awarded,
             notes=data.notes,
         )
         self.db.add(sub)

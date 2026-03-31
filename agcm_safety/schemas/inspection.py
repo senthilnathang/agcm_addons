@@ -10,20 +10,20 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class InspectionItemCreate(BaseModel):
     description: str = Field(..., max_length=500)
-    result: Optional[str] = None
-    notes: Optional[str] = None
-    photo_url: Optional[str] = None
-    display_order: Optional[int] = 0
+    result: Optional[str] = Field(None, max_length=20)
+    notes: Optional[str] = Field(None, max_length=2000)
+    photo_url: Optional[str] = Field(None, max_length=500)
+    display_order: Optional[int] = Field(0, ge=0, le=9999)
 
 
 class InspectionItemUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    description: Optional[str] = None
-    result: Optional[str] = None
-    notes: Optional[str] = None
-    photo_url: Optional[str] = None
-    display_order: Optional[int] = None
+    description: Optional[str] = Field(None, max_length=500)
+    result: Optional[str] = Field(None, max_length=20)
+    notes: Optional[str] = Field(None, max_length=2000)
+    photo_url: Optional[str] = Field(None, max_length=500)
+    display_order: Optional[int] = Field(None, ge=0, le=9999)
 
 
 class InspectionItemResponse(BaseModel):
@@ -47,26 +47,23 @@ class InspectionCreate(BaseModel):
     project_id: int
     template_id: Optional[int] = None
     inspector_name: str = Field(..., max_length=255)
-    inspector_company: Optional[str] = None
-    inspection_type: Optional[str] = None
+    inspector_company: Optional[str] = Field(None, max_length=255)
+    inspection_type: Optional[str] = Field(None, max_length=100)
     scheduled_date: Optional[date] = None
-    location: Optional[str] = None
-    notes: Optional[str] = None
+    location: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = Field(None, max_length=5000)
     items: Optional[List[InspectionItemCreate]] = []
 
 
 class InspectionUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    inspector_name: Optional[str] = None
-    inspector_company: Optional[str] = None
-    inspection_type: Optional[str] = None
-    status: Optional[str] = None
+    inspector_name: Optional[str] = Field(None, max_length=255)
+    inspector_company: Optional[str] = Field(None, max_length=255)
+    inspection_type: Optional[str] = Field(None, max_length=100)
     scheduled_date: Optional[date] = None
-    completed_date: Optional[date] = None
-    location: Optional[str] = None
-    notes: Optional[str] = None
-    overall_result: Optional[str] = None
+    location: Optional[str] = Field(None, max_length=255)
+    notes: Optional[str] = Field(None, max_length=5000)
     items: Optional[List[InspectionItemCreate]] = None
 
 

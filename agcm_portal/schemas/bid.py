@@ -10,16 +10,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class BidSubmissionBase(BaseModel):
     vendor_name: str = Field(..., max_length=255)
-    vendor_email: Optional[str] = None
-    vendor_phone: Optional[str] = None
-    status: Optional[str] = "draft"
-    total_amount: float = 0
-    scope_description: Optional[str] = None
-    exclusions: Optional[str] = None
+    vendor_email: Optional[str] = Field(None, max_length=255)
+    vendor_phone: Optional[str] = Field(None, max_length=50)
+    total_amount: float = Field(0, ge=0, le=99999999.99)
+    scope_description: Optional[str] = Field(None, max_length=5000)
+    exclusions: Optional[str] = Field(None, max_length=5000)
     submitted_date: Optional[date] = None
-    document_url: Optional[str] = None
-    is_awarded: bool = False
-    notes: Optional[str] = None
+    document_url: Optional[str] = Field(None, max_length=500)
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class BidSubmissionCreate(BidSubmissionBase):
@@ -29,17 +27,15 @@ class BidSubmissionCreate(BidSubmissionBase):
 class BidSubmissionUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    vendor_name: Optional[str] = None
-    vendor_email: Optional[str] = None
-    vendor_phone: Optional[str] = None
-    status: Optional[str] = None
-    total_amount: Optional[float] = None
-    scope_description: Optional[str] = None
-    exclusions: Optional[str] = None
+    vendor_name: Optional[str] = Field(None, max_length=255)
+    vendor_email: Optional[str] = Field(None, max_length=255)
+    vendor_phone: Optional[str] = Field(None, max_length=50)
+    total_amount: Optional[float] = Field(None, ge=0, le=99999999.99)
+    scope_description: Optional[str] = Field(None, max_length=5000)
+    exclusions: Optional[str] = Field(None, max_length=5000)
     submitted_date: Optional[date] = None
-    document_url: Optional[str] = None
-    is_awarded: Optional[bool] = None
-    notes: Optional[str] = None
+    document_url: Optional[str] = Field(None, max_length=500)
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class BidSubmissionResponse(BaseModel):
@@ -68,11 +64,10 @@ class BidSubmissionResponse(BaseModel):
 class BidPackageBase(BaseModel):
     project_id: int
     name: str = Field(..., max_length=255)
-    description: Optional[str] = None
-    trade: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=5000)
+    trade: Optional[str] = Field(None, max_length=100)
     due_date: Optional[date] = None
-    status: Optional[str] = "open"
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class BidPackageCreate(BidPackageBase):
@@ -82,12 +77,11 @@ class BidPackageCreate(BidPackageBase):
 class BidPackageUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    name: Optional[str] = None
-    description: Optional[str] = None
-    trade: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=5000)
+    trade: Optional[str] = Field(None, max_length=100)
     due_date: Optional[date] = None
-    status: Optional[str] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class BidPackageResponse(BaseModel):

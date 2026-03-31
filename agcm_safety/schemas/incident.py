@@ -9,41 +9,34 @@ from pydantic import BaseModel, ConfigDict, Field
 class IncidentReportCreate(BaseModel):
     project_id: int
     title: str = Field(..., max_length=500)
-    description: str
-    severity: str
+    description: str = Field(..., max_length=5000)
+    severity: str = Field(..., max_length=50)
     incident_date: date
-    incident_time: Optional[str] = None
-    location: Optional[str] = None
-    injured_party: Optional[str] = None
-    injury_description: Optional[str] = None
-    witness_names: Optional[str] = None
+    incident_time: Optional[str] = Field(None, max_length=10)
+    location: Optional[str] = Field(None, max_length=255)
+    injured_party: Optional[str] = Field(None, max_length=255)
+    injury_description: Optional[str] = Field(None, max_length=5000)
+    witness_names: Optional[str] = Field(None, max_length=1000)
     osha_recordable: Optional[bool] = False
-    photo_urls: Optional[str] = None
-    notes: Optional[str] = None
+    photo_urls: Optional[str] = Field(None, max_length=2000)
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class IncidentReportUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    title: Optional[str] = None
-    description: Optional[str] = None
-    severity: Optional[str] = None
-    status: Optional[str] = None
+    title: Optional[str] = Field(None, max_length=500)
+    description: Optional[str] = Field(None, max_length=5000)
+    severity: Optional[str] = Field(None, max_length=50)
     incident_date: Optional[date] = None
-    incident_time: Optional[str] = None
-    location: Optional[str] = None
-    injured_party: Optional[str] = None
-    injury_description: Optional[str] = None
-    witness_names: Optional[str] = None
-    root_cause: Optional[str] = None
-    corrective_action: Optional[str] = None
-    investigated_by: Optional[int] = None
-    investigation_date: Optional[date] = None
-    closed_date: Optional[date] = None
+    incident_time: Optional[str] = Field(None, max_length=10)
+    location: Optional[str] = Field(None, max_length=255)
+    injured_party: Optional[str] = Field(None, max_length=255)
+    injury_description: Optional[str] = Field(None, max_length=5000)
+    witness_names: Optional[str] = Field(None, max_length=1000)
     osha_recordable: Optional[bool] = None
-    days_lost: Optional[int] = None
-    photo_urls: Optional[str] = None
-    notes: Optional[str] = None
+    photo_urls: Optional[str] = Field(None, max_length=2000)
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class IncidentReportResponse(BaseModel):

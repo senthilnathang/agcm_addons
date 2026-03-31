@@ -10,9 +10,9 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class ReportScheduleBase(BaseModel):
     schedule_type: str = Field(..., max_length=20)  # daily, weekly, monthly
-    recipients: Optional[str] = None  # JSON array of emails
+    recipients: Optional[str] = Field(None, max_length=5000)  # JSON array of emails
     is_active: bool = True
-    format: str = "pdf"
+    format: str = Field("pdf", max_length=10)
 
 
 class ReportScheduleCreate(ReportScheduleBase):
@@ -22,11 +22,11 @@ class ReportScheduleCreate(ReportScheduleBase):
 class ReportScheduleUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    schedule_type: Optional[str] = None
-    recipients: Optional[str] = None
+    schedule_type: Optional[str] = Field(None, max_length=20)
+    recipients: Optional[str] = Field(None, max_length=5000)
     next_run: Optional[datetime] = None
     is_active: Optional[bool] = None
-    format: Optional[str] = None
+    format: Optional[str] = Field(None, max_length=10)
 
 
 class ReportScheduleResponse(BaseModel):
@@ -49,15 +49,14 @@ class ReportScheduleResponse(BaseModel):
 
 class ReportDefinitionBase(BaseModel):
     name: str = Field(..., max_length=255)
-    description: Optional[str] = None
-    report_type: str = "custom"
+    description: Optional[str] = Field(None, max_length=2000)
+    report_type: str = Field("custom", max_length=50)
     data_source: str = Field(..., max_length=100)
-    columns: Optional[str] = None
-    filters: Optional[str] = None
-    sort_by: Optional[str] = None
-    sort_order: str = "desc"
-    group_by: Optional[str] = None
-    is_system: bool = False
+    columns: Optional[str] = Field(None, max_length=10000)
+    filters: Optional[str] = Field(None, max_length=5000)
+    sort_by: Optional[str] = Field(None, max_length=100)
+    sort_order: str = Field("desc", max_length=10)
+    group_by: Optional[str] = Field(None, max_length=100)
     is_shared: bool = True
 
 
@@ -68,16 +67,15 @@ class ReportDefinitionCreate(ReportDefinitionBase):
 class ReportDefinitionUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    name: Optional[str] = None
-    description: Optional[str] = None
-    report_type: Optional[str] = None
-    data_source: Optional[str] = None
-    columns: Optional[str] = None
-    filters: Optional[str] = None
-    sort_by: Optional[str] = None
-    sort_order: Optional[str] = None
-    group_by: Optional[str] = None
-    is_system: Optional[bool] = None
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=2000)
+    report_type: Optional[str] = Field(None, max_length=50)
+    data_source: Optional[str] = Field(None, max_length=100)
+    columns: Optional[str] = Field(None, max_length=10000)
+    filters: Optional[str] = Field(None, max_length=5000)
+    sort_by: Optional[str] = Field(None, max_length=100)
+    sort_order: Optional[str] = Field(None, max_length=10)
+    group_by: Optional[str] = Field(None, max_length=100)
     is_shared: Optional[bool] = None
 
 

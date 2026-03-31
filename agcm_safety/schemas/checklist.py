@@ -11,7 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ChecklistTemplateItemCreate(BaseModel):
     description: str = Field(..., max_length=500)
     required: Optional[bool] = True
-    display_order: Optional[int] = 0
+    display_order: Optional[int] = Field(0, ge=0, le=9999)
 
 
 class ChecklistTemplateItemResponse(BaseModel):
@@ -31,8 +31,8 @@ class ChecklistTemplateItemResponse(BaseModel):
 
 class ChecklistTemplateCreate(BaseModel):
     name: str = Field(..., max_length=255)
-    description: Optional[str] = None
-    category: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=2000)
+    category: Optional[str] = Field(None, max_length=100)
     is_active: Optional[bool] = True
     items: Optional[List[ChecklistTemplateItemCreate]] = []
 
@@ -40,9 +40,9 @@ class ChecklistTemplateCreate(BaseModel):
 class ChecklistTemplateUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    name: Optional[str] = None
-    description: Optional[str] = None
-    category: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=255)
+    description: Optional[str] = Field(None, max_length=2000)
+    category: Optional[str] = Field(None, max_length=100)
     is_active: Optional[bool] = None
     items: Optional[List[ChecklistTemplateItemCreate]] = None
 

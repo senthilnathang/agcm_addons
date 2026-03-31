@@ -25,6 +25,7 @@ class EquipmentAssignment(Base, TimestampMixin):
         Integer,
         ForeignKey("companies.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
 
     # References

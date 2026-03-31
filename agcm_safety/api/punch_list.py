@@ -33,7 +33,7 @@ async def list_punch_items(
     status: Optional[str] = None,
     priority: Optional[str] = None,
     search: Optional[str] = None,
-    page: int = 1,
+    page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),

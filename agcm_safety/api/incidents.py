@@ -3,7 +3,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, get_effective_company_id
@@ -19,12 +19,12 @@ router = APIRouter()
 
 
 class InvestigateBody(BaseModel):
-    root_cause: str
-    corrective_action: str
+    root_cause: str = Field(..., max_length=5000)
+    corrective_action: str = Field(..., max_length=5000)
 
 
 class CloseBody(BaseModel):
-    days_lost: int = 0
+    days_lost: int = Field(0, ge=0, le=9999)
 
 
 def _get_service(db: Session, current_user) -> SafetyService:
@@ -38,7 +38,7 @@ async def list_incidents(
     severity: Optional[str] = None,
     status: Optional[str] = None,
     search: Optional[str] = None,
-    page: int = 1,
+    page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),

@@ -118,7 +118,7 @@ class ReportingService:
             sort_by=data.sort_by,
             sort_order=data.sort_order,
             group_by=data.group_by,
-            is_system=data.is_system,
+            is_system=False,
             is_shared=data.is_shared,
             created_by=self.user_id,
         )
@@ -191,10 +191,14 @@ class ReportingService:
                 base_query += " AND created_at <= :date_to"
                 params["date_to"] = merged_filters["date_to"]
 
-            # Sort
+            # Sort — whitelist column names to prevent SQL injection
             if report.sort_by:
-                direction = "DESC" if report.sort_order == "desc" else "ASC"
-                base_query += f" ORDER BY {report.sort_by} {direction}"
+                import re as _re
+                if _re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', report.sort_by):
+                    direction = "DESC" if report.sort_order == "desc" else "ASC"
+                    base_query += f" ORDER BY {report.sort_by} {direction}"
+                else:
+                    base_query += " ORDER BY id DESC"
             else:
                 base_query += " ORDER BY id DESC"
 

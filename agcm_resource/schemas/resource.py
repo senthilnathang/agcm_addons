@@ -21,13 +21,13 @@ class WorkerBase(BaseModel):
     trade: Optional[str] = Field(None, max_length=100)
     hourly_rate: float = Field(0, ge=0, le=9999.99)
     overtime_rate: float = Field(0, ge=0, le=9999.99)
-    certifications: Optional[str] = None
+    certifications: Optional[str] = Field(None, max_length=5000)
     emergency_contact: Optional[str] = Field(None, max_length=255)
     emergency_phone: Optional[str] = Field(None, max_length=50)
     hire_date: Optional[date] = None
     user_id: Optional[int] = None
     is_subcontractor: bool = False
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class WorkerCreate(WorkerBase):
@@ -47,13 +47,13 @@ class WorkerUpdate(BaseModel):
     trade: Optional[str] = Field(None, max_length=100)
     hourly_rate: Optional[float] = Field(None, ge=0, le=9999.99)
     overtime_rate: Optional[float] = Field(None, ge=0, le=9999.99)
-    certifications: Optional[str] = None
+    certifications: Optional[str] = Field(None, max_length=5000)
     emergency_contact: Optional[str] = Field(None, max_length=255)
     emergency_phone: Optional[str] = Field(None, max_length=50)
     hire_date: Optional[date] = None
     user_id: Optional[int] = None
     is_subcontractor: Optional[bool] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class WorkerResponse(BaseModel):
@@ -89,7 +89,7 @@ class WorkerResponse(BaseModel):
 
 class EquipmentBase(BaseModel):
     name: str = Field(..., max_length=255)
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=5000)
     equipment_type: str = Field(..., max_length=100)
     make: Optional[str] = Field(None, max_length=100)
     model: Optional[str] = Field(None, max_length=100)
@@ -104,7 +104,7 @@ class EquipmentBase(BaseModel):
     current_location: Optional[str] = Field(None, max_length=255)
     last_maintenance_date: Optional[date] = None
     next_maintenance_date: Optional[date] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class EquipmentCreate(EquipmentBase):
@@ -115,7 +115,7 @@ class EquipmentUpdate(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     name: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = None
+    description: Optional[str] = Field(None, max_length=5000)
     equipment_type: Optional[str] = Field(None, max_length=100)
     make: Optional[str] = Field(None, max_length=100)
     model: Optional[str] = Field(None, max_length=100)
@@ -130,7 +130,7 @@ class EquipmentUpdate(BaseModel):
     current_location: Optional[str] = Field(None, max_length=255)
     last_maintenance_date: Optional[date] = None
     next_maintenance_date: Optional[date] = None
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class EquipmentResponse(BaseModel):
@@ -173,9 +173,9 @@ class TimesheetBase(BaseModel):
     double_time_hours: float = Field(0, ge=0, le=24)
     clock_in: Optional[datetime] = None
     clock_out: Optional[datetime] = None
-    task_description: Optional[str] = None
+    task_description: Optional[str] = Field(None, max_length=2000)
     location: Optional[str] = Field(None, max_length=255)
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class TimesheetCreate(TimesheetBase):
@@ -193,9 +193,9 @@ class TimesheetUpdate(BaseModel):
     double_time_hours: Optional[float] = Field(None, ge=0, le=24)
     clock_in: Optional[datetime] = None
     clock_out: Optional[datetime] = None
-    task_description: Optional[str] = None
+    task_description: Optional[str] = Field(None, max_length=2000)
     location: Optional[str] = Field(None, max_length=255)
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class TimesheetResponse(BaseModel):
@@ -241,7 +241,7 @@ class EquipmentAssignmentBase(BaseModel):
     daily_rate: float = Field(0, ge=0, le=99999.99)
     total_days: int = Field(0, ge=0, le=9999)
     total_cost: float = Field(0, ge=0, le=9999999.99)
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class EquipmentAssignmentCreate(EquipmentAssignmentBase):
@@ -258,7 +258,7 @@ class EquipmentAssignmentUpdate(BaseModel):
     daily_rate: Optional[float] = Field(None, ge=0, le=99999.99)
     total_days: Optional[int] = Field(None, ge=0, le=9999)
     total_cost: Optional[float] = Field(None, ge=0, le=9999999.99)
-    notes: Optional[str] = None
+    notes: Optional[str] = Field(None, max_length=5000)
 
 
 class EquipmentAssignmentResponse(BaseModel):

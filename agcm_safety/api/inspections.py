@@ -3,7 +3,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, get_effective_company_id
@@ -20,7 +20,7 @@ router = APIRouter()
 
 
 class CompleteInspectionBody(BaseModel):
-    overall_result: str  # pass, fail, conditional
+    overall_result: str = Field(..., max_length=20)  # pass, fail, conditional
 
 
 def _get_service(db: Session, current_user) -> SafetyService:
@@ -33,7 +33,7 @@ async def list_inspections(
     project_id: Optional[int] = None,
     status: Optional[str] = None,
     search: Optional[str] = None,
-    page: int = 1,
+    page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
