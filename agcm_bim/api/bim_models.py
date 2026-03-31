@@ -3,7 +3,7 @@
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile, File
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from sqlalchemy.orm import Session
 
@@ -184,13 +184,30 @@ async def search_elements(
 @router.get("/models/{model_id}/xkt")
 async def serve_xkt_file(
     model_id: int,
+    token: Optional[str] = Query(None, description="JWT token for xeokit direct fetch"),
+    request: Request = None,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
 ):
     """
     Stream the converted .xkt file for the xeokit viewer.
-    The xkt file path is derived from the model's file_url.
+    Supports both Authorization header and ?token= query param
+    (xeokit XKTLoaderPlugin.load() makes raw fetch without auth headers).
     """
+    # Resolve user from header or token query param (same pattern as reports)
+    from app.auth.deps import get_current_user as _get_user
+    try:
+        if token:
+            from app.core.security import decode_access_token
+            payload = decode_access_token(token)
+            from app.models import User
+            current_user = db.query(User).filter(User.id == payload.get("sub")).first()
+            if not current_user:
+                raise HTTPException(status_code=401, detail="Invalid token")
+        else:
+            current_user = await _get_user(request=request, db=db)
+    except Exception:
+        raise HTTPException(status_code=401, detail="Authentication required. Pass ?token=JWT for xeokit viewer.")
+
     svc = _get_service(db, current_user)
     model = svc.get_model(model_id)
     if not model:

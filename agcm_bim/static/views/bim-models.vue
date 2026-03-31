@@ -303,7 +303,7 @@ onMounted(async () => {
                 <Button type="link" size="small" @click="goToViewer(record)"><EyeOutlined /></Button>
               </Tooltip>
               <Tooltip title="Metadata & Info">
-                <Button type="link" size="small" @click="openMetadata(record)"><FileTextOutlined /></Button>
+                <Button type="link" size="small" @click="router.push({ path: '/agcm/bim/model-detail', query: { id: record.id } })"><FileTextOutlined /></Button>
               </Tooltip>
               <Tooltip title="Version history">
                 <Button type="link" size="small" @click="openVersions(record)"><HistoryOutlined /></Button>

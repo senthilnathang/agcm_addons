@@ -41,6 +41,7 @@ Building Information Modeling module for construction projects.
 
     "views": [
         "views/bim-models.vue",
+        "views/bim-model-detail.vue",
         "views/bim-viewer.vue",
         "views/clash-tests.vue",
         "views/clash-results.vue",
@@ -79,6 +80,14 @@ Building Information Modeling module for construction projects.
                     "viewName": "clash-tests",
                 },
             ],
+        },
+        {
+            "name": "BIM Model Detail",
+            "path": "/agcm/bim/model-detail",
+            "parent": "agcm",
+            "hideInMenu": True,
+            "viewName": "bim-model-detail",
+            "sequence": 120,
         },
         {
             "name": "BIM Viewer",

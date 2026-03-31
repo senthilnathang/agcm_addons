@@ -400,7 +400,7 @@ async function loadModel(id, federation) {
 
     const sceneModel = xktLoader.load({
       id: sceneModelId,
-      src: `/api/v1${BASE}/models/${id}/xkt`,
+      src: `/api/v1${BASE}/models/${id}/xkt?token=${localStorage.getItem('accessToken') || ''}`,
       edges: true,
       saoEnabled: true,
       dtxEnabled: true,
