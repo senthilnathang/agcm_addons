@@ -1,0 +1,11 @@
+/* BIM Viewer styles */
+.bim-viewer-placeholder {
+  width: 100%;
+  height: 220px;
+  border: 2px dashed #d9d9d9;
+  border-radius: 8px;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
