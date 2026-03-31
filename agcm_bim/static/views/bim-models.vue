@@ -30,6 +30,7 @@ import {
   CloudUploadOutlined,
   DeleteOutlined,
   EyeOutlined,
+  FileTextOutlined,
   HistoryOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -65,6 +66,13 @@ const creating = ref(false);
 const showVersions = ref(false);
 const versions = ref([]);
 const versionsLoading = ref(false);
+
+// Metadata drawer
+const showMetadata = ref(false);
+const metadataRecord = ref(null);
+const metadataJson = ref(null);
+const metadataLoading = ref(false);
+const metadataSummary = ref(null);
 
 const disciplineOptions = [
   { value: 'architectural', label: 'Architectural' },
@@ -116,7 +124,7 @@ const columns = [
   { title: 'Version', dataIndex: 'version', key: 'version', width: 80 },
   { title: 'Elements', dataIndex: 'element_count', key: 'element_count', width: 100 },
   { title: 'Size', dataIndex: 'file_size', key: 'file_size', width: 100 },
-  { title: 'Actions', key: 'actions', width: 180 },
+  { title: 'Actions', key: 'actions', width: 210 },
 ];
 
 function formatSize(bytes) {
@@ -206,6 +214,32 @@ async function openVersions(record) {
   finally { versionsLoading.value = false; }
 }
 
+async function openMetadata(record) {
+  metadataRecord.value = record;
+  metadataJson.value = null;
+  metadataSummary.value = null;
+  showMetadata.value = true;
+  metadataLoading.value = true;
+  try {
+    // Fetch metadata JSON
+    const meta = await requestClient.get(`${BASE}/models/${record.id}/metadata`);
+    metadataJson.value = meta;
+    // Fetch element summary
+    const summary = await requestClient.get(`${BASE}/models/${record.id}/summary`);
+    metadataSummary.value = summary;
+  } catch (e) {
+    console.error('Metadata fetch failed:', e);
+  } finally {
+    metadataLoading.value = false;
+  }
+}
+
+function formatMetaValue(val) {
+  if (val === null || val === undefined) return '-';
+  if (typeof val === 'object') return JSON.stringify(val, null, 2);
+  return String(val);
+}
+
 watch(projectId, () => { page.value = 1; fetchModels(); });
 
 onMounted(async () => {
@@ -265,8 +299,11 @@ onMounted(async () => {
           </template>
           <template v-else-if="column.key === 'actions'">
             <Space>
-              <Tooltip title="View model">
+              <Tooltip title="3D Viewer">
                 <Button type="link" size="small" @click="goToViewer(record)"><EyeOutlined /></Button>
+              </Tooltip>
+              <Tooltip title="Metadata & Info">
+                <Button type="link" size="small" @click="openMetadata(record)"><FileTextOutlined /></Button>
               </Tooltip>
               <Tooltip title="Version history">
                 <Button type="link" size="small" @click="openVersions(record)"><HistoryOutlined /></Button>
@@ -316,6 +353,89 @@ onMounted(async () => {
         </Row>
       </div>
     </Modal>
+
+    <!-- Metadata & Info Drawer -->
+    <Drawer v-model:open="showMetadata" title="Model Metadata & Info" width="600" placement="right">
+      <template v-if="metadataRecord">
+        <!-- Basic Info -->
+        <Descriptions bordered size="small" :column="2" class="mb-4">
+          <DescriptionsItem label="Name" :span="2">{{ metadataRecord.name }}</DescriptionsItem>
+          <DescriptionsItem label="Sequence">{{ metadataRecord.sequence_name }}</DescriptionsItem>
+          <DescriptionsItem label="Format"><Tag>{{ (metadataRecord.file_format || '').toUpperCase() }}</Tag></DescriptionsItem>
+          <DescriptionsItem label="Discipline"><Tag :color="disciplineColors[metadataRecord.discipline]">{{ metadataRecord.discipline || '-' }}</Tag></DescriptionsItem>
+          <DescriptionsItem label="Status"><Badge :status="statusColors[metadataRecord.status]" :text="metadataRecord.status" /></DescriptionsItem>
+          <DescriptionsItem label="Version">v{{ metadataRecord.version }} <Tag v-if="metadataRecord.is_current" color="green" size="small">current</Tag></DescriptionsItem>
+          <DescriptionsItem label="Elements">{{ (metadataRecord.element_count || 0).toLocaleString() }}</DescriptionsItem>
+          <DescriptionsItem label="File Size">{{ formatSize(metadataRecord.file_size) }}</DescriptionsItem>
+          <DescriptionsItem label="File">{{ metadataRecord.file_name || '-' }}</DescriptionsItem>
+          <DescriptionsItem label="Description" :span="2">{{ metadataRecord.description || '-' }}</DescriptionsItem>
+        </Descriptions>
+
+        <!-- Loading -->
+        <div v-if="metadataLoading" style="text-align:center; padding:20px;">
+          <span>Loading metadata...</span>
+        </div>
+
+        <!-- Parsed Metadata JSON -->
+        <template v-if="metadataJson && !metadataLoading">
+          <h4 style="margin:12px 0 8px; font-size:13px; font-weight:600;">File Metadata</h4>
+          <Descriptions bordered size="small" :column="1">
+            <template v-for="(val, key) in metadataJson" :key="key">
+              <DescriptionsItem v-if="typeof val !== 'object'" :label="key">{{ formatMetaValue(val) }}</DescriptionsItem>
+            </template>
+          </Descriptions>
+
+          <!-- Nested objects (like geo_reference, etc) -->
+          <template v-for="(val, key) in metadataJson" :key="'obj-'+key">
+            <template v-if="typeof val === 'object' && val !== null">
+              <h4 style="margin:12px 0 6px; font-size:12px; font-weight:600; color:#555;">{{ key }}</h4>
+              <Descriptions bordered size="small" :column="1">
+                <DescriptionsItem v-for="(v2, k2) in val" :key="k2" :label="k2">{{ formatMetaValue(v2) }}</DescriptionsItem>
+              </Descriptions>
+            </template>
+          </template>
+        </template>
+
+        <!-- Element Summary -->
+        <template v-if="metadataSummary && !metadataLoading">
+          <h4 style="margin:16px 0 8px; font-size:13px; font-weight:600;">Element Summary</h4>
+
+          <template v-if="metadataSummary.by_type && Object.keys(metadataSummary.by_type).length">
+            <h5 style="margin:8px 0 4px; font-size:11px; color:#888;">By IFC Type</h5>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">
+              <Tag v-for="(count, type) in metadataSummary.by_type" :key="type" color="blue">{{ type }}: {{ count }}</Tag>
+            </div>
+          </template>
+
+          <template v-if="metadataSummary.by_level && Object.keys(metadataSummary.by_level).length">
+            <h5 style="margin:8px 0 4px; font-size:11px; color:#888;">By Level</h5>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">
+              <Tag v-for="(count, level) in metadataSummary.by_level" :key="level" color="green">{{ level }}: {{ count }}</Tag>
+            </div>
+          </template>
+
+          <template v-if="metadataSummary.by_material && Object.keys(metadataSummary.by_material).length">
+            <h5 style="margin:8px 0 4px; font-size:11px; color:#888;">By Material</h5>
+            <div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:8px;">
+              <Tag v-for="(count, mat) in metadataSummary.by_material" :key="mat" color="orange">{{ mat }}: {{ count }}</Tag>
+            </div>
+          </template>
+
+          <template v-if="metadataSummary.by_discipline && Object.keys(metadataSummary.by_discipline).length">
+            <h5 style="margin:8px 0 4px; font-size:11px; color:#888;">By Discipline</h5>
+            <div style="display:flex; flex-wrap:wrap; gap:4px;">
+              <Tag v-for="(count, disc) in metadataSummary.by_discipline" :key="disc" :color="disciplineColors[disc] || 'default'">{{ disc }}: {{ count }}</Tag>
+            </div>
+          </template>
+        </template>
+
+        <!-- Actions -->
+        <div style="margin-top:16px; display:flex; gap:8px;">
+          <Button type="primary" @click="goToViewer(metadataRecord)"><EyeOutlined /> Open 3D Viewer</Button>
+          <Button @click="openVersions(metadataRecord)"><HistoryOutlined /> Version History</Button>
+        </div>
+      </template>
+    </Drawer>
 
     <!-- Version History Drawer -->
     <Drawer v-model:open="showVersions" title="Version History" width="500">
