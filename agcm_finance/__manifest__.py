@@ -46,6 +46,7 @@ Financial management for construction projects.
         "views/invoice-form.vue",
         "views/bills.vue",
         "views/bill-form.vue",
+        "views/prime-contracts.vue",
     ],
 
     "assets": {
@@ -100,6 +101,13 @@ Financial management for construction projects.
                     "icon": "lucide:file-minus",
                     "sequence": 5,
                     "viewName": "bills",
+                },
+                {
+                    "name": "Prime Contracts",
+                    "path": "/agcm/finance/prime-contracts",
+                    "icon": "lucide:file-signature",
+                    "sequence": 6,
+                    "viewName": "prime-contracts",
                 },
             ],
         },

@@ -39,6 +39,7 @@ Document management system for construction projects.
 
     "views": [
         "views/documents.vue",
+        "views/drawings.vue",
     ],
 
     "assets": {
@@ -59,6 +60,14 @@ Document management system for construction projects.
             "icon": "lucide:file-text",
             "sequence": 25,
             "viewName": "documents",
+        },
+        {
+            "name": "Drawings",
+            "path": "/agcm/drawings",
+            "parent": "agcm",
+            "icon": "lucide:drafting-compass",
+            "sequence": 26,
+            "viewName": "drawings",
         },
     ],
 

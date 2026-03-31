@@ -23,6 +23,17 @@ from addons.agcm_procurement.models.vendor_bill import (
     BillRecordType,
     BillLineType,
 )
+from addons.agcm_procurement.models.payment_application import (
+    PaymentApplication,
+    PaymentApplicationLine,
+    PaymentApplicationStatus,
+)
+from addons.agcm_procurement.models.tm_ticket import (
+    TMTicket,
+    TMTicketLine,
+    TMTicketStatus,
+    TMLineType,
+)
 
 __all__ = [
     # Enums
@@ -35,6 +46,9 @@ __all__ = [
     "VendorBillStatus",
     "BillRecordType",
     "BillLineType",
+    "PaymentApplicationStatus",
+    "TMTicketStatus",
+    "TMLineType",
     # Purchase Order
     "PurchaseOrder",
     "PurchaseOrderLine",
@@ -46,4 +60,10 @@ __all__ = [
     "VendorBill",
     "VendorBillLine",
     "VendorBillPayment",
+    # Payment Application
+    "PaymentApplication",
+    "PaymentApplicationLine",
+    # T&M Ticket
+    "TMTicket",
+    "TMTicketLine",
 ]

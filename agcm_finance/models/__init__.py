@@ -5,6 +5,7 @@ from addons.agcm_finance.models.budget import Budget
 from addons.agcm_finance.models.expense import Expense, ExpenseLine, ExpenseStatus
 from addons.agcm_finance.models.invoice import Invoice, InvoiceStatus
 from addons.agcm_finance.models.bill import Bill, BillStatus
+from addons.agcm_finance.models.prime_contract import PrimeContract, PrimeContractStatus
 
 __all__ = [
     "CostCode",
@@ -16,4 +17,6 @@ __all__ = [
     "InvoiceStatus",
     "Bill",
     "BillStatus",
+    "PrimeContract",
+    "PrimeContractStatus",
 ]

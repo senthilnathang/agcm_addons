@@ -82,3 +82,14 @@ async def delete_budget(
     svc = _get_service(db, current_user)
     if not svc.delete_budget(budget_id):
         raise HTTPException(status_code=404, detail="Budget not found")
+
+
+@router.get("/budget/forecast")
+async def get_budget_forecast(
+    project_id: int = Query(..., description="Project ID"),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get EAC/ETC budget forecast for a project."""
+    svc = _get_service(db, current_user)
+    return svc.get_budget_forecast(project_id)

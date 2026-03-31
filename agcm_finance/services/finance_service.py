@@ -23,6 +23,11 @@ from addons.agcm_finance.schemas.finance import (
     RecordPayment,
 )
 
+# Lazy imports to avoid circular dependency issues
+def _get_change_order_model():
+    from addons.agcm_change_order.models.change_order import ChangeOrder
+    return ChangeOrder
+
 logger = logging.getLogger(__name__)
 
 # Sequence configs: (prefix, padding)
@@ -573,3 +578,79 @@ class FinanceService:
         self.db.commit()
         self.db.refresh(bill)
         return bill
+
+    # =========================================================================
+    # BUDGET FORECASTING (EAC/ETC)
+    # =========================================================================
+
+    def get_budget_forecast(self, project_id: int) -> dict:
+        """Compute Estimate at Completion / Estimate to Complete forecast."""
+        budgets = self.list_budgets(project_id)
+
+        original_budget = sum(b.planned_amount or 0 for b in budgets)
+        committed = sum(b.committed_amount or 0 for b in budgets)
+        actual_spent = sum(b.actual_amount or 0 for b in budgets)
+
+        # Get approved change order cost impacts
+        approved_changes = 0.0
+        try:
+            ChangeOrder = _get_change_order_model()
+            cos = (
+                self.db.query(func.coalesce(func.sum(ChangeOrder.cost_impact), 0))
+                .filter(
+                    ChangeOrder.project_id == project_id,
+                    ChangeOrder.company_id == self.company_id,
+                    ChangeOrder.status == "approved",
+                )
+                .scalar()
+            )
+            approved_changes = float(cos or 0)
+        except Exception:
+            pass
+
+        revised_budget = original_budget + approved_changes
+
+        # Trend factor: ratio of committed-but-unspent work
+        if committed > 0 and actual_spent > 0:
+            trend_factor = actual_spent / committed if committed else 1.0
+        else:
+            trend_factor = 1.0
+
+        remaining_committed = max(committed - actual_spent, 0)
+        estimated_at_completion = actual_spent + remaining_committed * trend_factor
+        # Ensure EAC is at least the revised budget when there is no variance signal
+        if estimated_at_completion < revised_budget and actual_spent == 0:
+            estimated_at_completion = revised_budget
+
+        estimate_to_complete = max(estimated_at_completion - actual_spent, 0)
+        variance = revised_budget - estimated_at_completion
+        pct_complete = (actual_spent / revised_budget * 100) if revised_budget else 0
+        cpi = (revised_budget / estimated_at_completion) if estimated_at_completion else 0
+
+        # Build per-cost-code breakdown
+        by_cost_code = []
+        for b in budgets:
+            cc_forecast = (b.actual_amount or 0) + max((b.committed_amount or 0) - (b.actual_amount or 0), 0) * trend_factor
+            by_cost_code.append({
+                "budget_id": b.id,
+                "cost_code_id": b.cost_code_id,
+                "description": b.description,
+                "planned": b.planned_amount or 0,
+                "committed": b.committed_amount or 0,
+                "actual": b.actual_amount or 0,
+                "forecast": round(cc_forecast, 2),
+            })
+
+        return {
+            "original_budget": round(original_budget, 2),
+            "approved_changes": round(approved_changes, 2),
+            "revised_budget": round(revised_budget, 2),
+            "committed": round(committed, 2),
+            "actual_spent": round(actual_spent, 2),
+            "estimated_at_completion": round(estimated_at_completion, 2),
+            "estimate_to_complete": round(estimate_to_complete, 2),
+            "variance": round(variance, 2),
+            "pct_complete": round(pct_complete, 2),
+            "cost_performance_index": round(cpi, 4),
+            "by_cost_code": by_cost_code,
+        }

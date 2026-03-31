@@ -41,6 +41,8 @@ Procurement management for construction projects.
         "views/subcontracts.vue",
         "views/subcontract-detail.vue",
         "views/vendor-bills.vue",
+        "views/payment-applications.vue",
+        "views/tm-tickets.vue",
     ],
 
     "assets": {
@@ -81,6 +83,20 @@ Procurement management for construction projects.
                     "icon": "lucide:receipt",
                     "sequence": 3,
                     "viewName": "vendor-bills",
+                },
+                {
+                    "name": "Pay Applications",
+                    "path": "/agcm/procurement/payment-applications",
+                    "icon": "lucide:file-check",
+                    "sequence": 4,
+                    "viewName": "payment-applications",
+                },
+                {
+                    "name": "T&M Tickets",
+                    "path": "/agcm/procurement/tm-tickets",
+                    "icon": "lucide:clock",
+                    "sequence": 5,
+                    "viewName": "tm-tickets",
                 },
             ],
         },
