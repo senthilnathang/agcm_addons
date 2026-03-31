@@ -70,7 +70,7 @@ class AGCMReportDefinition(Base, TimestampMixin, AuditMixin):
 
     # Relationships
     schedules = relationship(
-        "AGCMReportSchedule",
+        "agcm_report_schedules",
         back_populates="report",
         cascade="all, delete-orphan",
     )
@@ -114,4 +114,4 @@ class AGCMReportSchedule(Base, TimestampMixin):
     )
 
     # Relationships
-    report = relationship("AGCMReportDefinition", back_populates="schedules")
+    report = relationship("agcm_report_definitions", back_populates="schedules")

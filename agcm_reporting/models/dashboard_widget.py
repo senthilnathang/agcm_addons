@@ -96,4 +96,4 @@ class AGCMDashboardWidget(Base, TimestampMixin):
     display_order = Column(Integer, default=0)
 
     # Relationships
-    layout = relationship("AGCMDashboardLayout", back_populates="widgets")
+    layout = relationship("agcm_dashboard_layouts", back_populates="widgets")

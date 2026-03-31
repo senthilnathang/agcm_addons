@@ -10,10 +10,13 @@ from sqlalchemy import func, text
 from sqlalchemy.orm import Session, joinedload
 
 from addons.agcm_reporting.models.report_definition import (
-    ReportDefinition, ReportSchedule, ReportFormat,
+    AGCMReportDefinition as ReportDefinition,
+    AGCMReportSchedule as ReportSchedule,
+    ReportFormat,
 )
 from addons.agcm_reporting.models.dashboard_widget import (
-    DashboardLayout, DashboardWidget,
+    AGCMDashboardLayout as DashboardLayout,
+    AGCMDashboardWidget as DashboardWidget,
 )
 from addons.agcm_reporting.schemas.report_definition import (
     ReportDefinitionCreate, ReportDefinitionUpdate,
