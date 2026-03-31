@@ -1,73 +1,111 @@
-# Claude Instructions for agcm_addons
+# Claude Instructions for agcm_addons — BuildForge Construction Platform
 
-## Module: AGCM (Construction Management)
+## Platform Overview
 
-This is a FastVue addon module for construction project daily activity logging. Migrated from Odoo's AGCM module.
+BuildForge is a comprehensive construction management platform built as 15 addon modules on the FastVue framework. Inspired by Procore (enterprise) and Buildern (SMB), it covers the full construction lifecycle: estimating → scheduling → financial → quality → collaboration → reporting → BIM.
+
+**Total: 15 modules, 104 database tables, 270+ API endpoints, 64+ frontend views, 38,000+ demo records**
+
+## Module Map
+
+| Module | Purpose | Tables | Key Entities |
+|--------|---------|--------|-------------|
+| `agcm` | Base: projects, daily logs, weather, photos | 17 | Project, DailyActivityLog, ManPower, Weather |
+| `agcm_document` | Documents + drawings with revision control | 4 | ProjectFolder, ProjectDocument, Drawing, DrawingRevision |
+| `agcm_rfi` | Request for Information workflow | 5 | RFI, RFIResponse, RFILabel |
+| `agcm_submittal` | Submittals with multi-step approval | 6 | Submittal, SubmittalApprover, SubmittalPackage |
+| `agcm_change_order` | Change orders with line items | 2 | ChangeOrder, ChangeOrderLine |
+| `agcm_schedule` | Tasks, WBS, Gantt, dependencies | 4 | Task, WBS, Schedule, TaskDependency |
+| `agcm_finance` | Budget, expenses, invoices, bills, prime contracts | 7 | Budget, CostCode, Invoice, Bill, PrimeContract |
+| `agcm_progress` | Issues, milestones, estimation, S-curve | 5 | Issue, Milestone, EstimationItem, SCurveData |
+| `agcm_estimate` | Cost catalogs, assemblies, estimates, proposals, takeoff | 11 | Estimate, CostItem, Assembly, Proposal, TakeoffSheet |
+| `agcm_procurement` | POs, subcontracts, vendor bills, payment apps, T&M | 12 | PurchaseOrder, Subcontract, VendorBill, PaymentApplication, TMTicket |
+| `agcm_resource` | Workers, equipment, timesheets | 4 | Worker, Equipment, Timesheet, EquipmentAssignment |
+| `agcm_safety` | Checklists, inspections, punch lists, incidents | 8 | SafetyInspection, PunchListItem, IncidentReport, ChecklistTemplate |
+| `agcm_portal` | Client selections, bid packages, portal config | 5 | Selection, BidPackage, BidSubmission, PortalConfig |
+| `agcm_reporting` | Report definitions, dashboards, widgets | 4 | AGCMReportDefinition, AGCMDashboardLayout, AGCMDashboardWidget |
+| `agcm_bim` | 3D models, xeokit viewer, clash detection, annotations | 6 | BIMModel, BIMViewpoint, ClashTest, ClashResult, BIMAnnotation3D |
 
 ## Critical Rules
 
 ### Import Namespace
-- All imports MUST use `from addons.agcm.` prefix (NOT bare `from agcm.`)
-- Example: `from addons.agcm.models.project import Project`
-- The `AddonNamespaceFinder` maps `addons.agcm.*` to `agcm_addons/agcm/`
+- All imports MUST use `from addons.agcm_<module>.` prefix
+- Example: `from addons.agcm_estimate.models.estimate import Estimate`
+- The `AddonNamespaceFinder` maps `addons.*` to `agcm_addons/`
 
 ### API Router
-- NEVER add `prefix=` to `APIRouter()` — loader auto-mounts at `/api/v1/agcm`
+- NEVER add `prefix=` to `APIRouter()` — loader auto-mounts at `/api/v1/<module_name>`
 - Frontend `requestClient` already adds `/api/v1` — use paths like `/agcm/projects`
 
 ### Database
-- All table names prefixed with `agcm_` (e.g. `agcm_projects`, `agcm_daily_activity_logs`)
-- Every model must have `company_id` FK to `companies.id`
-- Use `get_effective_company_id()` for company scoping in API endpoints
-- Module tables are auto-created by AutoSchemaManager — no alembic migrations needed
+- All table names prefixed with `agcm_` (104 tables total)
+- Every model MUST have `company_id` FK to `companies.id`
+- Use `get_effective_company_id()` for company scoping
+- Tables auto-created by AutoSchemaManager — no alembic needed
 
-### Sequences
-- Use `sequence_service.py` for auto-generating codes: `Proj00001`, `DL00001`, `MP00001`, etc.
-- Sequence config matches Odoo's `ir_sequence_data.xml` prefixes
+### Module Installation
+- Modules must be in `installed_modules` DB table to have routers mounted
+- `installed_modules` requires: name, display_name, state="installed", version, category, license
+- Auto-discovered from `ADDONS_PATHS` but only installed modules get API routers
 
-### Frontend
+### Class Name Conflicts
+- AGCM models that share Python class names with core modules MUST be renamed
+- Pattern: `AGCMDashboardLayout`, `AGCMReportDefinition`, `SafetyInspection`
+- Use tablename-based relationships: `relationship("agcm_report_schedules", ...)`
+- Services use aliases: `from ... import AGCMReportDefinition as ReportDefinition`
+
+### Frontend (SFC-loaded views)
 - Vue 3 SFCs loaded at runtime by `vue3-sfc-loader`
-- Use Ant Design Vue `A`-prefixed components (globally registered, no imports needed)
-- Every `.vue` file needs a companion `.css` file (can be empty)
-- Import API functions from `#/api/agcm`
+- Ant Design Vue components (A-prefixed, globally registered)
+- Every `.vue` file needs a companion `.css` file
 - Import `requestClient` from `#/api/request`
+- Import `echarts` via `import * as echarts from 'echarts'`
+- Import xeokit via `import { Viewer, ... } from '@xeokit/xeokit-sdk'`
+- NO TypeScript in SFC-loaded views — plain JS only
 
 ### Pagination
-- All paginated API endpoints MUST use `page_size: int = Query(20, ge=1, le=200)` (import `Query` from `fastapi`)
-- Services should also enforce `page_size = min(page_size, 200)` as a safety net
-- Frontend MUST NEVER request `page_size` greater than 200 — the API will reject with 422
-- For project/user dropdowns use `page_size: 200` (the max), NOT 500 or unbounded
+- All paginated endpoints: `page_size: int = Query(20, ge=1, le=200)`
+- Services enforce: `page_size = min(page_size, 200)`
+- Frontend: NEVER request `page_size > 200`
 
 ### Enum Columns
-- New modules MUST use `Enum(MyEnum, values_callable=lambda e: [m.value for m in e])` so PostgreSQL stores lowercase values (e.g. `"in_progress"` not `"IN_PROGRESS"`)
-- Do NOT add `values_callable` to existing base `agcm` module enums — they already use uppercase member names in the DB
-- When passing enum values in seed scripts or API, use the lowercase string value (e.g. `"in_progress"`)
+- New modules: `Enum(MyEnum, values_callable=lambda e: [m.value for m in e])`
+- Base `agcm` module: NO `values_callable` (uses uppercase in DB)
 
-### Child Module Menus
-- Child modules (agcm_rfi, agcm_finance, etc.) MUST NOT re-declare the "Construction" parent menu
-- Instead, use `"parent": "agcm"` on each menu item to attach to the existing Construction menu
-- For Settings sub-items, use `"parent": "agcm.settings"`
-- Only the base `agcm` module declares the root `{"name": "Construction", "path": "/agcm"}` menu
-
-### Photo Storage
-- Photos stored via core documents module (not binary blobs)
-- Upload via multipart `POST /photos/upload`
-- Files stored at `uploads/agcm/photos/YYYY/MM/DD/`
+### Menus
+- Child modules use `"parent": "agcm"` — NEVER re-declare Construction parent
+- Settings items use `"parent": "agcm.settings"`
 
 ### Real-time Events
 - Service: `from addons.agcm.services.realtime_events import agcm_realtime`
-- All events broadcast to **project team members** via `agcm_project_users` M2M
-- Fire-and-forget pattern — `try: await agcm_realtime.xxx(db, entity) except: pass`
-- Event types prefixed `agcm:` (e.g., `agcm:rfi:created`, `agcm:task:progress_changed`)
-- Frontend listens: `const { on } = useRealtime(); on('agcm:rfi:response_new', handler)`
-- No core framework changes needed — plugs into existing WebSocket room infrastructure
-- Wired into: RFI (create, close, response), Tasks (create, status, progress), Submittals (create, approve), Change Orders (create, approve), Issues (create, update, resolve)
+- Fire-and-forget: `try: await agcm_realtime.xxx(db, entity) except: pass`
+- Wired into: RFI, Tasks, Submittals, Change Orders, Issues
 
-### Weather
-- Two models: `WeatherForecast` (auto from weather.gov) and `Weather` (manual entry)
-- Forecast fetched via weather.gov Points API → station observations / hourly forecast
+### Generic Systems
+- **Comments:** `EntityComment` (agcm_entity_comments) — any entity via entity_type+entity_id
+- **Attachments:** `agcm_entity_attachments` M2M — links any entity to documents
+- **Approvals:** `from addons.agcm.services.approval_integration import submit_for_approval`
+  - Wraps core `base_automation` ApprovalChain/ApprovalTask system
+  - Supports: purchase_order, change_order, subcontract, submittal, estimate, vendor_bill
 
 ### Reports
-- HTML reports served at `/daily-logs/{id}/report/html?token=JWT`
-- Token passed as query param for browser new-tab access (no Authorization header)
-- `_render_report_html()` in `daily_logs.py` renders the full report
+- Overview Canvas: SVG charts (donut, bars) in daily log reports
+- Project Dashboard: aggregated KPIs in periodic reports
+- PDF via WeasyPrint with HTML fallback
+
+### BIM Viewer (xeokit SDK)
+- 3D viewer: `bim-viewer.vue` (3,044 lines, 10 xeokit plugins)
+- IFC→XKT conversion via `convert2xkt` CLI through job queue
+- XKT streaming: `GET /agcm_bim/models/{id}/xkt`
+- 25 toolbar tools, 12 keyboard shortcuts
+- BCF 2.1 viewpoint save/restore with screenshots
+- 3D annotations with entity linking (RFI, Issue, Punch List)
+- Multi-model federation with transforms
+- IFC type color customization, explosion view, storey plans
+
+### Workflow Connections
+- Estimate → Budget: `send_to_budget()` creates agcm_finance.Budget records
+- Change Order → Budget: auto-updates `committed_amount` on approval
+- Inspection fail → Punch List: auto-creates PunchListItem
+- Bid awarded → Subcontract: auto-creates draft Subcontract
+- BIM Viewpoints ↔ RFIs/Issues: cross-entity linking
