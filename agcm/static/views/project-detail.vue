@@ -23,6 +23,14 @@ const loading = ref(false);
 const project = ref(null);
 const activeTab = ref('details');
 
+function getAccessToken() {
+  try {
+    return localStorage?.getItem('accessToken') || '';
+  } catch {
+    return '';
+  }
+}
+
 const statusColors = {
   new: 'blue',
   inprogress: 'orange',
@@ -181,7 +189,7 @@ onMounted(fetchProject);
               <ActivityThread
                 :model-name="'agcm_projects'"
                 :record-id="projectId"
-                :access-token="localStorage.getItem('accessToken') || ''"
+                :access-token="getAccessToken()"
                 :api-base="'/api/v1'"
                 :show-messages="true"
                 :show-activities="true"

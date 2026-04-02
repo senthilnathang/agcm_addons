@@ -21,6 +21,14 @@ const metadata = ref(null);
 const activeTab = ref('info');
 const modelId = computed(() => route.query.id);
 
+function getAccessToken() {
+  try {
+    return localStorage?.getItem('accessToken') || '';
+  } catch {
+    return '';
+  }
+}
+
 // Element search
 const elementSearch = ref({ ifc_type: '', name: '', level: '' });
 const elements = ref([]);
@@ -278,7 +286,7 @@ onMounted(fetchModel);
               <ActivityThread
                 :model-name="'agcm_bim_models'"
                 :record-id="modelId"
-                :access-token="localStorage.getItem('accessToken') || ''"
+                :access-token="getAccessToken()"
                 :api-base="'/api/v1'"
                 :show-messages="true"
                 :show-activities="true"

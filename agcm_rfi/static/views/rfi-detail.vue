@@ -52,6 +52,14 @@ const rfi = ref(null);
 const loading = ref(false);
 const activeTab = ref('responses');
 
+function getAccessToken() {
+  try {
+    return localStorage?.getItem('accessToken') || '';
+  } catch {
+    return '';
+  }
+}
+
 // Response form
 const newResponseContent = ref('');
 const isOfficialResponse = ref(false);
@@ -182,7 +190,7 @@ onMounted(fetchRFI);
             <ActivityThread
               :model-name="'agcm_rfis'"
               :record-id="rfiId"
-              :access-token="localStorage.getItem('accessToken') || ''"
+              :access-token="getAccessToken()"
               :api-base="'/api/v1'"
               :show-messages="true"
               :show-activities="true"

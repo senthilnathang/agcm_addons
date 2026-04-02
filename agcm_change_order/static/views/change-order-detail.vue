@@ -39,6 +39,14 @@ const co = ref(null);
 const loading = ref(false);
 const activeTab = ref('details');
 
+function getAccessToken() {
+  try {
+    return localStorage?.getItem('accessToken') || '';
+  } catch {
+    return '';
+  }
+}
+
 const statusColors = {
   draft: 'default',
   pending: 'processing',
@@ -178,7 +186,7 @@ onMounted(fetchChangeOrder);
             <ActivityThread
               :model-name="'agcm_change_orders'"
               :record-id="coId"
-              :access-token="localStorage.getItem('accessToken') || ''"
+              :access-token="getAccessToken()"
               :api-base="'/api/v1'"
               :show-messages="true"
               :show-activities="true"

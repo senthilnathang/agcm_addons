@@ -45,6 +45,14 @@ const loading = ref(false);
 const submittal = ref(null);
 const activeTab = ref('details');
 
+function getAccessToken() {
+  try {
+    return localStorage?.getItem('accessToken') || '';
+  } catch {
+    return '';
+  }
+}
+
 const statusColors = {
   draft: 'default',
   pending_review: 'processing',
@@ -310,7 +318,7 @@ onMounted(fetchSubmittal);
               <ActivityThread
                 :model-name="'agcm_submittals'"
                 :record-id="submittalId"
-                :access-token="localStorage.getItem('accessToken') || ''"
+                :access-token="getAccessToken()"
                 :api-base="'/api/v1'"
                 :show-messages="true"
                 :show-activities="true"

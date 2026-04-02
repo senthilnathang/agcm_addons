@@ -25,6 +25,14 @@ const router = useRouter();
 const estimateId = computed(() => route.params.id);
 const isNew = computed(() => estimateId.value === 'new');
 
+function getAccessToken() {
+  try {
+    return localStorage?.getItem('accessToken') || '';
+  } catch {
+    return '';
+  }
+}
+
 const loading = ref(false);
 const saving = ref(false);
 const estimate = ref(null);
@@ -851,7 +859,7 @@ onMounted(fetchEstimate);
           <ActivityThread
             :model-name="'agcm_estimates'"
             :record-id="estimateId"
-            :access-token="localStorage.getItem('accessToken') || ''"
+            :access-token="getAccessToken()"
             :api-base="'/api/v1'"
             :show-messages="true"
             :show-activities="true"

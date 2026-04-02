@@ -51,6 +51,14 @@ const saving = ref(false);
 const isNew = ref(false);
 const detail = ref(null);
 const projects = ref([]);
+
+function getAccessToken() {
+  try {
+    return localStorage?.getItem('accessToken') || '';
+  } catch {
+    return '';
+  }
+}
 const activeTab = ref('lines');
 
 // Form data for new/edit
@@ -374,7 +382,7 @@ onMounted(async () => {
             <ActivityThread
               :model-name="'agcm_purchase_orders'"
               :record-id="route.query.id"
-              :access-token="localStorage.getItem('accessToken') || ''"
+              :access-token="getAccessToken()"
               :api-base="'/api/v1'"
               :show-messages="true"
               :show-activities="true"
