@@ -49,24 +49,17 @@ Project scheduling system for construction management.
     },
     "menus": [
         {
-            "name": "Schedule",
-            "path": "/agcm/schedule",
+            "parent": "agcm",
+            "name": "Task Schedule",
+            "path": "/agcm/schedule/task-schedule",
             "icon": "lucide:gantt-chart",
-            "sequence": 38,
-            "children": [
-                {
-                    "name": "Task Schedule",
-                    "path": "/agcm/schedule/task-schedule",
-                    "icon": "lucide:gantt-chart",
-                    "sequence": 1,
-                    "viewName": "task-schedule",
-                },
-            ],
+            "sequence": 6,
+            "viewName": "task-schedule",
         },
         {
             "name": "Task Form",
             "path": "/agcm/schedule/tasks/form",
-            "parent": "/agcm/schedule",
+            "parent": "agcm",
             "hideInMenu": True,
             "viewName": "task-form",
             "sequence": 107,
