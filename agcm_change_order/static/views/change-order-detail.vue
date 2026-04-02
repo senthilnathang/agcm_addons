@@ -27,13 +27,11 @@ import {
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
-import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMChangeOrderDetail' });
 
 const route = useRoute();
 const router = useRouter();
-const userStore = useUserStore();
 const BASE = '/agcm_change_order';
 
 const coId = ref(Number(route.query.id));
@@ -180,7 +178,7 @@ onMounted(fetchChangeOrder);
             <ActivityThread
               :model-name="'agcm_change_orders'"
               :record-id="coId"
-              :access-token="userStore.accessToken"
+              :access-token="localStorage.getItem('accessToken') || ''"
               :api-base="'/api/v1'"
               :show-messages="true"
               :show-activities="true"

@@ -53,7 +53,7 @@ Project scheduling system for construction management.
             "name": "Task Schedule",
             "path": "/agcm/schedule/task-schedule",
             "icon": "lucide:gantt-chart",
-            "sequence": 6,
+            "sequence": 12,
             "viewName": "task-schedule",
         },
         {

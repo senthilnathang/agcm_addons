@@ -48,7 +48,7 @@ Document management system for construction projects.
     },
     "menus": [
         {
-            "name": "Documents",
+            "name": "Files",
             "path": "/agcm/documents",
             "icon": "lucide:file-text",
             "sequence": 25,

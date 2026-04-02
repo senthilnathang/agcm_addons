@@ -24,7 +24,7 @@ Daily activity logging system for construction projects.
     """,
     "author": "FastVue",
     "license": "MIT",
-    "category": "Construction",
+    "category": "Projects",
 
     "application": True,
     "installable": True,
@@ -72,39 +72,38 @@ Daily activity logging system for construction projects.
 
     "menus": [
         {
-            "name": "Construction",
+            "name": "Projects",
             "path": "/agcm",
             "icon": "lucide:hard-hat",
-            "sequence": 40,
+            "sequence": 1,
             "children": [
                 {
-                    "name": "Dashboard",
-                    "path": "/agcm/dashboard",
-                    "icon": "lucide:layout-dashboard",
-                    "sequence": 0,
-                    "children": [
-                        {
-                            "name": "Overview",
-                            "path": "/agcm/dashboard/overview",
-                            "icon": "lucide:bar-chart-3",
-                            "sequence": 1,
-                            "viewName": "dashboard-overview",
-                        },
-                        {
-                            "name": "Project Analytics",
-                            "path": "/agcm/dashboard/project",
-                            "icon": "lucide:trending-up",
-                            "sequence": 2,
-                            "viewName": "dashboard-project",
-                        },
-                        {
-                            "name": "Daily Log Analytics",
-                            "path": "/agcm/dashboard/dailylog",
-                            "icon": "lucide:pie-chart",
-                            "sequence": 3,
-                            "viewName": "dashboard-dailylog",
-                        },
-                    ],
+					"name": "Dashboard",
+					"path": "/agcm/dashboard/overview",
+					"icon": "lucide:bar-chart-3",
+					"sequence": 1,
+					"viewName": "dashboard-overview",
+				},
+				{
+					"name": "Project Analytics",
+					"path": "/agcm/dashboard/project",
+					"icon": "lucide:trending-up",
+					"sequence": 2,
+					"viewName": "dashboard-project",
+				},
+				{
+					"name": "Daily Log Analytics",
+					"path": "/agcm/dashboard/dailylog",
+					"icon": "lucide:pie-chart",
+					"sequence": 3,
+					"viewName": "dashboard-dailylog",
+				},
+				{
+                    "name": "Periodic Project Report",
+                    "path": "/agcm/periodic-report",
+                    "icon": "lucide:file-bar-chart",
+                    "sequence": 4,
+                    "viewName": "periodic-report",
                 },
                 {
                     "name": "Projects",
@@ -120,13 +119,7 @@ Daily activity logging system for construction projects.
                     "sequence": 20,
                     "viewName": "daily-logs",
                 },
-                {
-                    "name": "Periodic Project Report",
-                    "path": "/agcm/periodic-report",
-                    "icon": "lucide:file-bar-chart",
-                    "sequence": 30,
-                    "viewName": "periodic-report",
-                },
+               
                 # Hidden routes for forms/details
                 {
                     "name": "Project Form",

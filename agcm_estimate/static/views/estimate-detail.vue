@@ -15,14 +15,12 @@ import {
   PlusOutlined,
   SendOutlined,
 } from '@ant-design/icons-vue';
-import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMEstimateDetail' });
 
 const BASE = '/agcm_estimate';
 const route = useRoute();
 const router = useRouter();
-const userStore = useUserStore();
 
 const estimateId = computed(() => route.params.id);
 const isNew = computed(() => estimateId.value === 'new');
@@ -853,7 +851,7 @@ onMounted(fetchEstimate);
           <ActivityThread
             :model-name="'agcm_estimates'"
             :record-id="estimateId"
-            :access-token="userStore.accessToken"
+            :access-token="localStorage.getItem('accessToken') || ''"
             :api-base="'/api/v1'"
             :show-messages="true"
             :show-activities="true"

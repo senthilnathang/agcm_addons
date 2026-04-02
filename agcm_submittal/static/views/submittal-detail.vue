@@ -33,13 +33,11 @@ import {
 } from '@ant-design/icons-vue';
 
 import { requestClient } from '#/api/request';
-import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMSubmittalDetail' });
 
 const route = useRoute();
 const router = useRouter();
-const userStore = useUserStore();
 const BASE = '/agcm_submittal';
 
 const submittalId = computed(() => route.params.id);
@@ -312,7 +310,7 @@ onMounted(fetchSubmittal);
               <ActivityThread
                 :model-name="'agcm_submittals'"
                 :record-id="submittalId"
-                :access-token="userStore.accessToken"
+                :access-token="localStorage.getItem('accessToken') || ''"
                 :api-base="'/api/v1'"
                 :show-messages="true"
                 :show-activities="true"

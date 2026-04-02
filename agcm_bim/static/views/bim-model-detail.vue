@@ -5,13 +5,11 @@ import { Page } from '@vben/common-ui';
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
-import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMBIMModelDetail' });
 
 const route = useRoute();
 const router = useRouter();
-const userStore = useUserStore();
 const BASE = '/agcm_bim';
 
 const loading = ref(true);
@@ -280,7 +278,7 @@ onMounted(fetchModel);
               <ActivityThread
                 :model-name="'agcm_bim_models'"
                 :record-id="modelId"
-                :access-token="userStore.accessToken"
+                :access-token="localStorage.getItem('accessToken') || ''"
                 :api-base="'/api/v1'"
                 :show-messages="true"
                 :show-activities="true"

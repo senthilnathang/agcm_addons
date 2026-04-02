@@ -12,13 +12,11 @@ import {
 } from '@ant-design/icons-vue';
 
 import { getProjectApi } from '#/api/agcm';
-import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMProjectDetail' });
 
 const route = useRoute();
 const router = useRouter();
-const userStore = useUserStore();
 const projectId = computed(() => route.params.id);
 
 const loading = ref(false);
@@ -183,7 +181,7 @@ onMounted(fetchProject);
               <ActivityThread
                 :model-name="'agcm_projects'"
                 :record-id="projectId"
-                :access-token="userStore.accessToken"
+                :access-token="localStorage.getItem('accessToken') || ''"
                 :api-base="'/api/v1'"
                 :show-messages="true"
                 :show-activities="true"

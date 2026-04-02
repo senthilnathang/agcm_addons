@@ -39,13 +39,11 @@ import {
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
-import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMSubcontractDetail' });
 
 const route = useRoute();
 const router = useRouter();
-const userStore = useUserStore();
 const BASE = '/agcm_procurement';
 
 const loading = ref(false);
@@ -479,7 +477,7 @@ onMounted(async () => {
             <ActivityThread
               :model-name="'agcm_subcontracts'"
               :record-id="route.query.id"
-              :access-token="userStore.accessToken"
+              :access-token="localStorage.getItem('accessToken') || ''"
               :api-base="'/api/v1'"
               :show-messages="true"
               :show-activities="true"

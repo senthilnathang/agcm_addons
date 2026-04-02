@@ -40,13 +40,11 @@ import {
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
-import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMRFIDetail' });
 
 const route = useRoute();
 const router = useRouter();
-const userStore = useUserStore();
 const BASE = '/agcm_rfi';
 
 const rfiId = ref(Number(route.query.id));
@@ -184,7 +182,7 @@ onMounted(fetchRFI);
             <ActivityThread
               :model-name="'agcm_rfis'"
               :record-id="rfiId"
-              :access-token="userStore.accessToken"
+              :access-token="localStorage.getItem('accessToken') || ''"
               :api-base="'/api/v1'"
               :show-messages="true"
               :show-activities="true"
