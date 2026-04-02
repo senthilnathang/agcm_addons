@@ -19,30 +19,25 @@ Resource tracking for construction projects.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/workers.vue",
         "views/equipment.vue",
         "views/timesheets.vue",
         "views/equipment-assignments.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -52,14 +47,12 @@ Resource tracking for construction projects.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "Resources",
             "path": "/agcm/resources",
             "icon": "lucide:users",
             "sequence": 42,
-            "parent": "agcm",
             "children": [
                 {
                     "name": "Workers",
@@ -92,7 +85,6 @@ Resource tracking for construction projects.
             ],
         },
     ],
-
     "permissions": [
         "agcm_resource.worker.view",
         "agcm_resource.worker.create",
@@ -108,36 +100,60 @@ Resource tracking for construction projects.
         "agcm_resource.timesheet.delete",
         "agcm_resource.timesheet.approve",
     ],
-
     "access_rights": [
         {
             "name": "agcm_resource.manager",
             "model": "agcm_resource.agcm_workers",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_resource.user",
             "model": "agcm_resource.agcm_workers",
-            "permissions": {"read": True, "write": False, "create": False, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": False,
+                "create": False,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
         {
             "name": "agcm_resource.equipment.manager",
             "model": "agcm_resource.agcm_equipment",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_resource.timesheet.manager",
             "model": "agcm_resource.agcm_timesheets",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_resource.timesheet.user",
             "model": "agcm_resource.agcm_timesheets",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

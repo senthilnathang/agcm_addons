@@ -20,29 +20,24 @@ Project scheduling system for construction management.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/task-schedule.vue",
         "views/schedules.vue",
         "views/task-form.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -52,34 +47,38 @@ Project scheduling system for construction management.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
-            "name": "Task Schedule",
-            "path": "/agcm/task-schedule",
-            "parent": "agcm",
+            "name": "Schedule",
+            "path": "/agcm/schedule",
             "icon": "lucide:gantt-chart",
             "sequence": 38,
-            "viewName": "task-schedule",
+            "children": [
+                {
+                    "name": "Task Schedule",
+                    "path": "/agcm/schedule/task-schedule",
+                    "icon": "lucide:gantt-chart",
+                    "sequence": 1,
+                    "viewName": "task-schedule",
+                },
+                {
+                    "name": "Schedules",
+                    "path": "/agcm/schedule/schedules",
+                    "icon": "lucide:calendar",
+                    "sequence": 2,
+                    "viewName": "schedules",
+                },
+            ],
         },
         {
             "name": "Task Form",
             "path": "/agcm/schedule/tasks/form",
-            "parent": "agcm",
+            "parent": "/agcm/schedule",
             "hideInMenu": True,
             "viewName": "task-form",
             "sequence": 107,
         },
-        {
-            "name": "Schedules",
-            "path": "/agcm/schedule/schedules",
-            "parent": "agcm",
-            "hideInMenu": True,
-            "viewName": "schedules",
-            "sequence": 108,
-        },
     ],
-
     "permissions": [
         "agcm_schedule.schedule.view",
         "agcm_schedule.schedule.create",
@@ -90,30 +89,49 @@ Project scheduling system for construction management.
         "agcm_schedule.task.edit",
         "agcm_schedule.task.delete",
     ],
-
     "access_rights": [
         {
             "name": "agcm_schedule.manager",
             "model": "agcm_schedule.agcm_schedules",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_schedule.user",
             "model": "agcm_schedule.agcm_schedules",
-            "permissions": {"read": True, "write": False, "create": False, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": False,
+                "create": False,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
         {
             "name": "agcm_schedule.task.manager",
             "model": "agcm_schedule.agcm_tasks",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_schedule.task.user",
             "model": "agcm_schedule.agcm_tasks",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_user"],
         },
     ],

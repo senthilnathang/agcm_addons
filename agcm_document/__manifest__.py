@@ -20,28 +20,23 @@ Document management system for construction projects.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/documents.vue",
         "views/drawings.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -51,26 +46,30 @@ Document management system for construction projects.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "Documents",
             "path": "/agcm/documents",
-            "parent": "agcm",
             "icon": "lucide:file-text",
             "sequence": 25,
-            "viewName": "documents",
-        },
-        {
-            "name": "Drawings",
-            "path": "/agcm/drawings",
-            "parent": "agcm",
-            "icon": "lucide:drafting-compass",
-            "sequence": 26,
-            "viewName": "drawings",
+            "children": [
+                {
+                    "name": "Documents",
+                    "path": "/agcm/documents/list",
+                    "icon": "lucide:file-text",
+                    "sequence": 1,
+                    "viewName": "documents",
+                },
+                {
+                    "name": "Drawings",
+                    "path": "/agcm/documents/drawings",
+                    "icon": "lucide:drafting-compass",
+                    "sequence": 2,
+                    "viewName": "drawings",
+                },
+            ],
         },
     ],
-
     "permissions": [
         "agcm_document.document.view",
         "agcm_document.document.create",
@@ -78,18 +77,27 @@ Document management system for construction projects.
         "agcm_document.document.delete",
         "agcm_document.folder.manage",
     ],
-
     "access_rights": [
         {
             "name": "agcm_document.manager",
             "model": "agcm_document.agcm_project_documents",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_document.user",
             "model": "agcm_document.agcm_project_documents",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

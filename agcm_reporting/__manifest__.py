@@ -20,29 +20,24 @@ Executive dashboards and custom report builder for construction management.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/reports.vue",
         "views/report-builder.vue",
         "views/dashboards.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -52,14 +47,12 @@ Executive dashboards and custom report builder for construction management.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "Reporting",
             "path": "/agcm/reporting",
             "icon": "lucide:bar-chart-big",
             "sequence": 45,
-            "parent": "agcm",
             "children": [
                 {
                     "name": "Reports",
@@ -75,18 +68,16 @@ Executive dashboards and custom report builder for construction management.
                     "sequence": 2,
                     "viewName": "dashboards",
                 },
-                # Hidden route for report builder
                 {
                     "name": "Report Builder",
                     "path": "/agcm/reporting/report-builder",
-                    "hideInMenu": True,
+                    "icon": "lucide:pencil-ruler",
+                    "sequence": 3,
                     "viewName": "report-builder",
-                    "sequence": 120,
                 },
             ],
         },
     ],
-
     "permissions": [
         "agcm_reporting.report.view",
         "agcm_reporting.report.create",
@@ -97,18 +88,27 @@ Executive dashboards and custom report builder for construction management.
         "agcm_reporting.dashboard.edit",
         "agcm_reporting.dashboard.delete",
     ],
-
     "access_rights": [
         {
             "name": "agcm_reporting.manager",
             "model": "agcm_reporting.agcm_report_definitions",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_reporting.user",
             "model": "agcm_reporting.agcm_report_definitions",
-            "permissions": {"read": True, "write": False, "create": False, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": False,
+                "create": False,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

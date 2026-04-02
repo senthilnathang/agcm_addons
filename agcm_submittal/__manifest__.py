@@ -20,30 +20,25 @@ Manage construction submittals with approval workflows.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": True,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/submittals.vue",
         "views/submittal-form.vue",
         "views/submittal-detail.vue",
         "views/settings-submittal-types.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -53,20 +48,33 @@ Manage construction submittals with approval workflows.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "Submittals",
             "path": "/agcm/submittals",
-            "parent": "agcm",
             "icon": "lucide:file-check-2",
             "sequence": 36,
-            "viewName": "submittals",
+            "children": [
+                {
+                    "name": "Submittals",
+                    "path": "/agcm/submittals/list",
+                    "icon": "lucide:file-check-2",
+                    "sequence": 1,
+                    "viewName": "submittals",
+                },
+                {
+                    "name": "Submittal Types",
+                    "path": "/agcm/submittals/types",
+                    "icon": "lucide:file-type",
+                    "sequence": 2,
+                    "viewName": "settings-submittal-types",
+                },
+            ],
         },
         {
             "name": "Submittal Form",
             "path": "/agcm/submittals/form",
-            "parent": "agcm",
+            "parent": "/agcm/submittals",
             "hideInMenu": True,
             "viewName": "submittal-form",
             "sequence": 110,
@@ -74,21 +82,12 @@ Manage construction submittals with approval workflows.
         {
             "name": "Submittal Detail",
             "path": "/agcm/submittals/detail",
-            "parent": "agcm",
+            "parent": "/agcm/submittals",
             "hideInMenu": True,
             "viewName": "submittal-detail",
             "sequence": 111,
         },
-        {
-            "name": "Submittal Types",
-            "path": "/agcm/settings/submittal-types",
-            "parent": "agcm.settings",
-            "icon": "lucide:file-type",
-            "sequence": 6,
-            "viewName": "settings-submittal-types",
-        },
     ],
-
     "permissions": [
         "agcm_submittal.submittal.view",
         "agcm_submittal.submittal.create",
@@ -96,18 +95,27 @@ Manage construction submittals with approval workflows.
         "agcm_submittal.submittal.delete",
         "agcm_submittal.settings.manage",
     ],
-
     "access_rights": [
         {
             "name": "agcm_submittal.manager",
             "model": "agcm_submittal.agcm_submittals",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_submittal.user",
             "model": "agcm_submittal.agcm_submittals",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

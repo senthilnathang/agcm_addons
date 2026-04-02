@@ -20,23 +20,19 @@ Progress tracking module for construction projects.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/milestones.vue",
         "views/issues.vue",
@@ -45,7 +41,6 @@ Progress tracking module for construction projects.
         "views/scurve.vue",
         "views/project-images.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -55,63 +50,59 @@ Progress tracking module for construction projects.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
-        {
-            "name": "Issues",
-            "path": "/agcm/issues",
-            "parent": "agcm",
-            "icon": "lucide:alert-circle",
-            "sequence": 39,
-            "viewName": "issues",
-        },
         {
             "name": "Progress",
             "path": "/agcm/progress",
-            "parent": "agcm",
             "icon": "lucide:trending-up",
             "sequence": 41,
             "children": [
                 {
+                    "name": "Issues",
+                    "path": "/agcm/progress/issues",
+                    "icon": "lucide:alert-circle",
+                    "sequence": 1,
+                    "viewName": "issues",
+                },
+                {
                     "name": "S-Curve",
                     "path": "/agcm/progress/scurve",
                     "icon": "lucide:line-chart",
-                    "sequence": 1,
+                    "sequence": 2,
                     "viewName": "scurve",
                 },
                 {
                     "name": "Milestones",
                     "path": "/agcm/progress/milestones",
                     "icon": "lucide:flag",
-                    "sequence": 2,
+                    "sequence": 3,
                     "viewName": "milestones",
                 },
                 {
                     "name": "Estimation",
                     "path": "/agcm/progress/estimation",
                     "icon": "lucide:calculator",
-                    "sequence": 3,
+                    "sequence": 4,
                     "viewName": "estimation",
                 },
                 {
                     "name": "Project Images",
                     "path": "/agcm/progress/project-images",
                     "icon": "lucide:image",
-                    "sequence": 4,
+                    "sequence": 5,
                     "viewName": "project-images",
                 },
             ],
         },
         {
             "name": "Issue Form",
-            "path": "/agcm/issues/form",
-            "parent": "agcm",
+            "path": "/agcm/progress/issues/form",
+            "parent": "/agcm/progress",
             "hideInMenu": True,
             "viewName": "issue-form",
             "sequence": 109,
         },
     ],
-
     "permissions": [
         "agcm_progress.issue.view",
         "agcm_progress.issue.create",
@@ -134,18 +125,27 @@ Progress tracking module for construction projects.
         "agcm_progress.image.edit",
         "agcm_progress.image.delete",
     ],
-
     "access_rights": [
         {
             "name": "agcm_progress.manager",
             "model": "agcm_progress.agcm_milestones",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_progress.user",
             "model": "agcm_progress.agcm_milestones",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

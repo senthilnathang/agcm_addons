@@ -23,23 +23,19 @@ Full construction estimating platform inspired by Procore and Buildern.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/estimates.vue",
         "views/estimate-detail.vue",
@@ -48,7 +44,6 @@ Full construction estimating platform inspired by Procore and Buildern.
         "views/proposals.vue",
         "views/takeoff-sheets.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -58,12 +53,10 @@ Full construction estimating platform inspired by Procore and Buildern.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "Estimating",
             "path": "/agcm/estimating",
-            "parent": "agcm",
             "icon": "lucide:calculator",
             "sequence": 32,
             "children": [
@@ -107,13 +100,12 @@ Full construction estimating platform inspired by Procore and Buildern.
         {
             "name": "Estimate Detail",
             "path": "/agcm/estimating/estimates/detail",
-            "parent": "agcm",
+            "parent": "/agcm/estimating",
             "hideInMenu": True,
             "viewName": "estimate-detail",
             "sequence": 115,
         },
     ],
-
     "permissions": [
         "agcm_estimate.estimate.view",
         "agcm_estimate.estimate.create",
@@ -130,18 +122,27 @@ Full construction estimating platform inspired by Procore and Buildern.
         "agcm_estimate.takeoff.view",
         "agcm_estimate.takeoff.manage",
     ],
-
     "access_rights": [
         {
             "name": "agcm_estimate.manager",
             "model": "agcm_estimate.agcm_estimates",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_estimate.user",
             "model": "agcm_estimate.agcm_estimates",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

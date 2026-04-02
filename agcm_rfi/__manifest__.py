@@ -21,30 +21,25 @@ Request for Information (RFI) management for construction projects.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/rfis.vue",
         "views/rfi-form.vue",
         "views/rfi-detail.vue",
         "views/settings-rfi-labels.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -54,20 +49,33 @@ Request for Information (RFI) management for construction projects.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "RFI",
             "path": "/agcm/rfi",
-            "parent": "agcm",
             "icon": "lucide:message-circle-question",
             "sequence": 35,
-            "viewName": "rfis",
+            "children": [
+                {
+                    "name": "RFIs",
+                    "path": "/agcm/rfi/rfis",
+                    "icon": "lucide:message-circle-question",
+                    "sequence": 1,
+                    "viewName": "rfis",
+                },
+                {
+                    "name": "RFI Labels",
+                    "path": "/agcm/rfi/labels",
+                    "icon": "lucide:tags",
+                    "sequence": 2,
+                    "viewName": "settings-rfi-labels",
+                },
+            ],
         },
         {
             "name": "RFI Form",
             "path": "/agcm/rfi/form",
-            "parent": "agcm",
+            "parent": "/agcm/rfi",
             "hideInMenu": True,
             "viewName": "rfi-form",
             "sequence": 105,
@@ -75,21 +83,12 @@ Request for Information (RFI) management for construction projects.
         {
             "name": "RFI Detail",
             "path": "/agcm/rfi/detail",
-            "parent": "agcm",
+            "parent": "/agcm/rfi",
             "hideInMenu": True,
             "viewName": "rfi-detail",
             "sequence": 106,
         },
-        {
-            "name": "RFI Labels",
-            "path": "/agcm/settings/rfi-labels",
-            "parent": "agcm.settings",
-            "icon": "lucide:tags",
-            "sequence": 5,
-            "viewName": "settings-rfi-labels",
-        },
     ],
-
     "permissions": [
         "agcm_rfi.rfi.view",
         "agcm_rfi.rfi.create",
@@ -97,18 +96,27 @@ Request for Information (RFI) management for construction projects.
         "agcm_rfi.rfi.delete",
         "agcm_rfi.settings.manage",
     ],
-
     "access_rights": [
         {
             "name": "agcm_rfi.manager",
             "model": "agcm_rfi.agcm_rfis",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_rfi.user",
             "model": "agcm_rfi.agcm_rfis",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

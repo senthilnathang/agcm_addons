@@ -18,29 +18,24 @@ Client and subcontractor portal for construction projects.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/selections.vue",
         "views/bids.vue",
         "views/portal-settings.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -50,14 +45,12 @@ Client and subcontractor portal for construction projects.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "Portals",
             "path": "/agcm/portals",
             "icon": "lucide:door-open",
             "sequence": 44,
-            "parent": "agcm",
             "children": [
                 {
                     "name": "Selections",
@@ -83,7 +76,6 @@ Client and subcontractor portal for construction projects.
             ],
         },
     ],
-
     "permissions": [
         "agcm_portal.selection.view",
         "agcm_portal.selection.create",
@@ -95,18 +87,27 @@ Client and subcontractor portal for construction projects.
         "agcm_portal.bid.delete",
         "agcm_portal.config.manage",
     ],
-
     "access_rights": [
         {
             "name": "agcm_portal.manager",
             "model": "agcm_portal.agcm_selections",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_portal.user",
             "model": "agcm_portal.agcm_selections",
-            "permissions": {"read": True, "write": False, "create": False, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": False,
+                "create": False,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

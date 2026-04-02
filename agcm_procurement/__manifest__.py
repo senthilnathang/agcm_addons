@@ -18,23 +18,19 @@ Procurement management for construction projects.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/purchase-orders.vue",
         "views/po-detail.vue",
@@ -44,7 +40,6 @@ Procurement management for construction projects.
         "views/payment-applications.vue",
         "views/tm-tickets.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -54,12 +49,10 @@ Procurement management for construction projects.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "Procurement",
             "path": "/agcm/procurement",
-            "parent": "agcm",
             "icon": "lucide:shopping-cart",
             "sequence": 34,
             "children": [
@@ -103,7 +96,7 @@ Procurement management for construction projects.
         {
             "name": "PO Detail",
             "path": "/agcm/procurement/purchase-orders/detail",
-            "parent": "agcm",
+            "parent": "/agcm/procurement",
             "hideInMenu": True,
             "viewName": "po-detail",
             "sequence": 116,
@@ -111,13 +104,12 @@ Procurement management for construction projects.
         {
             "name": "Subcontract Detail",
             "path": "/agcm/procurement/subcontracts/detail",
-            "parent": "agcm",
+            "parent": "/agcm/procurement",
             "hideInMenu": True,
             "viewName": "subcontract-detail",
             "sequence": 117,
         },
     ],
-
     "permissions": [
         "agcm_procurement.po.view",
         "agcm_procurement.po.create",
@@ -135,18 +127,27 @@ Procurement management for construction projects.
         "agcm_procurement.vendor_bill.delete",
         "agcm_procurement.vendor_bill.approve",
     ],
-
     "access_rights": [
         {
             "name": "agcm_procurement.manager",
             "model": "agcm_procurement.agcm_purchase_orders",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_procurement.user",
             "model": "agcm_procurement.agcm_purchase_orders",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

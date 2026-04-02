@@ -20,23 +20,19 @@ Financial management for construction projects.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/cost-codes.vue",
         "views/budget.vue",
@@ -48,7 +44,6 @@ Financial management for construction projects.
         "views/bill-form.vue",
         "views/prime-contracts.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -58,12 +53,10 @@ Financial management for construction projects.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "Finance",
             "path": "/agcm/finance",
-            "parent": "agcm",
             "icon": "lucide:wallet",
             "sequence": 40,
             "children": [
@@ -114,7 +107,7 @@ Financial management for construction projects.
         {
             "name": "Expense Form",
             "path": "/agcm/finance/expenses/form",
-            "parent": "agcm",
+            "parent": "/agcm/finance",
             "hideInMenu": True,
             "viewName": "expense-form",
             "sequence": 140,
@@ -122,7 +115,7 @@ Financial management for construction projects.
         {
             "name": "Invoice Form",
             "path": "/agcm/finance/invoices/form",
-            "parent": "agcm",
+            "parent": "/agcm/finance",
             "hideInMenu": True,
             "viewName": "invoice-form",
             "sequence": 141,
@@ -130,13 +123,12 @@ Financial management for construction projects.
         {
             "name": "Bill Form",
             "path": "/agcm/finance/bills/form",
-            "parent": "agcm",
+            "parent": "/agcm/finance",
             "hideInMenu": True,
             "viewName": "bill-form",
             "sequence": 142,
         },
     ],
-
     "permissions": [
         "agcm_finance.budget.view",
         "agcm_finance.budget.create",
@@ -155,18 +147,27 @@ Financial management for construction projects.
         "agcm_finance.bill.edit",
         "agcm_finance.bill.delete",
     ],
-
     "access_rights": [
         {
             "name": "agcm_finance.manager",
             "model": "agcm_finance.agcm_budgets",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_finance.user",
             "model": "agcm_finance.agcm_budgets",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

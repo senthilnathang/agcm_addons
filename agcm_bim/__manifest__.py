@@ -22,23 +22,19 @@ Building Information Modeling module for construction projects.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/bim-models.vue",
         "views/bim-model-detail.vue",
@@ -46,7 +42,6 @@ Building Information Modeling module for construction projects.
         "views/clash-tests.vue",
         "views/clash-results.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -56,12 +51,10 @@ Building Information Modeling module for construction projects.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "BIM",
             "path": "/agcm/bim",
-            "parent": "agcm",
             "icon": "lucide:box",
             "sequence": 46,
             "children": [
@@ -84,7 +77,7 @@ Building Information Modeling module for construction projects.
         {
             "name": "BIM Model Detail",
             "path": "/agcm/bim/model-detail",
-            "parent": "agcm",
+            "parent": "/agcm/bim",
             "hideInMenu": True,
             "viewName": "bim-model-detail",
             "sequence": 120,
@@ -92,7 +85,7 @@ Building Information Modeling module for construction projects.
         {
             "name": "BIM Viewer",
             "path": "/agcm/bim/viewer",
-            "parent": "agcm",
+            "parent": "/agcm/bim",
             "hideInMenu": True,
             "viewName": "bim-viewer",
             "sequence": 121,
@@ -100,13 +93,12 @@ Building Information Modeling module for construction projects.
         {
             "name": "Clash Results",
             "path": "/agcm/bim/clash-results",
-            "parent": "agcm",
+            "parent": "/agcm/bim",
             "hideInMenu": True,
             "viewName": "clash-results",
             "sequence": 122,
         },
     ],
-
     "permissions": [
         "agcm_bim.model.view",
         "agcm_bim.model.create",
@@ -122,42 +114,71 @@ Building Information Modeling module for construction projects.
         "agcm_bim.annotation.delete",
         "agcm_bim.annotation.resolve",
     ],
-
     "access_rights": [
         {
             "name": "agcm_bim.manager",
             "model": "agcm_bim.agcm_bim_models",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_bim.user",
             "model": "agcm_bim.agcm_bim_models",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
         {
             "name": "agcm_bim.clash.manager",
             "model": "agcm_bim.agcm_clash_tests",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_bim.clash.user",
             "model": "agcm_bim.agcm_clash_tests",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
         {
             "name": "agcm_bim.annotation.manager",
             "model": "agcm_bim.agcm_bim_annotations",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_bim.annotation.user",
             "model": "agcm_bim.agcm_bim_annotations",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],

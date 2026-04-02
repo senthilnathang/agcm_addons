@@ -19,30 +19,25 @@ Quality and safety management for construction projects.
     "author": "FastVue",
     "license": "MIT",
     "category": "Construction",
-
     "application": False,
     "installable": True,
     "auto_install": False,
-
     "depends": ["agcm"],
     "external_dependencies": {
         "python": [],
         "bin": [],
     },
-
     "models": ["models"],
     "api": ["api"],
     "services": ["services"],
     "data": [],
     "demo": [],
-
     "views": [
         "views/checklists.vue",
         "views/inspections.vue",
         "views/punch-list.vue",
         "views/incidents.vue",
     ],
-
     "assets": {
         "routes": None,
         "stores": [],
@@ -52,12 +47,10 @@ Quality and safety management for construction projects.
         "locales": [],
         "assets": [],
     },
-
     "menus": [
         {
             "name": "Quality & Safety",
             "path": "/agcm/safety",
-            "parent": "agcm",
             "icon": "lucide:shield-check",
             "sequence": 43,
             "children": [
@@ -92,7 +85,6 @@ Quality and safety management for construction projects.
             ],
         },
     ],
-
     "permissions": [
         "agcm_safety.checklist.view",
         "agcm_safety.checklist.manage",
@@ -104,18 +96,27 @@ Quality and safety management for construction projects.
         "agcm_safety.incident.view",
         "agcm_safety.incident.manage",
     ],
-
     "access_rights": [
         {
             "name": "agcm_safety.manager",
             "model": "agcm_safety.agcm_inspections_v2",
-            "permissions": {"read": True, "write": True, "create": True, "delete": True},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": True,
+            },
             "groups": ["base.group_manager"],
         },
         {
             "name": "agcm_safety.user",
             "model": "agcm_safety.agcm_inspections_v2",
-            "permissions": {"read": True, "write": True, "create": True, "delete": False},
+            "permissions": {
+                "read": True,
+                "write": True,
+                "create": True,
+                "delete": False,
+            },
             "groups": ["base.group_user"],
         },
     ],
