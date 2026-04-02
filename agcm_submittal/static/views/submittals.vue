@@ -153,11 +153,11 @@ function handleCreate() {
 }
 
 function handleEdit(record) {
-  router.push(`/agcm/submittals/form/${record.id}`);
+  router.push(`/agcm/submittals/form?id=${record.id}`);
 }
 
 function handleView(record) {
-  router.push(`/agcm/submittals/detail/${record.id}`);
+  router.push({ path: '/agcm/submittals/detail', query: { id: record.id } });
 }
 
 async function handleDelete(record) {

@@ -40,7 +40,7 @@ const route = useRoute();
 const router = useRouter();
 const BASE = '/agcm_submittal';
 
-const submittalId = computed(() => route.params.id);
+const submittalId = computed(() => route.query.id);
 const loading = ref(false);
 const submittal = ref(null);
 const activeTab = ref('details');
@@ -123,7 +123,7 @@ async function fetchSubmittal() {
 }
 
 function handleEdit() {
-  router.push(`/agcm/submittals/form/${submittalId.value}`);
+  router.push(`/agcm/submittals/form?id=${submittalId.value}`);
 }
 
 function handleBack() {

@@ -35,7 +35,7 @@ const route = useRoute();
 const router = useRouter();
 const BASE = '/agcm_submittal';
 
-const submittalId = computed(() => route.params.id);
+const submittalId = computed(() => route.query.id);
 const isEdit = computed(() => !!submittalId.value);
 
 const loading = ref(false);
@@ -186,7 +186,7 @@ async function handleSave() {
     } else {
       const result = await requestClient.post(`${BASE}/submittals`, payload);
       message.success('Submittal created');
-      router.replace(`/agcm/submittals/form/${result.id}`);
+      router.replace({ path: '/agcm/submittals/form', query: { id: result.id } });
     }
   } catch {
     message.error('Failed to save submittal');
