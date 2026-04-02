@@ -110,9 +110,9 @@ class Project(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     start_date = Column(Date, nullable=False)
     end_date = Column(Date, nullable=False)
 
-    # Status
+    # Status - base agcm module uses uppercase enum names in DB
     status = Column(
-        Enum(ProjectStatus, values_callable=lambda e: [m.value for m in e]),
+        Enum(ProjectStatus),
         default=ProjectStatus.NEW,
         nullable=False,
         index=True,
@@ -146,9 +146,9 @@ class Project(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     project_longitude = Column(Float, default=0.0, nullable=True)
     date_localization = Column(Date, nullable=True)
 
-    # Office region
+    # Office region - base agcm module uses uppercase enum names in DB
     agcm_office = Column(
-        Enum(ProjectOffice, values_callable=lambda e: [m.value for m in e]),
+        Enum(ProjectOffice),
         nullable=True,
     )
 

@@ -67,15 +67,15 @@ class Weather(Base, TimestampMixin):
     date = Column(Date, nullable=True)
     date_time = Column(DateTime(timezone=True), nullable=True)
 
-    # Weather data
+    # Weather data - base agcm module uses uppercase enum names in DB
     temperature = Column(Float, default=0.0, nullable=True)
     temperature_type = Column(
-        Enum(TemperatureUnit, values_callable=lambda e: [m.value for m in e]),
+        Enum(TemperatureUnit),
         default=TemperatureUnit.FAHRENHEIT,
         nullable=True,
     )
     climate_type = Column(
-        Enum(ClimateType, values_callable=lambda e: [m.value for m in e]),
+        Enum(ClimateType),
         default=ClimateType.CLEAR,
         nullable=True,
     )
@@ -143,10 +143,10 @@ class WeatherForecast(Base, TimestampMixin):
     date = Column(Date, nullable=True, index=True)
     time_interval = Column(String(20), nullable=True)  # e.g. "2024-01-15T06:00"
 
-    # Weather data
+    # Weather data - base agcm module uses uppercase enum names in DB
     temperature = Column(Float, default=0.0, nullable=True)
     temperature_type = Column(
-        Enum(TemperatureUnit, values_callable=lambda e: [m.value for m in e]),
+        Enum(TemperatureUnit),
         default=TemperatureUnit.FAHRENHEIT,
         nullable=True,
     )
