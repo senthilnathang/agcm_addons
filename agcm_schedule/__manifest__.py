@@ -61,13 +61,6 @@ Project scheduling system for construction management.
                     "sequence": 1,
                     "viewName": "task-schedule",
                 },
-                {
-                    "name": "Schedules",
-                    "path": "/agcm/schedule/schedules",
-                    "icon": "lucide:calendar",
-                    "sequence": 2,
-                    "viewName": "schedules",
-                },
             ],
         },
         {
