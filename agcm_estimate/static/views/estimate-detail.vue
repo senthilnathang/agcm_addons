@@ -22,7 +22,7 @@ const BASE = '/agcm_estimate';
 const route = useRoute();
 const router = useRouter();
 
-const estimateId = computed(() => route.params.id);
+const estimateId = computed(() => route.query.id);
 const isNew = computed(() => estimateId.value === 'new');
 
 function getAccessToken() {
@@ -188,7 +188,7 @@ async function handleCreateEstimate() {
   try {
     const res = await requestClient.post(`${BASE}/estimates`, { ...newForm });
     message.success('Estimate created');
-    router.replace(`/agcm-estimate/estimates/detail/${res.id}`);
+    router.replace({ path: '/agcm/estimating/estimates/detail', query: { id: res.id } });
   } catch {
     message.error('Failed to create estimate');
   } finally {
@@ -209,7 +209,7 @@ async function handleCreateVersion() {
   try {
     const res = await requestClient.post(`${BASE}/estimates/${estimateId.value}/create-version`);
     message.success('New version created');
-    router.push(`/agcm-estimate/estimates/detail/${res.id}`);
+    router.push({ path: '/agcm/estimating/estimates/detail', query: { id: res.id } });
   } catch { message.error('Failed to create version'); }
 }
 
@@ -230,7 +230,7 @@ async function handleApprove() {
 }
 
 async function handleGenerateProposal() {
-  router.push(`/agcm-estimate/proposals?from_estimate=${estimateId.value}`);
+  router.push({ path: '/agcm/estimating/proposals', query: { from_estimate: estimateId.value } });
 }
 
 // ---- Inline name editing ----
@@ -523,7 +523,7 @@ onMounted(fetchEstimate);
         <!-- Header -->
         <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px">
           <ASpace align="center">
-            <AButton @click="router.push('/agcm-estimate/estimates')">
+            <AButton @click="router.push('/agcm/estimating/estimates')">
               <template #icon><ArrowLeftOutlined /></template>
             </AButton>
             <template v-if="editingName">
