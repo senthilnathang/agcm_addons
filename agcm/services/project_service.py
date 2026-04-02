@@ -1,17 +1,56 @@
 """Project service - business logic for construction projects"""
 
+import hashlib
+import json
 import logging
 from typing import Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from addons.agcm.models.project import Project, agcm_project_users, agcm_project_contractors
+from addons.agcm.models.project import (
+    Project,
+    agcm_project_users,
+    agcm_project_contractors,
+)
 from addons.agcm.models.daily_activity_log import DailyActivityLog
 from addons.agcm.schemas.project import ProjectCreate, ProjectUpdate
 from addons.agcm.services.sequence_service import next_sequence
 
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
+
+
+def _serialize_for_cache(obj):
+    """Serialize ORM objects for cache storage."""
+    if hasattr(obj, "__table__"):
+        result = {}
+        for col in obj.__table__.columns:
+            val = getattr(obj, col.key, None)
+            if hasattr(val, "isoformat"):
+                val = val.isoformat()
+            elif hasattr(val, "tolist"):
+                val = val.tolist()
+            elif hasattr(val, "__iter__") and not isinstance(
+                val, (str, bytes, dict, list)
+            ):
+                val = list(val)
+            result[col.key] = val
+        return result
+    return obj
 
 
 class ProjectService:
@@ -56,9 +95,7 @@ class ProjectService:
 
         # Non-management: only assigned projects
         if not is_management:
-            query = query.filter(
-                Project.user_ids.any(id=self.user_id)
-            )
+            query = query.filter(Project.user_ids.any(id=self.user_id))
 
         if status:
             query = query.filter(Project.status == status)
@@ -96,8 +133,8 @@ class ProjectService:
             .first()
         )
 
-    def get_project_detail(self, project_id: int) -> Optional[dict]:
-        """Get project with related counts."""
+    def _get_project_detail_uncached(self, project_id: int) -> dict:
+        """Internal method to get project detail without caching."""
         project = self.get_project(project_id)
         if not project:
             return None
@@ -112,11 +149,37 @@ class ProjectService:
         partner_ids = [p.id for p in project.partner_ids]
 
         return {
-            **{c.key: getattr(project, c.key) for c in project.__table__.columns},
+            **_serialize_for_cache(project),
             "user_ids": user_ids,
             "partner_ids": partner_ids,
             "daily_log_count": daily_log_count or 0,
         }
+
+    def get_project_detail(self, project_id: int) -> Optional[dict]:
+        """Get project with related counts (cached)."""
+        cache_key = f"agcm:project_detail:{self.company_id}:{project_id}"
+
+        if CACHE_AVAILABLE:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+        detail = self._get_project_detail_uncached(project_id)
+
+        if detail and CACHE_AVAILABLE:
+            cache.set(cache_key, detail, ttl=300)
+
+        return detail
+
+    def _invalidate_project_cache(self, project_id: int = None):
+        """Invalidate project-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if project_id:
+            cache.invalidate(f"agcm:project_detail:{self.company_id}:{project_id}")
+
+        cache.invalidate_pattern_distributed(f"agcm:project_list:{self.company_id}:*")
 
     def create_project(self, data: ProjectCreate) -> Project:
         """
@@ -161,6 +224,25 @@ class ProjectService:
 
         self.db.commit()
         self.db.refresh(project)
+
+        self._invalidate_project_cache()
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            project.log_activity(
+                self.db,
+                ActivityAction.CREATE,
+                user_id=self.user_id,
+                description=f"Project '{project.name}' created",
+                new_values={
+                    "name": project.name,
+                    "status": str(
+                        project.status.value
+                        if hasattr(project.status, "value")
+                        else project.status
+                    ),
+                },
+            )
+
         return project
 
     def update_project(self, project_id: int, data: ProjectUpdate) -> Optional[Project]:
@@ -192,6 +274,17 @@ class ProjectService:
 
         self.db.commit()
         self.db.refresh(project)
+
+        self._invalidate_project_cache(project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            project.log_activity(
+                self.db,
+                ActivityAction.UPDATE,
+                user_id=self.user_id,
+                description=f"Project '{project.name}' updated",
+            )
+
         return project
 
     def delete_project(self, project_id: int) -> bool:
@@ -199,8 +292,19 @@ class ProjectService:
         project = self.get_project(project_id)
         if not project:
             return False
+        project_name = project.name
         project.soft_delete(user_id=self.user_id)
         self.db.commit()
+        self._invalidate_project_cache(project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            project.log_activity(
+                self.db,
+                ActivityAction.ARCHIVE,
+                user_id=self.user_id,
+                description=f"Project '{project_name}' archived",
+            )
+
         return True
 
     # --- M2M helpers ---
@@ -214,9 +318,7 @@ class ProjectService:
         )
         for uid in user_ids:
             self.db.execute(
-                agcm_project_users.insert().values(
-                    project_id=project_id, user_id=uid
-                )
+                agcm_project_users.insert().values(project_id=project_id, user_id=uid)
             )
 
     def _sync_m2m_partners(self, project_id: int, partner_ids: set):

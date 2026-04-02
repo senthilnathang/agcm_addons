@@ -3,39 +3,24 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text,
+    Column,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
     Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class ClashTestStatus(str, enum.Enum):
-    PENDING = "pending"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-class ClashSeverity(str, enum.Enum):
-    CRITICAL = "critical"
-    MAJOR = "major"
-    MINOR = "minor"
-    INFO = "info"
-
-
-class ClashStatus(str, enum.Enum):
-    NEW = "new"
-    ACTIVE = "active"
-    REVIEWED = "reviewed"
-    APPROVED = "approved"
-    RESOLVED = "resolved"
-    IGNORED = "ignored"
-
-
-class ClashTest(Base, TimestampMixin, AuditMixin):
+class ClashTest(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """
     Clash detection run configuration.
 
@@ -43,6 +28,7 @@ class ClashTest(Base, TimestampMixin, AuditMixin):
     Test types: hard (physical overlap), soft (clearance zone),
     clearance (minimum distance), duplicate (identical elements).
     """
+
     __tablename__ = "agcm_clash_tests"
     _description = "Clash detection test configuration and run results"
 
@@ -80,7 +66,9 @@ class ClashTest(Base, TimestampMixin, AuditMixin):
     )
 
     # Test parameters
-    test_type = Column(String(50), default="hard", nullable=False)  # hard, soft, clearance, duplicate
+    test_type = Column(
+        String(50), default="hard", nullable=False
+    )  # hard, soft, clearance, duplicate
     tolerance = Column(Float, default=0.01, nullable=False)  # meters
 
     # Status & results
@@ -116,16 +104,18 @@ class ClashTest(Base, TimestampMixin, AuditMixin):
     __table_args__ = (
         Index("ix_agcm_clash_test_project", "project_id"),
         Index("ix_agcm_clash_test_company", "company_id"),
+        {"extend_existing": True},
     )
 
 
-class ClashResult(Base, TimestampMixin, AuditMixin):
+class ClashResult(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """
     Individual clash found during a clash test run.
 
     Each result represents an overlap or clearance violation between
     two IFC elements, with location, severity, and resolution tracking.
     """
+
     __tablename__ = "agcm_clash_results"
     _description = "Individual clash detection results with resolution workflow"
 
@@ -149,7 +139,7 @@ class ClashResult(Base, TimestampMixin, AuditMixin):
     sequence_name = Column(String(50), nullable=True)
 
     # Element A
-    element_a_id = Column(String(255), nullable=True)    # IFC GlobalId
+    element_a_id = Column(String(255), nullable=True)  # IFC GlobalId
     element_a_name = Column(String(255), nullable=True)
     element_a_type = Column(String(100), nullable=True)  # IfcWall, IfcPipe, etc.
 
@@ -171,9 +161,9 @@ class ClashResult(Base, TimestampMixin, AuditMixin):
     )
 
     # Location
-    clash_point = Column(Text, nullable=True)   # JSON {x, y, z}
-    distance = Column(Float, nullable=True)     # overlap distance in meters
-    description = Column(Text, nullable=True)   # auto-generated description
+    clash_point = Column(Text, nullable=True)  # JSON {x, y, z}
+    distance = Column(Float, nullable=True)  # overlap distance in meters
+    description = Column(Text, nullable=True)  # auto-generated description
 
     # Visual
     screenshot_url = Column(String(500), nullable=True)
@@ -201,7 +191,12 @@ class ClashResult(Base, TimestampMixin, AuditMixin):
 
     # Relationships
     company = relationship("Company", foreign_keys=[company_id], lazy="select")
-    clash_test = relationship("ClashTest", back_populates="results", foreign_keys=[clash_test_id], lazy="select")
+    clash_test = relationship(
+        "ClashTest",
+        back_populates="results",
+        foreign_keys=[clash_test_id],
+        lazy="select",
+    )
     viewpoint = relationship("BIMViewpoint", foreign_keys=[viewpoint_id], lazy="select")
     assignee = relationship("User", foreign_keys=[assigned_to], lazy="select")
     resolver = relationship("User", foreign_keys=[resolved_by], lazy="select")
@@ -209,4 +204,5 @@ class ClashResult(Base, TimestampMixin, AuditMixin):
     __table_args__ = (
         Index("ix_agcm_clash_result_test_status", "clash_test_id", "status"),
         Index("ix_agcm_clash_result_severity", "severity"),
+        {"extend_existing": True},
     )

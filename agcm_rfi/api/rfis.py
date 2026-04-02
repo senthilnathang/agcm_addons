@@ -11,8 +11,13 @@ from app.api.deps import get_db, get_current_user, get_effective_company_id
 from addons.agcm.models.entity_attachment import agcm_entity_attachments
 
 from addons.agcm_rfi.schemas.rfi import (
-    RFICreate, RFIUpdate, RFIResponseSchema, RFIDetail,
-    RFIResponseCreate, RFIResponseUpdate, RFIResponseResponseSchema,
+    RFICreate,
+    RFIUpdate,
+    RFIResponseSchema,
+    RFIDetail,
+    RFIResponseCreate,
+    RFIResponseUpdate,
+    RFIResponseResponseSchema,
 )
 from addons.agcm_rfi.services.rfi_service import RFIService
 
@@ -37,7 +42,9 @@ async def list_rfis(
 ):
     svc = _get_service(db, current_user)
     result = svc.list_rfis(project_id, status, priority, search, page, page_size)
-    result["items"] = [RFIResponseSchema.model_validate(i).model_dump() for i in result["items"]]
+    result["items"] = [
+        RFIResponseSchema.model_validate(i).model_dump() for i in result["items"]
+    ]
     return result
 
 
@@ -64,6 +71,7 @@ async def create_rfi(
     rfi = svc.create_rfi(data)
     try:
         from addons.agcm.services.realtime_events import agcm_realtime
+
         await agcm_realtime.rfi_created(db, rfi)
     except Exception:
         pass
@@ -95,6 +103,19 @@ async def delete_rfi(
         raise HTTPException(status_code=404, detail="RFI not found")
 
 
+@router.post("/rfis/{rfi_id}/restore", response_model=RFIResponseSchema)
+async def restore_rfi(
+    rfi_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    svc = _get_service(db, current_user)
+    result = svc.restore_rfi(rfi_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="RFI not found or not deleted")
+    return result
+
+
 @router.post("/rfis/{rfi_id}/close", response_model=RFIResponseSchema)
 async def close_rfi(
     rfi_id: int,
@@ -107,6 +128,7 @@ async def close_rfi(
         raise HTTPException(status_code=404, detail="RFI not found")
     try:
         from addons.agcm.services.realtime_events import agcm_realtime
+
         await agcm_realtime.rfi_closed(db, result)
     except Exception:
         pass
@@ -128,7 +150,12 @@ async def reopen_rfi(
 
 # --- Responses ---
 
-@router.post("/rfis/{rfi_id}/responses", response_model=RFIResponseResponseSchema, status_code=201)
+
+@router.post(
+    "/rfis/{rfi_id}/responses",
+    response_model=RFIResponseResponseSchema,
+    status_code=201,
+)
 async def create_rfi_response(
     rfi_id: int,
     data: RFIResponseCreate,
@@ -141,6 +168,7 @@ async def create_rfi_response(
         raise HTTPException(status_code=404, detail="RFI not found")
     try:
         from addons.agcm.services.realtime_events import agcm_realtime
+
         rfi = svc.get_rfi(rfi_id)
         if rfi:
             await agcm_realtime.rfi_response_created(db, rfi, result)
@@ -190,7 +218,11 @@ async def attach_document_to_rfi(
     )
     db.execute(stmt)
     db.commit()
-    return {"message": "Document attached", "document_id": body.document_id, "rfi_id": rfi_id}
+    return {
+        "message": "Document attached",
+        "document_id": body.document_id,
+        "rfi_id": rfi_id,
+    }
 
 
 @router.delete("/rfis/{rfi_id}/attachments/{document_id}", status_code=204)

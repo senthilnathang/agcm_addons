@@ -3,22 +3,24 @@
 import enum
 
 from sqlalchemy import (
-    Boolean, Column, Date, Enum, Float, ForeignKey, Index, Integer, String, Text,
+    Boolean,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class SelectionStatus(str, enum.Enum):
-    PENDING = "pending"
-    PRESENTED = "presented"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-
-
-class Selection(Base, TimestampMixin, AuditMixin):
+class Selection(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Material/finish selection for client approval."""
 
     __tablename__ = "agcm_selections"
@@ -76,7 +78,7 @@ class Selection(Base, TimestampMixin, AuditMixin):
     )
 
 
-class SelectionOption(Base, TimestampMixin):
+class SelectionOption(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Individual option within a selection."""
 
     __tablename__ = "agcm_selection_options"

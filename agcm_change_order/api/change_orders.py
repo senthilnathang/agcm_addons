@@ -39,7 +39,9 @@ async def list_change_orders(
     """List change orders with pagination and filtering."""
     svc = _get_service(db, current_user)
     result = svc.list_change_orders(project_id, status, search, page, page_size)
-    result["items"] = [ChangeOrderResponse.model_validate(i).model_dump() for i in result["items"]]
+    result["items"] = [
+        ChangeOrderResponse.model_validate(i).model_dump() for i in result["items"]
+    ]
     return result
 
 
@@ -68,6 +70,7 @@ async def create_change_order(
     co = svc.create_change_order(data)
     try:
         from addons.agcm.services.realtime_events import agcm_realtime
+
         await agcm_realtime.change_order_created(db, co)
     except Exception:
         pass
@@ -95,10 +98,26 @@ async def delete_change_order(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Delete a change order."""
+    """Soft delete a change order."""
     svc = _get_service(db, current_user)
     if not svc.delete_change_order(co_id):
         raise HTTPException(status_code=404, detail="Change order not found")
+
+
+@router.post("/change-orders/{co_id}/restore", response_model=ChangeOrderResponse)
+async def restore_change_order(
+    co_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Restore a soft-deleted change order."""
+    svc = _get_service(db, current_user)
+    result = svc.restore_change_order(co_id)
+    if not result:
+        raise HTTPException(
+            status_code=404, detail="Change order not found or not deleted"
+        )
+    return result
 
 
 @router.post("/change-orders/{co_id}/approve", response_model=ChangeOrderResponse)
@@ -114,7 +133,10 @@ async def approve_change_order(
         raise HTTPException(status_code=404, detail="Change order not found")
     try:
         from addons.agcm.services.realtime_events import agcm_realtime
-        await agcm_realtime.change_order_status_changed(db, result, "pending", "approved")
+
+        await agcm_realtime.change_order_status_changed(
+            db, result, "pending", "approved"
+        )
     except Exception:
         pass
     return result
@@ -136,7 +158,10 @@ async def reject_change_order(
 
 # --- Line Item Endpoints ---
 
-@router.post("/change-order-lines", response_model=ChangeOrderLineResponse, status_code=201)
+
+@router.post(
+    "/change-order-lines", response_model=ChangeOrderLineResponse, status_code=201
+)
 async def create_line(
     data: ChangeOrderLineCreate,
     change_order_id: int,

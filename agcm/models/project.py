@@ -3,13 +3,20 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, Enum, Float, ForeignKey, Integer, String, Table,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
     Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
 class ProjectStatus(str, enum.Enum):
@@ -36,20 +43,37 @@ class ProjectOffice(str, enum.Enum):
 agcm_project_contractors = Table(
     "agcm_project_contractors",
     Base.metadata,
-    Column("project_id", Integer, ForeignKey("agcm_projects.id", ondelete="CASCADE"), primary_key=True),
-    Column("partner_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "project_id",
+        Integer,
+        ForeignKey("agcm_projects.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "partner_id",
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 # Many-to-many: Project <-> Users
 agcm_project_users = Table(
     "agcm_project_users",
     Base.metadata,
-    Column("project_id", Integer, ForeignKey("agcm_projects.id", ondelete="CASCADE"), primary_key=True),
-    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "project_id",
+        Integer,
+        ForeignKey("agcm_projects.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    ),
 )
 
 
-class Project(Base, TimestampMixin, AuditMixin, SoftDeleteMixin):
+class Project(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """
     Construction project.
 
@@ -59,9 +83,13 @@ class Project(Base, TimestampMixin, AuditMixin, SoftDeleteMixin):
     - Auto-computes lat/lng from ZIP + country
     - Owner is auto-added to user_ids
     - Non-management users only see projects they are assigned to
+    - Activity logging for all CRUD operations
     """
+
     __tablename__ = "agcm_projects"
-    _description = "Construction projects with location tracking and contractor management"
+    _description = (
+        "Construction projects with location tracking and contractor management"
+    )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
 
@@ -84,7 +112,7 @@ class Project(Base, TimestampMixin, AuditMixin, SoftDeleteMixin):
 
     # Status
     status = Column(
-        Enum(ProjectStatus),
+        Enum(ProjectStatus, values_callable=lambda e: [m.value for m in e]),
         default=ProjectStatus.NEW,
         nullable=False,
         index=True,
@@ -120,7 +148,7 @@ class Project(Base, TimestampMixin, AuditMixin, SoftDeleteMixin):
 
     # Office region
     agcm_office = Column(
-        Enum(ProjectOffice),
+        Enum(ProjectOffice, values_callable=lambda e: [m.value for m in e]),
         nullable=True,
     )
 

@@ -13,15 +13,38 @@ from sqlalchemy.orm import Session
 from addons.agcm_bim.models.bim_model import BIMModel, BIMModelStatus
 from addons.agcm_bim.models.bim_viewpoint import BIMViewpoint
 from addons.agcm_bim.models.clash_detection import (
-    ClashTest, ClashTestStatus, ClashSeverity, ClashStatus, ClashResult,
+    ClashTest,
+    ClashTestStatus,
+    ClashSeverity,
+    ClashStatus,
+    ClashResult,
 )
 from addons.agcm_bim.models.bim_element import BIMElement
 from addons.agcm_bim.schemas.bim import (
-    BIMModelCreate, BIMModelUpdate,
-    BIMViewpointCreate, BIMViewpointUpdate,
-    ClashTestCreate, ClashTestUpdate,
-    ClashResultUpdate, ClashResultResolve, ClashResultAssign,
+    BIMModelCreate,
+    BIMModelUpdate,
+    BIMViewpointCreate,
+    BIMViewpointUpdate,
+    ClashTestCreate,
+    ClashTestUpdate,
+    ClashResultUpdate,
+    ClashResultResolve,
+    ClashResultAssign,
 )
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +54,21 @@ SEQ_CLASH_TEST = ("CT", 5)
 SEQ_CLASH_RESULT = ("CL", 5)
 
 
-def _next_seq(db: Session, model_class, company_id: int, prefix: str, padding: int) -> str:
+def _next_seq(
+    db: Session, model_class, company_id: int, prefix: str, padding: int
+) -> str:
     """Generate next sequence name for a model."""
     last = (
         db.query(model_class.sequence_name)
-        .filter(model_class.company_id == company_id, model_class.sequence_name.isnot(None))
+        .filter(
+            model_class.company_id == company_id, model_class.sequence_name.isnot(None)
+        )
         .order_by(model_class.id.desc())
         .first()
     )
     num = 1
     if last and last[0]:
-        match = re.search(r'(\d+)$', last[0])
+        match = re.search(r"(\d+)$", last[0])
         if match:
             num = int(match.group(1)) + 1
     return f"{prefix}{num:0{padding}d}"
@@ -54,6 +81,17 @@ class BIMService:
         self.db = db
         self.company_id = company_id
         self.user_id = user_id
+
+    def _invalidate_bim_cache(self, project_id: int = None):
+        """Invalidate BIM-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_bim:project:{self.company_id}:{project_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_bim:*")
 
     # ─── BIM Model CRUD ──────────────────────────────────────────────────
 
@@ -105,7 +143,8 @@ class BIMService:
         viewpoint_count = (
             self.db.query(func.count(BIMViewpoint.id))
             .filter(BIMViewpoint.model_id == model_id)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
 
         # Version history
@@ -115,15 +154,22 @@ class BIMService:
                 self.db.query(BIMModel)
                 .filter(
                     BIMModel.company_id == self.company_id,
-                    ((BIMModel.parent_model_id == model.parent_model_id) |
-                     (BIMModel.id == model.parent_model_id))
+                    (
+                        (BIMModel.parent_model_id == model.parent_model_id)
+                        | (BIMModel.id == model.parent_model_id)
+                    ),
                 )
                 .order_by(BIMModel.version.desc())
                 .all()
             )
             version_history = [
-                {"id": v.id, "version": v.version, "name": v.name,
-                 "is_current": v.is_current, "created_at": str(v.created_at) if v.created_at else None}
+                {
+                    "id": v.id,
+                    "version": v.version,
+                    "name": v.name,
+                    "is_current": v.is_current,
+                    "created_at": str(v.created_at) if v.created_at else None,
+                }
                 for v in versions
             ]
 
@@ -152,6 +198,7 @@ class BIMService:
         self.db.add(model)
         self.db.commit()
         self.db.refresh(model)
+        self._invalidate_bim_cache(data.project_id)
         return model
 
     def update_model(self, model_id: int, data: BIMModelUpdate) -> Optional[BIMModel]:
@@ -159,6 +206,7 @@ class BIMService:
         if not model:
             return None
 
+        project_id = model.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(model, key, value)
@@ -166,14 +214,17 @@ class BIMService:
 
         self.db.commit()
         self.db.refresh(model)
+        self._invalidate_bim_cache(project_id)
         return model
 
     def delete_model(self, model_id: int) -> bool:
         model = self.get_model(model_id)
         if not model:
             return False
+        project_id = model.project_id
         self.db.delete(model)
         self.db.commit()
+        self._invalidate_bim_cache(project_id)
         return True
 
     def update_model_file(
@@ -187,10 +238,17 @@ class BIMService:
         # Derive format from extension
         ext = file_name.rsplit(".", 1)[-1].lower() if "." in file_name else ""
         format_map = {
-            "ifc": "ifc", "rvt": "rvt", "nwd": "nwd", "nwc": "nwd",
-            "fbx": "fbx", "glb": "glb", "gltf": "glb", "obj": "obj",
+            "ifc": "ifc",
+            "rvt": "rvt",
+            "nwd": "nwd",
+            "nwc": "nwd",
+            "fbx": "fbx",
+            "glb": "glb",
+            "gltf": "glb",
+            "obj": "obj",
         }
 
+        project_id = model.project_id
         model.file_url = file_url
         model.file_name = file_name
         model.file_size = file_size
@@ -200,6 +258,7 @@ class BIMService:
 
         self.db.commit()
         self.db.refresh(model)
+        self._invalidate_bim_cache(project_id)
         return model
 
     def process_model(self, model_id: int) -> Optional[BIMModel]:
@@ -211,12 +270,14 @@ class BIMService:
         if not model:
             return None
 
+        project_id = model.project_id
         try:
             # Count existing elements for this model
             element_count = (
                 self.db.query(func.count(BIMElement.id))
                 .filter(BIMElement.model_id == model_id)
-                .scalar() or 0
+                .scalar()
+                or 0
             )
             model.element_count = element_count
             model.status = BIMModelStatus.READY
@@ -229,6 +290,7 @@ class BIMService:
         model.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(model)
+        self._invalidate_bim_cache(project_id)
         return model
 
     def create_model_version(self, model_id: int) -> Optional[BIMModel]:
@@ -239,15 +301,17 @@ class BIMService:
 
         # Determine root of version chain
         root_id = original.parent_model_id or original.id
+        project_id = original.project_id
 
         # Find highest version in chain
         max_version = (
             self.db.query(func.max(BIMModel.version))
             .filter(
                 BIMModel.company_id == self.company_id,
-                ((BIMModel.parent_model_id == root_id) | (BIMModel.id == root_id))
+                ((BIMModel.parent_model_id == root_id) | (BIMModel.id == root_id)),
             )
-            .scalar() or 1
+            .scalar()
+            or 1
         )
 
         # Mark all versions as non-current
@@ -255,7 +319,7 @@ class BIMService:
             self.db.query(BIMModel)
             .filter(
                 BIMModel.company_id == self.company_id,
-                ((BIMModel.parent_model_id == root_id) | (BIMModel.id == root_id))
+                ((BIMModel.parent_model_id == root_id) | (BIMModel.id == root_id)),
             )
             .update({"is_current": False}, synchronize_session="fetch")
         )
@@ -278,6 +342,7 @@ class BIMService:
         self.db.add(new_model)
         self.db.commit()
         self.db.refresh(new_model)
+        self._invalidate_bim_cache(project_id)
         return new_model
 
     def get_model_versions(self, model_id: int) -> List[BIMModel]:
@@ -290,7 +355,7 @@ class BIMService:
             self.db.query(BIMModel)
             .filter(
                 BIMModel.company_id == self.company_id,
-                ((BIMModel.parent_model_id == root_id) | (BIMModel.id == root_id))
+                ((BIMModel.parent_model_id == root_id) | (BIMModel.id == root_id)),
             )
             .order_by(BIMModel.version.desc())
             .all()
@@ -307,7 +372,9 @@ class BIMService:
         page_size: int = 50,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(BIMViewpoint).filter(BIMViewpoint.company_id == self.company_id)
+        query = self.db.query(BIMViewpoint).filter(
+            BIMViewpoint.company_id == self.company_id
+        )
 
         if model_id:
             query = query.filter(BIMViewpoint.model_id == model_id)
@@ -318,14 +385,19 @@ class BIMService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(BIMViewpoint.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(BIMViewpoint.id.desc()).offset(skip).limit(page_size).all()
+        )
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_viewpoint(self, viewpoint_id: int) -> Optional[BIMViewpoint]:
         return (
             self.db.query(BIMViewpoint)
-            .filter(BIMViewpoint.id == viewpoint_id, BIMViewpoint.company_id == self.company_id)
+            .filter(
+                BIMViewpoint.id == viewpoint_id,
+                BIMViewpoint.company_id == self.company_id,
+            )
             .first()
         )
 
@@ -355,9 +427,12 @@ class BIMService:
         self.db.add(vp)
         self.db.commit()
         self.db.refresh(vp)
+        self._invalidate_bim_cache()
         return vp
 
-    def link_viewpoint_to_entity(self, viewpoint_id: int, entity_type: str, entity_id: int) -> Optional[BIMViewpoint]:
+    def link_viewpoint_to_entity(
+        self, viewpoint_id: int, entity_type: str, entity_id: int
+    ) -> Optional[BIMViewpoint]:
         """Link a viewpoint to an entity (rfi, issue, etc.)."""
         vp = self.get_viewpoint(viewpoint_id)
         if not vp:
@@ -373,7 +448,9 @@ class BIMService:
         self.db.refresh(vp)
         return vp
 
-    def update_viewpoint(self, viewpoint_id: int, data: BIMViewpointUpdate) -> Optional[BIMViewpoint]:
+    def update_viewpoint(
+        self, viewpoint_id: int, data: BIMViewpointUpdate
+    ) -> Optional[BIMViewpoint]:
         vp = self.get_viewpoint(viewpoint_id)
         if not vp:
             return None
@@ -392,6 +469,7 @@ class BIMService:
             return False
         self.db.delete(vp)
         self.db.commit()
+        self._invalidate_bim_cache()
         return True
 
     # ─── Clash Test CRUD ─────────────────────────────────────────────────
@@ -438,17 +516,24 @@ class BIMService:
         )
 
         result_dicts = [
-            {c.key: getattr(r, c.key) for c in r.__table__.columns}
-            for r in results
+            {c.key: getattr(r, c.key) for c in r.__table__.columns} for r in results
         ]
 
         model_a_name = None
         model_b_name = None
         if test.model_a_id:
-            ma = self.db.query(BIMModel.name).filter(BIMModel.id == test.model_a_id).first()
+            ma = (
+                self.db.query(BIMModel.name)
+                .filter(BIMModel.id == test.model_a_id)
+                .first()
+            )
             model_a_name = ma[0] if ma else None
         if test.model_b_id:
-            mb = self.db.query(BIMModel.name).filter(BIMModel.id == test.model_b_id).first()
+            mb = (
+                self.db.query(BIMModel.name)
+                .filter(BIMModel.id == test.model_b_id)
+                .first()
+            )
             model_b_name = mb[0] if mb else None
 
         return {
@@ -461,7 +546,9 @@ class BIMService:
     def create_clash_test(self, data: ClashTestCreate) -> ClashTest:
         test = ClashTest(
             company_id=self.company_id,
-            sequence_name=_next_seq(self.db, ClashTest, self.company_id, *SEQ_CLASH_TEST),
+            sequence_name=_next_seq(
+                self.db, ClashTest, self.company_id, *SEQ_CLASH_TEST
+            ),
             name=data.name,
             description=data.description,
             project_id=data.project_id,
@@ -474,13 +561,17 @@ class BIMService:
         self.db.add(test)
         self.db.commit()
         self.db.refresh(test)
+        self._invalidate_bim_cache(data.project_id)
         return test
 
-    def update_clash_test(self, test_id: int, data: ClashTestUpdate) -> Optional[ClashTest]:
+    def update_clash_test(
+        self, test_id: int, data: ClashTestUpdate
+    ) -> Optional[ClashTest]:
         test = self.get_clash_test(test_id)
         if not test:
             return None
 
+        project_id = test.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(test, key, value)
@@ -488,14 +579,17 @@ class BIMService:
 
         self.db.commit()
         self.db.refresh(test)
+        self._invalidate_bim_cache(project_id)
         return test
 
     def delete_clash_test(self, test_id: int) -> bool:
         test = self.get_clash_test(test_id)
         if not test:
             return False
+        project_id = test.project_id
         self.db.delete(test)
         self.db.commit()
+        self._invalidate_bim_cache(project_id)
         return True
 
     def run_clash_test(self, test_id: int) -> Optional[ClashTest]:
@@ -512,9 +606,11 @@ class BIMService:
         test = self.get_clash_test(test_id)
         if not test:
             return None
+        project_id = test.project_id
         if not test.model_a_id:
             test.status = ClashTestStatus.FAILED
             self.db.commit()
+            self._invalidate_bim_cache(project_id)
             return test
 
         test.status = ClashTestStatus.RUNNING
@@ -536,7 +632,7 @@ class BIMService:
 
             # Load elements from model B (or same model for self-clash)
             model_b_id = test.model_b_id or test.model_a_id
-            is_self_clash = (model_b_id == test.model_a_id)
+            is_self_clash = model_b_id == test.model_a_id
 
             elements_b = (
                 self.db.query(BIMElement)
@@ -552,8 +648,12 @@ class BIMService:
                 try:
                     bb = json.loads(el.bounding_box)
                     return {
-                        "min_x": bb["min"]["x"], "min_y": bb["min"]["y"], "min_z": bb["min"]["z"],
-                        "max_x": bb["max"]["x"], "max_y": bb["max"]["y"], "max_z": bb["max"]["z"],
+                        "min_x": bb["min"]["x"],
+                        "min_y": bb["min"]["y"],
+                        "min_z": bb["min"]["z"],
+                        "max_x": bb["max"]["x"],
+                        "max_y": bb["max"]["y"],
+                        "max_z": bb["max"]["z"],
                     }
                 except (json.JSONDecodeError, KeyError, TypeError):
                     return None
@@ -571,7 +671,9 @@ class BIMService:
             minor = 0
 
             # Delete previous results
-            self.db.query(ClashResult).filter(ClashResult.clash_test_id == test_id).delete()
+            self.db.query(ClashResult).filter(
+                ClashResult.clash_test_id == test_id
+            ).delete()
 
             # AABB overlap check
             for el_a, bb_a in bboxes_a:
@@ -581,11 +683,21 @@ class BIMService:
                         continue
 
                     # Check AABB overlap with tolerance
-                    overlap_x = min(bb_a["max_x"], bb_b["max_x"]) - max(bb_a["min_x"], bb_b["min_x"])
-                    overlap_y = min(bb_a["max_y"], bb_b["max_y"]) - max(bb_a["min_y"], bb_b["min_y"])
-                    overlap_z = min(bb_a["max_z"], bb_b["max_z"]) - max(bb_a["min_z"], bb_b["min_z"])
+                    overlap_x = min(bb_a["max_x"], bb_b["max_x"]) - max(
+                        bb_a["min_x"], bb_b["min_x"]
+                    )
+                    overlap_y = min(bb_a["max_y"], bb_b["max_y"]) - max(
+                        bb_a["min_y"], bb_b["min_y"]
+                    )
+                    overlap_z = min(bb_a["max_z"], bb_b["max_z"]) - max(
+                        bb_a["min_z"], bb_b["min_z"]
+                    )
 
-                    if overlap_x > -tolerance and overlap_y > -tolerance and overlap_z > -tolerance:
+                    if (
+                        overlap_x > -tolerance
+                        and overlap_y > -tolerance
+                        and overlap_z > -tolerance
+                    ):
                         # Calculate overlap distance (minimum overlap across axes)
                         dist = min(
                             max(overlap_x, 0),
@@ -607,9 +719,18 @@ class BIMService:
                             sev = ClashSeverity.INFO
 
                         # Clash point = midpoint of overlap region
-                        cx = (max(bb_a["min_x"], bb_b["min_x"]) + min(bb_a["max_x"], bb_b["max_x"])) / 2
-                        cy = (max(bb_a["min_y"], bb_b["min_y"]) + min(bb_a["max_y"], bb_b["max_y"])) / 2
-                        cz = (max(bb_a["min_z"], bb_b["min_z"]) + min(bb_a["max_z"], bb_b["max_z"])) / 2
+                        cx = (
+                            max(bb_a["min_x"], bb_b["min_x"])
+                            + min(bb_a["max_x"], bb_b["max_x"])
+                        ) / 2
+                        cy = (
+                            max(bb_a["min_y"], bb_b["min_y"])
+                            + min(bb_a["max_y"], bb_b["max_y"])
+                        ) / 2
+                        cz = (
+                            max(bb_a["min_z"], bb_b["min_z"])
+                            + min(bb_a["max_z"], bb_b["max_z"])
+                        ) / 2
 
                         desc = (
                             f"{el_a.ifc_type} '{el_a.name or el_a.global_id}' clashes with "
@@ -620,7 +741,9 @@ class BIMService:
                         result = ClashResult(
                             clash_test_id=test_id,
                             company_id=self.company_id,
-                            sequence_name=_next_seq(self.db, ClashResult, self.company_id, *SEQ_CLASH_RESULT),
+                            sequence_name=_next_seq(
+                                self.db, ClashResult, self.company_id, *SEQ_CLASH_RESULT
+                            ),
                             element_a_id=el_a.global_id,
                             element_a_name=el_a.name,
                             element_a_type=el_a.ifc_type,
@@ -629,7 +752,13 @@ class BIMService:
                             element_b_type=el_b.ifc_type,
                             severity=sev,
                             status=ClashStatus.NEW,
-                            clash_point=json.dumps({"x": round(cx, 4), "y": round(cy, 4), "z": round(cz, 4)}),
+                            clash_point=json.dumps(
+                                {
+                                    "x": round(cx, 4),
+                                    "y": round(cy, 4),
+                                    "z": round(cz, 4),
+                                }
+                            ),
                             distance=round(dist, 4),
                             description=desc,
                             created_by=self.user_id,
@@ -660,6 +789,7 @@ class BIMService:
         test.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(test)
+        self._invalidate_bim_cache(project_id)
         return test
 
     # ─── Clash Result CRUD ───────────────────────────────────────────────
@@ -673,9 +803,9 @@ class BIMService:
         page_size: int = 50,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = (
-            self.db.query(ClashResult)
-            .filter(ClashResult.clash_test_id == clash_test_id, ClashResult.company_id == self.company_id)
+        query = self.db.query(ClashResult).filter(
+            ClashResult.clash_test_id == clash_test_id,
+            ClashResult.company_id == self.company_id,
         )
         if status:
             query = query.filter(ClashResult.status == status)
@@ -684,18 +814,27 @@ class BIMService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(ClashResult.severity, ClashResult.id).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(ClashResult.severity, ClashResult.id)
+            .offset(skip)
+            .limit(page_size)
+            .all()
+        )
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_clash_result(self, result_id: int) -> Optional[ClashResult]:
         return (
             self.db.query(ClashResult)
-            .filter(ClashResult.id == result_id, ClashResult.company_id == self.company_id)
+            .filter(
+                ClashResult.id == result_id, ClashResult.company_id == self.company_id
+            )
             .first()
         )
 
-    def update_clash_result(self, result_id: int, data: ClashResultUpdate) -> Optional[ClashResult]:
+    def update_clash_result(
+        self, result_id: int, data: ClashResultUpdate
+    ) -> Optional[ClashResult]:
         result = self.get_clash_result(result_id)
         if not result:
             return None
@@ -707,9 +846,12 @@ class BIMService:
 
         self.db.commit()
         self.db.refresh(result)
+        self._invalidate_bim_cache()
         return result
 
-    def resolve_clash(self, result_id: int, data: ClashResultResolve) -> Optional[ClashResult]:
+    def resolve_clash(
+        self, result_id: int, data: ClashResultResolve
+    ) -> Optional[ClashResult]:
         result = self.get_clash_result(result_id)
         if not result:
             return None
@@ -722,9 +864,12 @@ class BIMService:
 
         self.db.commit()
         self.db.refresh(result)
+        self._invalidate_bim_cache()
         return result
 
-    def assign_clash(self, result_id: int, data: ClashResultAssign) -> Optional[ClashResult]:
+    def assign_clash(
+        self, result_id: int, data: ClashResultAssign
+    ) -> Optional[ClashResult]:
         result = self.get_clash_result(result_id)
         if not result:
             return None
@@ -736,6 +881,7 @@ class BIMService:
 
         self.db.commit()
         self.db.refresh(result)
+        self._invalidate_bim_cache()
         return result
 
     def ignore_clash(self, result_id: int) -> Optional[ClashResult]:
@@ -748,6 +894,7 @@ class BIMService:
 
         self.db.commit()
         self.db.refresh(result)
+        self._invalidate_bim_cache()
         return result
 
     # ─── Element Search ──────────────────────────────────────────────────
@@ -763,9 +910,8 @@ class BIMService:
         page_size: int = 50,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = (
-            self.db.query(BIMElement)
-            .filter(BIMElement.model_id == model_id, BIMElement.company_id == self.company_id)
+        query = self.db.query(BIMElement).filter(
+            BIMElement.model_id == model_id, BIMElement.company_id == self.company_id
         )
 
         if ifc_type:
@@ -779,7 +925,12 @@ class BIMService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(BIMElement.ifc_type, BIMElement.id).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(BIMElement.ifc_type, BIMElement.id)
+            .offset(skip)
+            .limit(page_size)
+            .all()
+        )
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 

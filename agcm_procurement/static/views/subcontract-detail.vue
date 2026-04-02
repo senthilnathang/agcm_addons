@@ -39,11 +39,13 @@ import {
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
+import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMSubcontractDetail' });
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 const BASE = '/agcm_procurement';
 
 const loading = ref(false);
@@ -51,6 +53,7 @@ const saving = ref(false);
 const isNew = ref(false);
 const detail = ref(null);
 const projects = ref([]);
+const activeTab = ref('sov');
 
 const form = ref({
   project_id: null,
@@ -419,33 +422,70 @@ onMounted(async () => {
         </Table>
       </Card>
 
-      <!-- Compliance Docs -->
-      <Card title="Compliance Documents">
-        <template #extra>
-          <Button type="primary" size="small" @click="openDocModal()"><PlusOutlined /> Add Document</Button>
-        </template>
-        <Table :columns="complianceColumns" :data-source="detail.compliance_docs || []" row-key="id" size="small" :pagination="false">
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'doc_type'">
-              {{ formatStatus(record.doc_type) }}
+      <!-- Tabs for SOV, Compliance, Activity -->
+      <Card>
+        <Tabs v-model:activeKey="activeTab">
+          <Tabs.TabPane key="sov" tab="Schedule of Values">
+            <template #extra>
+              <Button type="primary" size="small" @click="openSovModal()"><PlusOutlined /> Add SOV Line</Button>
             </template>
-            <template v-else-if="column.key === 'status'">
-              <Tag :color="docStatusColors[record.status] || 'default'">{{ formatStatus(record.status) }}</Tag>
+            <Table :columns="sovColumns" :data-source="detail.sov_lines || []" row-key="id" size="small" :pagination="false" :scroll="{ x: 1200 }">
+              <template #bodyCell="{ column, record }">
+                <template v-if="['scheduled_value', 'billed_previous', 'billed_current', 'stored_materials', 'total_completed', 'retainage', 'balance_to_finish'].includes(column.key)">
+                  {{ formatCurrency(record[column.dataIndex]) }}
+                </template>
+                <template v-else-if="column.key === 'pct_complete'">
+                  {{ record.pct_complete?.toFixed(1) }}%
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <Space>
+                    <Button type="link" size="small" @click="openSovModal(record)"><EditOutlined /></Button>
+                    <Popconfirm title="Delete?" @confirm="deleteSov(record.id)">
+                      <Button type="link" size="small" danger><DeleteOutlined /></Button>
+                    </Popconfirm>
+                  </Space>
+                </template>
+              </template>
+            </Table>
+          </Tabs.TabPane>
+          <Tabs.TabPane key="compliance" tab="Compliance Documents">
+            <template #extra>
+              <Button type="primary" size="small" @click="openDocModal()"><PlusOutlined /> Add Document</Button>
             </template>
-            <template v-else-if="column.key === 'file_name'">
-              <a v-if="record.document_url" :href="record.document_url" target="_blank">{{ record.file_name || 'View' }}</a>
-              <span v-else>-</span>
-            </template>
-            <template v-else-if="column.key === 'actions'">
-              <Space>
-                <Button type="link" size="small" @click="openDocModal(record)"><EditOutlined /></Button>
-                <Popconfirm title="Delete?" @confirm="deleteDoc(record.id)">
-                  <Button type="link" size="small" danger><DeleteOutlined /></Button>
-                </Popconfirm>
-              </Space>
-            </template>
-          </template>
-        </Table>
+            <Table :columns="complianceColumns" :data-source="detail.compliance_docs || []" row-key="id" size="small" :pagination="false">
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'doc_type'">
+                  {{ formatStatus(record.doc_type) }}
+                </template>
+                <template v-else-if="column.key === 'status'">
+                  <Tag :color="docStatusColors[record.status] || 'default'">{{ formatStatus(record.status) }}</Tag>
+                </template>
+                <template v-else-if="column.key === 'file_name'">
+                  <a v-if="record.document_url" :href="record.document_url" target="_blank">{{ record.file_name || 'View' }}</a>
+                  <span v-else>-</span>
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <Space>
+                    <Button type="link" size="small" @click="openDocModal(record)"><EditOutlined /></Button>
+                    <Popconfirm title="Delete?" @confirm="deleteDoc(record.id)">
+                      <Button type="link" size="small" danger><DeleteOutlined /></Button>
+                    </Popconfirm>
+                  </Space>
+                </template>
+              </template>
+            </Table>
+          </Tabs.TabPane>
+          <Tabs.TabPane key="activity" tab="Activity">
+            <ActivityThread
+              :model-name="'agcm_subcontracts'"
+              :record-id="route.query.id"
+              :access-token="userStore.accessToken"
+              :api-base="'/api/v1'"
+              :show-messages="true"
+              :show-activities="true"
+            />
+          </Tabs.TabPane>
+        </Tabs>
       </Card>
     </template>
 

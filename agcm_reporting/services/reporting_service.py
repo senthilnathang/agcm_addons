@@ -19,13 +19,31 @@ from addons.agcm_reporting.models.dashboard_widget import (
     AGCMDashboardWidget as DashboardWidget,
 )
 from addons.agcm_reporting.schemas.report_definition import (
-    ReportDefinitionCreate, ReportDefinitionUpdate,
-    ReportScheduleCreate, ReportScheduleUpdate,
+    ReportDefinitionCreate,
+    ReportDefinitionUpdate,
+    ReportScheduleCreate,
+    ReportScheduleUpdate,
 )
 from addons.agcm_reporting.schemas.dashboard_widget import (
-    DashboardLayoutCreate, DashboardLayoutUpdate,
-    DashboardWidgetCreate, DashboardWidgetUpdate,
+    DashboardLayoutCreate,
+    DashboardLayoutUpdate,
+    DashboardWidgetCreate,
+    DashboardWidgetUpdate,
 )
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +68,17 @@ class ReportingService:
         self.db = db
         self.company_id = company_id
         self.user_id = user_id
+
+    def _invalidate_reporting_cache(self, project_id: int = None):
+        """Invalidate reporting-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_reporting:project:{self.company_id}:{project_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_reporting:*")
 
     # =========================================================================
     # REPORT DEFINITIONS
@@ -87,7 +116,12 @@ class ReportingService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(ReportDefinition.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(ReportDefinition.id.desc())
+            .offset(skip)
+            .limit(page_size)
+            .all()
+        )
 
         return {
             "items": items,
@@ -128,9 +162,12 @@ class ReportingService:
         self.db.add(report)
         self.db.commit()
         self.db.refresh(report)
+        self._invalidate_reporting_cache()
         return report
 
-    def update_report(self, report_id: int, data: ReportDefinitionUpdate) -> Optional[ReportDefinition]:
+    def update_report(
+        self, report_id: int, data: ReportDefinitionUpdate
+    ) -> Optional[ReportDefinition]:
         """Update a report definition."""
         report = self.get_report(report_id)
         if not report:
@@ -145,6 +182,7 @@ class ReportingService:
 
         self.db.commit()
         self.db.refresh(report)
+        self._invalidate_reporting_cache()
         return report
 
     def delete_report(self, report_id: int) -> bool:
@@ -154,6 +192,7 @@ class ReportingService:
             return False
         self.db.delete(report)
         self.db.commit()
+        self._invalidate_reporting_cache()
         return True
 
     def execute_report(self, report_id: int, filters: Optional[dict] = None) -> dict:
@@ -164,7 +203,11 @@ class ReportingService:
 
         table_name = DATA_SOURCE_TABLES.get(report.data_source)
         if not table_name:
-            return {"error": f"Unknown data source: {report.data_source}", "rows": [], "columns": []}
+            return {
+                "error": f"Unknown data source: {report.data_source}",
+                "rows": [],
+                "columns": [],
+            }
 
         try:
             # Build simple query
@@ -197,7 +240,8 @@ class ReportingService:
             # Sort — whitelist column names to prevent SQL injection
             if report.sort_by:
                 import re as _re
-                if _re.match(r'^[a-zA-Z_][a-zA-Z0-9_]*$', report.sort_by):
+
+                if _re.match(r"^[a-zA-Z_][a-zA-Z0-9_]*$", report.sort_by):
                     direction = "DESC" if report.sort_order == "desc" else "ASC"
                     base_query += f" ORDER BY {report.sort_by} {direction}"
                 else:
@@ -217,9 +261,14 @@ class ReportingService:
                 try:
                     report_columns = json.loads(report.columns)
                 except (json.JSONDecodeError, TypeError):
-                    report_columns = [{"key": c, "title": c.replace("_", " ").title()} for c in columns]
+                    report_columns = [
+                        {"key": c, "title": c.replace("_", " ").title()}
+                        for c in columns
+                    ]
             else:
-                report_columns = [{"key": c, "title": c.replace("_", " ").title()} for c in columns]
+                report_columns = [
+                    {"key": c, "title": c.replace("_", " ").title()} for c in columns
+                ]
 
             return {
                 "columns": report_columns,
@@ -231,7 +280,9 @@ class ReportingService:
             logger.error(f"Failed to execute report {report_id}: {e}")
             return {"error": str(e), "rows": [], "columns": []}
 
-    def export_report(self, report_id: int, format: str = "csv", filters: Optional[dict] = None) -> Optional[tuple]:
+    def export_report(
+        self, report_id: int, format: str = "csv", filters: Optional[dict] = None
+    ) -> Optional[tuple]:
         """Export report data as CSV/Excel bytes. Returns (bytes, content_type, filename)."""
         data = self.execute_report(report_id, filters)
         if "error" in data and data["error"]:
@@ -244,18 +295,37 @@ class ReportingService:
         rows = data.get("rows", [])
         col_defs = data.get("columns", [])
         col_keys = [c.get("key", c) if isinstance(c, dict) else c for c in col_defs]
-        col_titles = [c.get("title", c.get("key", "")) if isinstance(c, dict) else c for c in col_defs]
+        col_titles = [
+            c.get("title", c.get("key", "")) if isinstance(c, dict) else c
+            for c in col_defs
+        ]
 
-        if format == "csv":
-            output = io.StringIO()
-            writer = csv.writer(output)
-            writer.writerow(col_titles)
-            for row in rows:
-                writer.writerow([row.get(k, "") for k in col_keys])
-            content = output.getvalue().encode("utf-8")
-            return content, "text/csv", f"{report.name}.csv"
+        if format == "excel":
+            try:
+                import openpyxl
 
-        # Default: return as CSV
+                wb = openpyxl.Workbook()
+                ws = wb.active
+                ws.title = report.name[:31]
+                ws.append(col_titles)
+                for row in rows:
+                    ws.append([row.get(k, "") for k in col_keys])
+                for col_idx, title in enumerate(col_titles, 1):
+                    ws.column_dimensions[
+                        openpyxl.utils.get_column_letter(col_idx)
+                    ].width = max(12, len(str(title)) + 4)
+                buf = io.BytesIO()
+                wb.save(buf)
+                content = buf.getvalue()
+                return (
+                    content,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    f"{report.name}.xlsx",
+                )
+            except ImportError:
+                pass  # Fall through to CSV
+
+        # CSV (default)
         output = io.StringIO()
         writer = csv.writer(output)
         writer.writerow(col_titles)
@@ -268,7 +338,9 @@ class ReportingService:
     # REPORT SCHEDULES
     # =========================================================================
 
-    def create_schedule(self, report_id: int, data: ReportScheduleCreate) -> Optional[ReportSchedule]:
+    def create_schedule(
+        self, report_id: int, data: ReportScheduleCreate
+    ) -> Optional[ReportSchedule]:
         """Add a schedule to a report."""
         report = self.get_report(report_id)
         if not report:
@@ -285,9 +357,12 @@ class ReportingService:
         self.db.add(schedule)
         self.db.commit()
         self.db.refresh(schedule)
+        self._invalidate_reporting_cache()
         return schedule
 
-    def update_schedule(self, schedule_id: int, data: ReportScheduleUpdate) -> Optional[ReportSchedule]:
+    def update_schedule(
+        self, schedule_id: int, data: ReportScheduleUpdate
+    ) -> Optional[ReportSchedule]:
         """Update a report schedule."""
         schedule = (
             self.db.query(ReportSchedule)
@@ -306,6 +381,7 @@ class ReportingService:
 
         self.db.commit()
         self.db.refresh(schedule)
+        self._invalidate_reporting_cache()
         return schedule
 
     def delete_schedule(self, schedule_id: int) -> bool:
@@ -322,6 +398,7 @@ class ReportingService:
             return False
         self.db.delete(schedule)
         self.db.commit()
+        self._invalidate_reporting_cache()
         return True
 
     # =========================================================================
@@ -347,7 +424,12 @@ class ReportingService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(DashboardLayout.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(DashboardLayout.id.desc())
+            .offset(skip)
+            .limit(page_size)
+            .all()
+        )
 
         return {
             "items": items,
@@ -368,7 +450,9 @@ class ReportingService:
             .first()
         )
 
-    def get_default_layout(self, layout_type: str = "executive") -> Optional[DashboardLayout]:
+    def get_default_layout(
+        self, layout_type: str = "executive"
+    ) -> Optional[DashboardLayout]:
         """Get the default layout for a type."""
         return (
             self.db.query(DashboardLayout)
@@ -393,7 +477,7 @@ class ReportingService:
         self.db.add(layout)
         self.db.flush()
 
-        for w_data in (data.widgets or []):
+        for w_data in data.widgets or []:
             widget = DashboardWidget(
                 layout_id=layout.id,
                 company_id=self.company_id,
@@ -411,9 +495,12 @@ class ReportingService:
 
         self.db.commit()
         self.db.refresh(layout)
+        self._invalidate_reporting_cache()
         return layout
 
-    def update_layout(self, layout_id: int, data: DashboardLayoutUpdate) -> Optional[DashboardLayout]:
+    def update_layout(
+        self, layout_id: int, data: DashboardLayoutUpdate
+    ) -> Optional[DashboardLayout]:
         """Update a dashboard layout."""
         layout = self.get_layout(layout_id)
         if not layout:
@@ -426,6 +513,7 @@ class ReportingService:
 
         self.db.commit()
         self.db.refresh(layout)
+        self._invalidate_reporting_cache()
         return layout
 
     def delete_layout(self, layout_id: int) -> bool:
@@ -435,13 +523,16 @@ class ReportingService:
             return False
         self.db.delete(layout)
         self.db.commit()
+        self._invalidate_reporting_cache()
         return True
 
     # =========================================================================
     # DASHBOARD WIDGETS
     # =========================================================================
 
-    def create_widget(self, layout_id: int, data: DashboardWidgetCreate) -> Optional[DashboardWidget]:
+    def create_widget(
+        self, layout_id: int, data: DashboardWidgetCreate
+    ) -> Optional[DashboardWidget]:
         """Add a widget to a layout."""
         layout = self.get_layout(layout_id)
         if not layout:
@@ -463,9 +554,12 @@ class ReportingService:
         self.db.add(widget)
         self.db.commit()
         self.db.refresh(widget)
+        self._invalidate_reporting_cache()
         return widget
 
-    def update_widget(self, widget_id: int, data: DashboardWidgetUpdate) -> Optional[DashboardWidget]:
+    def update_widget(
+        self, widget_id: int, data: DashboardWidgetUpdate
+    ) -> Optional[DashboardWidget]:
         """Update a widget."""
         widget = (
             self.db.query(DashboardWidget)
@@ -484,6 +578,7 @@ class ReportingService:
 
         self.db.commit()
         self.db.refresh(widget)
+        self._invalidate_reporting_cache()
         return widget
 
     def delete_widget(self, widget_id: int) -> bool:
@@ -500,6 +595,7 @@ class ReportingService:
             return False
         self.db.delete(widget)
         self.db.commit()
+        self._invalidate_reporting_cache()
         return True
 
     # =========================================================================
@@ -510,40 +606,66 @@ class ReportingService:
         """Get portfolio-level KPIs across all projects."""
         try:
             # Total projects
-            total_projects = self.db.execute(
-                text("SELECT COUNT(*) FROM agcm_projects WHERE company_id = :cid"),
-                {"cid": self.company_id},
-            ).scalar() or 0
+            total_projects = (
+                self.db.execute(
+                    text("SELECT COUNT(*) FROM agcm_projects WHERE company_id = :cid"),
+                    {"cid": self.company_id},
+                ).scalar()
+                or 0
+            )
 
             # Active projects
-            active_projects = self.db.execute(
-                text("SELECT COUNT(*) FROM agcm_projects WHERE company_id = :cid AND status = 'inprogress'"),
-                {"cid": self.company_id},
-            ).scalar() or 0
+            active_projects = (
+                self.db.execute(
+                    text(
+                        "SELECT COUNT(*) FROM agcm_projects WHERE company_id = :cid AND status = 'inprogress'"
+                    ),
+                    {"cid": self.company_id},
+                ).scalar()
+                or 0
+            )
 
             # Completed projects
-            completed_projects = self.db.execute(
-                text("SELECT COUNT(*) FROM agcm_projects WHERE company_id = :cid AND status = 'completed'"),
-                {"cid": self.company_id},
-            ).scalar() or 0
+            completed_projects = (
+                self.db.execute(
+                    text(
+                        "SELECT COUNT(*) FROM agcm_projects WHERE company_id = :cid AND status = 'completed'"
+                    ),
+                    {"cid": self.company_id},
+                ).scalar()
+                or 0
+            )
 
             # Total daily logs
-            total_logs = self.db.execute(
-                text("SELECT COUNT(*) FROM agcm_daily_activity_logs WHERE company_id = :cid"),
-                {"cid": self.company_id},
-            ).scalar() or 0
+            total_logs = (
+                self.db.execute(
+                    text(
+                        "SELECT COUNT(*) FROM agcm_daily_activity_logs WHERE company_id = :cid"
+                    ),
+                    {"cid": self.company_id},
+                ).scalar()
+                or 0
+            )
 
             # Total accidents
-            total_accidents = self.db.execute(
-                text("SELECT COUNT(*) FROM agcm_accidents WHERE company_id = :cid"),
-                {"cid": self.company_id},
-            ).scalar() or 0
+            total_accidents = (
+                self.db.execute(
+                    text("SELECT COUNT(*) FROM agcm_accidents WHERE company_id = :cid"),
+                    {"cid": self.company_id},
+                ).scalar()
+                or 0
+            )
 
             # Total deficiencies
-            total_deficiencies = self.db.execute(
-                text("SELECT COUNT(*) FROM agcm_deficiencies WHERE company_id = :cid"),
-                {"cid": self.company_id},
-            ).scalar() or 0
+            total_deficiencies = (
+                self.db.execute(
+                    text(
+                        "SELECT COUNT(*) FROM agcm_deficiencies WHERE company_id = :cid"
+                    ),
+                    {"cid": self.company_id},
+                ).scalar()
+                or 0
+            )
 
             return {
                 "total_projects": total_projects,
@@ -553,14 +675,21 @@ class ReportingService:
                 "total_accidents": total_accidents,
                 "total_deficiencies": total_deficiencies,
                 "completion_rate": round(
-                    (completed_projects / total_projects * 100) if total_projects > 0 else 0, 1
+                    (completed_projects / total_projects * 100)
+                    if total_projects > 0
+                    else 0,
+                    1,
                 ),
             }
         except Exception as e:
             logger.error(f"Failed to get portfolio KPIs: {e}")
             return {
-                "total_projects": 0, "active_projects": 0, "completed_projects": 0,
-                "total_daily_logs": 0, "total_accidents": 0, "total_deficiencies": 0,
+                "total_projects": 0,
+                "active_projects": 0,
+                "completed_projects": 0,
+                "total_daily_logs": 0,
+                "total_accidents": 0,
+                "total_deficiencies": 0,
                 "completion_rate": 0,
             }
 
@@ -569,55 +698,75 @@ class ReportingService:
         try:
             params = {"cid": self.company_id, "pid": project_id}
 
-            total_logs = self.db.execute(
-                text("SELECT COUNT(*) FROM agcm_daily_activity_logs WHERE company_id = :cid AND project_id = :pid"),
-                params,
-            ).scalar() or 0
+            total_logs = (
+                self.db.execute(
+                    text(
+                        "SELECT COUNT(*) FROM agcm_daily_activity_logs WHERE company_id = :cid AND project_id = :pid"
+                    ),
+                    params,
+                ).scalar()
+                or 0
+            )
 
-            total_inspections = self.db.execute(
-                text("""
+            total_inspections = (
+                self.db.execute(
+                    text("""
                     SELECT COUNT(*) FROM agcm_inspections i
                     JOIN agcm_daily_activity_logs d ON i.daily_activity_log_id = d.id
                     WHERE d.company_id = :cid AND d.project_id = :pid
                 """),
-                params,
-            ).scalar() or 0
+                    params,
+                ).scalar()
+                or 0
+            )
 
-            total_accidents = self.db.execute(
-                text("""
+            total_accidents = (
+                self.db.execute(
+                    text("""
                     SELECT COUNT(*) FROM agcm_accidents a
                     JOIN agcm_daily_activity_logs d ON a.daily_activity_log_id = d.id
                     WHERE d.company_id = :cid AND d.project_id = :pid
                 """),
-                params,
-            ).scalar() or 0
+                    params,
+                ).scalar()
+                or 0
+            )
 
-            total_deficiencies = self.db.execute(
-                text("""
+            total_deficiencies = (
+                self.db.execute(
+                    text("""
                     SELECT COUNT(*) FROM agcm_deficiencies df
                     JOIN agcm_daily_activity_logs d ON df.daily_activity_log_id = d.id
                     WHERE d.company_id = :cid AND d.project_id = :pid
                 """),
-                params,
-            ).scalar() or 0
+                    params,
+                ).scalar()
+                or 0
+            )
 
-            total_delays = self.db.execute(
-                text("""
+            total_delays = (
+                self.db.execute(
+                    text("""
                     SELECT COUNT(*) FROM agcm_delays dl
                     JOIN agcm_daily_activity_logs d ON dl.daily_activity_log_id = d.id
                     WHERE d.company_id = :cid AND d.project_id = :pid
                 """),
-                params,
-            ).scalar() or 0
+                    params,
+                ).scalar()
+                or 0
+            )
 
-            total_violations = self.db.execute(
-                text("""
+            total_violations = (
+                self.db.execute(
+                    text("""
                     SELECT COUNT(*) FROM agcm_safety_violations sv
                     JOIN agcm_daily_activity_logs d ON sv.daily_activity_log_id = d.id
                     WHERE d.company_id = :cid AND d.project_id = :pid
                 """),
-                params,
-            ).scalar() or 0
+                    params,
+                ).scalar()
+                or 0
+            )
 
             return {
                 "total_daily_logs": total_logs,
@@ -626,13 +775,19 @@ class ReportingService:
                 "total_deficiencies": total_deficiencies,
                 "total_delays": total_delays,
                 "total_safety_violations": total_violations,
-                "safety_score": max(0, 100 - (total_accidents * 10) - (total_violations * 5)),
+                "safety_score": max(
+                    0, 100 - (total_accidents * 10) - (total_violations * 5)
+                ),
             }
         except Exception as e:
             logger.error(f"Failed to get project KPIs: {e}")
             return {
-                "total_daily_logs": 0, "total_inspections": 0, "total_accidents": 0,
-                "total_deficiencies": 0, "total_delays": 0, "total_safety_violations": 0,
+                "total_daily_logs": 0,
+                "total_inspections": 0,
+                "total_accidents": 0,
+                "total_deficiencies": 0,
+                "total_delays": 0,
+                "total_safety_violations": 0,
                 "safety_score": 100,
             }
 

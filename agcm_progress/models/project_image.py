@@ -1,14 +1,20 @@
 """Project Image model for progress photos"""
 
 from sqlalchemy import (
-    Column, Date, ForeignKey, Index, Integer, String, Text,
+    Column,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
 )
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class ProjectImage(Base, TimestampMixin, AuditMixin):
+class ProjectImage(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Progress photo with metadata."""
 
     __tablename__ = "agcm_project_images"

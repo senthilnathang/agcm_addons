@@ -3,34 +3,23 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, Enum, Float, ForeignKey, Integer, String, Text, Index,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
-class PurchaseOrderStatus(str, enum.Enum):
-    DRAFT = "draft"
-    PENDING_APPROVAL = "pending_approval"
-    APPROVED = "approved"
-    PARTIALLY_RECEIVED = "partially_received"
-    RECEIVED = "received"
-    CLOSED = "closed"
-    CANCELLED = "cancelled"
-
-
-class ItemType(str, enum.Enum):
-    MATERIAL = "material"
-    LABOR = "labor"
-    EQUIPMENT = "equipment"
-    SUBCONTRACTOR = "subcontractor"
-    FEE = "fee"
-    ALLOWANCE = "allowance"
-
-
-class PurchaseOrder(Base, TimestampMixin, AuditMixin):
+class PurchaseOrder(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Purchase order for a construction project."""
 
     __tablename__ = "agcm_purchase_orders"
@@ -152,6 +141,4 @@ class PurchaseOrderLine(Base, TimestampMixin):
     # Relationships
     purchase_order = relationship("PurchaseOrder", back_populates="lines")
 
-    __table_args__ = (
-        Index("ix_agcm_po_line_po", "po_id"),
-    )
+    __table_args__ = (Index("ix_agcm_po_line_po", "po_id"),)

@@ -1,16 +1,22 @@
 """Budget model - budget line items per project"""
 
 from sqlalchemy import (
-    Column, Float, ForeignKey, Integer, String, Index,
+    Column,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin
+from app.models.base import TimestampMixin, SoftDeleteMixin, AuditMixin, ActivityMixin
 
 
-class Budget(Base, TimestampMixin):
+class Budget(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Budget line item for a construction project."""
+
     __tablename__ = "agcm_budgets"
     _description = "Budget line items with planned, actual, and committed amounts"
 

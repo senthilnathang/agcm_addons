@@ -15,6 +15,7 @@ class BIMAnnotation3D(Base, TimestampMixin, AuditMixin):
     and optional links to RFIs, issues, or punch list items.
     """
     __tablename__ = "agcm_bim_annotations"
+    __table_args__ = {"extend_existing": True}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 

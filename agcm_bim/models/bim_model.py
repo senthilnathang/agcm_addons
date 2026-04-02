@@ -3,24 +3,24 @@
 import enum
 
 from sqlalchemy import (
-    Boolean, Column, DateTime, Enum, Float, ForeignKey, Integer, String, Text,
+    Boolean,
+    Column,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
     Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class BIMModelStatus(str, enum.Enum):
-    UPLOADING = "uploading"
-    PROCESSING = "processing"
-    READY = "ready"
-    FAILED = "failed"
-    ARCHIVED = "archived"
-
-
-class BIMModel(Base, TimestampMixin, AuditMixin):
+class BIMModel(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """
     Uploaded 3D model file.
 
@@ -28,6 +28,7 @@ class BIMModel(Base, TimestampMixin, AuditMixin):
     Models can be versioned via parent_model_id chain.
     Metadata is extracted during processing (element count, units, geo, author).
     """
+
     __tablename__ = "agcm_bim_models"
     _description = "BIM 3D model files with versioning and metadata extraction"
 
@@ -53,7 +54,9 @@ class BIMModel(Base, TimestampMixin, AuditMixin):
     description = Column(Text, nullable=True)
 
     # Classification
-    discipline = Column(String(50), nullable=True)  # architectural, structural, mep, civil, composite
+    discipline = Column(
+        String(50), nullable=True
+    )  # architectural, structural, mep, civil, composite
 
     # File info
     file_format = Column(String(20), nullable=True)  # ifc, rvt, nwd, fbx, glb, obj
@@ -92,7 +95,9 @@ class BIMModel(Base, TimestampMixin, AuditMixin):
     )
 
     # Extracted metadata
-    metadata_json = Column(Text, nullable=True)  # JSON: units, geo, author, application, schema
+    metadata_json = Column(
+        Text, nullable=True
+    )  # JSON: units, geo, author, application, schema
     element_count = Column(Integer, default=0, nullable=False)
     processing_error = Column(Text, nullable=True)
 
@@ -106,7 +111,9 @@ class BIMModel(Base, TimestampMixin, AuditMixin):
     # Relationships
     company = relationship("Company", foreign_keys=[company_id], lazy="select")
     uploader = relationship("User", foreign_keys=[uploaded_by], lazy="select")
-    parent_model = relationship("BIMModel", remote_side=[id], foreign_keys=[parent_model_id], lazy="select")
+    parent_model = relationship(
+        "BIMModel", remote_side=[id], foreign_keys=[parent_model_id], lazy="select"
+    )
 
     viewpoints = relationship(
         "BIMViewpoint",
@@ -125,4 +132,5 @@ class BIMModel(Base, TimestampMixin, AuditMixin):
     __table_args__ = (
         Index("ix_agcm_bim_model_project_discipline", "project_id", "discipline"),
         Index("ix_agcm_bim_model_company", "company_id"),
+        {"extend_existing": True},
     )

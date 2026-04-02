@@ -3,25 +3,23 @@
 import enum
 
 from sqlalchemy import (
-    Boolean, Column, Date, Enum, Float, ForeignKey, Integer, String, Text,
+    Boolean,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class BidStatus(str, enum.Enum):
-    INVITED = "invited"
-    DRAFT = "draft"
-    SUBMITTED = "submitted"
-    UNDER_REVIEW = "under_review"
-    AWARDED = "awarded"
-    REJECTED = "rejected"
-    WITHDRAWN = "withdrawn"
-
-
-class BidPackage(Base, TimestampMixin, AuditMixin):
+class BidPackage(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Bid request sent to subcontractors."""
 
     __tablename__ = "agcm_bid_packages"
@@ -59,7 +57,7 @@ class BidPackage(Base, TimestampMixin, AuditMixin):
     )
 
 
-class BidSubmission(Base, TimestampMixin):
+class BidSubmission(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Subcontractor response to a bid package."""
 
     __tablename__ = "agcm_bid_submissions"

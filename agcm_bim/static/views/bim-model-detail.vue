@@ -5,11 +5,13 @@ import { Page } from '@vben/common-ui';
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
+import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMBIMModelDetail' });
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 const BASE = '/agcm_bim';
 
 const loading = ref(true);
@@ -19,6 +21,7 @@ const summary = ref(null);
 const versions = ref([]);
 const metadata = ref(null);
 const activeTab = ref('info');
+const modelId = computed(() => route.query.id);
 
 // Element search
 const elementSearch = ref({ ifc_type: '', name: '', level: '' });
@@ -270,6 +273,18 @@ onMounted(fetchModel);
                   </template>
                 </ATableColumn>
               </ATable>
+            </ATabPane>
+
+            <!-- Activity Tab -->
+            <ATabPane key="activity" tab="Activity">
+              <ActivityThread
+                :model-name="'agcm_bim_models'"
+                :record-id="modelId"
+                :access-token="userStore.accessToken"
+                :api-base="'/api/v1'"
+                :show-messages="true"
+                :show-activities="true"
+              />
             </ATabPane>
           </ATabs>
         </ACard>

@@ -3,24 +3,24 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, Enum, Float, ForeignKey, Integer, String, Index,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
-class InvoiceStatus(str, enum.Enum):
-    DRAFT = "draft"
-    SENT = "sent"
-    PAID = "paid"
-    OVERDUE = "overdue"
-    VOID = "void"
-
-
-class Invoice(Base, TimestampMixin, AuditMixin):
+class Invoice(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Customer invoice for a construction project."""
+
     __tablename__ = "agcm_invoices"
     _description = "Customer invoices with payment tracking"
 

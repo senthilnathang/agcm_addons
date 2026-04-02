@@ -7,41 +7,24 @@ Separate from the simple agcm_finance.Bill model.
 import enum
 
 from sqlalchemy import (
-    Boolean, Column, Date, Enum, Float, ForeignKey, Integer, String, Text, Index,
+    Boolean,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
-class VendorBillStatus(str, enum.Enum):
-    DRAFT = "draft"
-    PENDING_APPROVAL = "pending_approval"
-    APPROVED = "approved"
-    PARTIALLY_PAID = "partially_paid"
-    PAID = "paid"
-    OVERDUE = "overdue"
-    CANCELLED = "cancelled"
-
-
-class BillRecordType(str, enum.Enum):
-    BILL = "bill"
-    EXPENSE = "expense"
-    VENDOR_CREDIT = "vendor_credit"
-
-
-class BillLineType(str, enum.Enum):
-    MATERIAL = "material"
-    LABOR = "labor"
-    EQUIPMENT = "equipment"
-    SUBCONTRACTOR = "subcontractor"
-    ALLOWANCE = "allowance"
-    CHANGE_ORDER = "change_order"
-    OTHER = "other"
-
-
-class VendorBill(Base, TimestampMixin, AuditMixin):
+class VendorBill(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Enhanced vendor bill with line items, payments, OCR, and PO matching."""
 
     __tablename__ = "agcm_vendor_bills"

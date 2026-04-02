@@ -8,11 +8,14 @@ from datetime import date
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _co(load_model):
     return load_model("agcm_change_order", "change_order", "ChangeOrder")
 
+
 def _co_line(load_model):
     return load_model("agcm_change_order", "change_order", "ChangeOrderLine")
+
 
 def _co_status(load_model):
     return load_model("agcm_change_order", "change_order", "ChangeOrderStatus")
@@ -22,9 +25,11 @@ def _co_status(load_model):
 # Tests
 # ---------------------------------------------------------------------------
 
-class TestChangeOrder:
 
-    def test_create_change_order(self, db, load_model, project_ids, company_id, user_id):
+class TestChangeOrder:
+    def test_create_change_order(
+        self, db, load_model, project_ids, company_id, user_id
+    ):
         ChangeOrder = _co(load_model)
         co = ChangeOrder(
             title="Add mezzanine level",
@@ -46,15 +51,22 @@ class TestChangeOrder:
         ChangeOrder = _co(load_model)
 
         for i in range(1, 4):
-            db.add(ChangeOrder(
-                title=f"CO {i}",
-                project_id=project_ids[0],
-                company_id=company_id,
-                sequence_name=f"CO{i:05d}",
-            ))
+            db.add(
+                ChangeOrder(
+                    title=f"CO {i}",
+                    project_id=project_ids[0],
+                    company_id=company_id,
+                    sequence_name=f"CO{i:05d}",
+                )
+            )
         db.flush()
 
-        cos = db.query(ChangeOrder).filter(ChangeOrder.project_id == project_ids[0]).order_by(ChangeOrder.id).all()
+        cos = (
+            db.query(ChangeOrder)
+            .filter(ChangeOrder.project_id == project_ids[0])
+            .order_by(ChangeOrder.id)
+            .all()
+        )
         assert cos[0].sequence_name == "CO00001"
         assert cos[1].sequence_name == "CO00002"
         assert cos[2].sequence_name == "CO00003"
@@ -94,7 +106,9 @@ class TestChangeOrder:
         assert co.lines[0].description == "Steel beams"
         assert co.lines[1].total_cost == 40 * 85.0
 
-    def test_change_order_approval(self, db, load_model, project_ids, company_id, user_id):
+    def test_change_order_approval(
+        self, db, load_model, project_ids, company_id, user_id
+    ):
         ChangeOrder = _co(load_model)
         ChangeOrderStatus = _co_status(load_model)
 
@@ -120,7 +134,12 @@ class TestChangeOrder:
         ChangeOrder = _co(load_model)
         ChangeOrderStatus = _co_status(load_model)
 
-        co = ChangeOrder(title="Reject me", project_id=project_ids[0], company_id=company_id, status=ChangeOrderStatus.PENDING)
+        co = ChangeOrder(
+            title="Reject me",
+            project_id=project_ids[0],
+            company_id=company_id,
+            status=ChangeOrderStatus.PENDING,
+        )
         db.add(co)
         db.flush()
 
@@ -133,12 +152,21 @@ class TestChangeOrder:
         ChangeOrder = _co(load_model)
         ChangeOrderLine = _co_line(load_model)
 
-        co = ChangeOrder(title="Line CRUD", project_id=project_ids[0], company_id=company_id)
+        co = ChangeOrder(
+            title="Line CRUD", project_id=project_ids[0], company_id=company_id
+        )
         db.add(co)
         db.flush()
 
         # Add
-        line = ChangeOrderLine(change_order_id=co.id, description="Original item", quantity=5, unit_cost=100.0, total_cost=500.0, company_id=company_id)
+        line = ChangeOrderLine(
+            change_order_id=co.id,
+            description="Original item",
+            quantity=5,
+            unit_cost=100.0,
+            total_cost=500.0,
+            company_id=company_id,
+        )
         db.add(line)
         db.flush()
         line_id = line.id
@@ -178,25 +206,75 @@ class TestChangeOrder:
         ChangeOrder = _co(load_model)
         ChangeOrderStatus = _co_status(load_model)
 
-        db.add(ChangeOrder(title="Draft 1", project_id=project_ids[0], company_id=company_id, status=ChangeOrderStatus.DRAFT))
-        db.add(ChangeOrder(title="Approved 1", project_id=project_ids[0], company_id=company_id, status=ChangeOrderStatus.APPROVED))
-        db.add(ChangeOrder(title="Draft 2", project_id=project_ids[0], company_id=company_id, status=ChangeOrderStatus.DRAFT))
-        db.add(ChangeOrder(title="Void 1", project_id=project_ids[0], company_id=company_id, status=ChangeOrderStatus.VOID))
+        db.add(
+            ChangeOrder(
+                title="Draft 1",
+                project_id=project_ids[0],
+                company_id=company_id,
+                status=ChangeOrderStatus.DRAFT,
+            )
+        )
+        db.add(
+            ChangeOrder(
+                title="Approved 1",
+                project_id=project_ids[0],
+                company_id=company_id,
+                status=ChangeOrderStatus.APPROVED,
+            )
+        )
+        db.add(
+            ChangeOrder(
+                title="Draft 2",
+                project_id=project_ids[0],
+                company_id=company_id,
+                status=ChangeOrderStatus.DRAFT,
+            )
+        )
+        db.add(
+            ChangeOrder(
+                title="Void 1",
+                project_id=project_ids[0],
+                company_id=company_id,
+                status=ChangeOrderStatus.VOID,
+            )
+        )
         db.flush()
 
-        drafts = db.query(ChangeOrder).filter(ChangeOrder.status == ChangeOrderStatus.DRAFT).all()
+        drafts = (
+            db.query(ChangeOrder)
+            .filter(ChangeOrder.status == ChangeOrderStatus.DRAFT)
+            .all()
+        )
         assert len(drafts) == 2
 
-    def test_delete_change_order_cascades_lines(self, db, load_model, project_ids, company_id):
+    def test_delete_change_order_cascades_lines(
+        self, db, load_model, project_ids, company_id
+    ):
         ChangeOrder = _co(load_model)
         ChangeOrderLine = _co_line(load_model)
 
-        co = ChangeOrder(title="Cascade CO", project_id=project_ids[0], company_id=company_id)
+        co = ChangeOrder(
+            title="Cascade CO", project_id=project_ids[0], company_id=company_id
+        )
         db.add(co)
         db.flush()
 
-        line1 = ChangeOrderLine(change_order_id=co.id, description="Line 1", quantity=1, unit_cost=100, total_cost=100, company_id=company_id)
-        line2 = ChangeOrderLine(change_order_id=co.id, description="Line 2", quantity=2, unit_cost=200, total_cost=400, company_id=company_id)
+        line1 = ChangeOrderLine(
+            change_order_id=co.id,
+            description="Line 1",
+            quantity=1,
+            unit_cost=100,
+            total_cost=100,
+            company_id=company_id,
+        )
+        line2 = ChangeOrderLine(
+            change_order_id=co.id,
+            description="Line 2",
+            quantity=2,
+            unit_cost=200,
+            total_cost=400,
+            company_id=company_id,
+        )
         db.add_all([line1, line2])
         db.flush()
         line_ids = [line1.id, line2.id]
@@ -211,7 +289,12 @@ class TestChangeOrder:
         ChangeOrder = _co(load_model)
         ChangeOrderStatus = _co_status(load_model)
 
-        co = ChangeOrder(title="Void test", project_id=project_ids[0], company_id=company_id, status=ChangeOrderStatus.APPROVED)
+        co = ChangeOrder(
+            title="Void test",
+            project_id=project_ids[0],
+            company_id=company_id,
+            status=ChangeOrderStatus.APPROVED,
+        )
         db.add(co)
         db.flush()
 
@@ -223,10 +306,86 @@ class TestChangeOrder:
         ChangeOrder = _co(load_model)
         ChangeOrderStatus = _co_status(load_model)
 
-        co = ChangeOrder(title="Defaults", project_id=project_ids[0], company_id=company_id)
+        co = ChangeOrder(
+            title="Defaults", project_id=project_ids[0], company_id=company_id
+        )
         db.add(co)
         db.flush()
 
         assert co.status == ChangeOrderStatus.DRAFT
         assert co.cost_impact == 0.0
         assert co.schedule_impact_days == 0
+
+    def test_change_order_soft_delete(
+        self, db, load_model, project_ids, company_id, user_id
+    ):
+        """Test soft delete functionality for change orders."""
+        ChangeOrder = _co(load_model)
+
+        co = ChangeOrder(
+            title="Soft delete test", project_id=project_ids[0], company_id=company_id
+        )
+        db.add(co)
+        db.flush()
+
+        assert co.is_deleted is False
+        assert co.deleted_at is None
+
+        co.soft_delete(user_id=user_id)
+        db.flush()
+
+        assert co.is_deleted is True
+        assert co.deleted_at is not None
+        assert co.deleted_by == user_id
+
+    def test_change_order_restore(
+        self, db, load_model, project_ids, company_id, user_id
+    ):
+        """Test restore functionality for change orders."""
+        ChangeOrder = _co(load_model)
+
+        co = ChangeOrder(
+            title="Restore test", project_id=project_ids[0], company_id=company_id
+        )
+        db.add(co)
+        db.flush()
+
+        co.soft_delete(user_id=user_id)
+        db.flush()
+        assert co.is_deleted is True
+
+        co.restore()
+        db.flush()
+        assert co.is_deleted is False
+        assert co.deleted_at is None
+        assert co.deleted_by is None
+
+    def test_soft_deleted_change_orders_excluded_from_list(
+        self, db, load_model, project_ids, company_id, user_id
+    ):
+        """Test that soft-deleted change orders are excluded from default queries."""
+        ChangeOrder = _co(load_model)
+
+        co1 = ChangeOrder(
+            title="Active CO", project_id=project_ids[0], company_id=company_id
+        )
+        co2 = ChangeOrder(
+            title="Deleted CO", project_id=project_ids[0], company_id=company_id
+        )
+        db.add_all([co1, co2])
+        db.flush()
+
+        co2.soft_delete(user_id=user_id)
+        db.flush()
+
+        active_cos = (
+            db.query(ChangeOrder)
+            .filter(
+                ChangeOrder.project_id == project_ids[0],
+                ChangeOrder.is_deleted == False,
+            )
+            .all()
+        )
+
+        assert len(active_cos) == 1
+        assert active_cos[0].title == "Active CO"

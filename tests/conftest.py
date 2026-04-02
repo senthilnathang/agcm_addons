@@ -159,9 +159,15 @@ _addon_models = [
     ("agcm_portal_selection", _model_path("agcm_portal", "selection.py")),
     ("agcm_portal_bid", _model_path("agcm_portal", "bid.py")),
     ("agcm_portal_config", _model_path("agcm_portal", "portal_config.py")),
-    # agcm_reporting
-    ("agcm_reporting_report", _model_path("agcm_reporting", "report_definition.py")),
-    ("agcm_reporting_dashboard", _model_path("agcm_reporting", "dashboard_widget.py")),
+    # agcm_reporting — keys must match load_model fixture pattern: "{addon}_{file}"
+    ("agcm_reporting_report_definition", _model_path("agcm_reporting", "report_definition.py")),
+    ("agcm_reporting_dashboard_widget", _model_path("agcm_reporting", "dashboard_widget.py")),
+    # agcm_bim — keys must match load_model fixture pattern: "{addon}_{file}"
+    ("agcm_bim_bim_model", _model_path("agcm_bim", "bim_model.py")),
+    ("agcm_bim_bim_viewpoint", _model_path("agcm_bim", "bim_viewpoint.py")),
+    ("agcm_bim_bim_element", _model_path("agcm_bim", "bim_element.py")),
+    ("agcm_bim_annotation", _model_path("agcm_bim", "annotation.py")),
+    ("agcm_bim_clash_detection", _model_path("agcm_bim", "clash_detection.py")),
 ]
 
 for mod_name, mod_path in _core_models + _base_models + _addon_models:

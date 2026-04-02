@@ -1,15 +1,19 @@
 """Portal configuration model - per-project portal settings"""
 
 from sqlalchemy import (
-    Boolean, Column, ForeignKey, Integer, Text,
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    Text,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class PortalConfig(Base, TimestampMixin):
+class PortalConfig(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Per-project portal visibility settings."""
 
     __tablename__ = "agcm_portal_configs"

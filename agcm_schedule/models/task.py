@@ -3,13 +3,21 @@
 import enum
 
 from sqlalchemy import (
-    Boolean, Column, Date, Enum, Float, ForeignKey, Integer, String, Text,
+    Boolean,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
     Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
 class TaskType(str, enum.Enum):
@@ -35,13 +43,14 @@ class TaskStatus(str, enum.Enum):
     COMPLETED = "completed"
 
 
-class Task(Base, TimestampMixin, AuditMixin):
+class Task(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """
     Individual task within a schedule.
 
     Supports planned/actual dates, progress tracking, float calculations,
-    and critical path flagging.
+    critical path flagging, and activity logging.
     """
+
     __tablename__ = "agcm_tasks"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
@@ -110,7 +119,9 @@ class Task(Base, TimestampMixin, AuditMixin):
     )
 
     # Relationships
-    schedule = relationship("Schedule", foreign_keys=[schedule_id], back_populates="tasks")
+    schedule = relationship(
+        "Schedule", foreign_keys=[schedule_id], back_populates="tasks"
+    )
     wbs = relationship("WBS", foreign_keys=[wbs_id], lazy="select")
     assignee = relationship("User", foreign_keys=[assigned_to], lazy="select")
     project = relationship("Project", foreign_keys=[project_id], lazy="select")
@@ -131,4 +142,6 @@ class Task(Base, TimestampMixin, AuditMixin):
     __table_args__ = (
         Index("ix_agcm_tasks_project_schedule", "project_id", "schedule_id"),
         Index("ix_agcm_tasks_company", "company_id"),
+        Index("ix_agcm_tasks_assigned_to", "assigned_to"),
+        Index("ix_agcm_tasks_wbs", "wbs_id"),
     )

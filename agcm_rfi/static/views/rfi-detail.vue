@@ -19,6 +19,7 @@ import {
   Row,
   Space,
   Switch,
+  Tabs,
   Tag,
   Textarea,
   Timeline,
@@ -39,16 +40,19 @@ import {
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
+import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMRFIDetail' });
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 const BASE = '/agcm_rfi';
 
 const rfiId = ref(Number(route.query.id));
 const rfi = ref(null);
 const loading = ref(false);
+const activeTab = ref('responses');
 
 // Response form
 const newResponseContent = ref('');
@@ -144,35 +148,49 @@ onMounted(fetchRFI);
         </div>
       </Card>
 
-      <!-- Responses -->
-      <Card title="Responses" class="mt-4">
-        <div v-if="rfi.responses && rfi.responses.length">
-          <div v-for="resp in rfi.responses" :key="resp.id" class="mb-4 p-3 border rounded" :class="resp.is_official_response ? 'border-green-300 bg-green-50' : 'border-gray-200'">
-            <div class="flex items-center justify-between mb-2">
-              <Space>
-                <Tag v-if="resp.is_official_response" color="green"><CheckCircleOutlined /> Official Response</Tag>
-                <span class="text-gray-500 text-xs">User #{{ resp.responded_by }}</span>
-              </Space>
-              <span class="text-gray-400 text-xs">{{ formatDate(resp.created_at) }}</span>
+      <!-- Responses & Activity Tabs -->
+      <Card class="mt-4">
+        <Tabs v-model:activeKey="activeTab">
+          <Tabs.TabPane key="responses" tab="Responses">
+            <div v-if="rfi.responses && rfi.responses.length">
+              <div v-for="resp in rfi.responses" :key="resp.id" class="mb-4 p-3 border rounded" :class="resp.is_official_response ? 'border-green-300 bg-green-50' : 'border-gray-200'">
+                <div class="flex items-center justify-between mb-2">
+                  <Space>
+                    <Tag v-if="resp.is_official_response" color="green"><CheckCircleOutlined /> Official Response</Tag>
+                    <span class="text-gray-500 text-xs">User #{{ resp.responded_by }}</span>
+                  </Space>
+                  <span class="text-gray-400 text-xs">{{ formatDate(resp.created_at) }}</span>
+                </div>
+                <p style="white-space: pre-wrap;">{{ resp.content }}</p>
+              </div>
             </div>
-            <p style="white-space: pre-wrap;">{{ resp.content }}</p>
-          </div>
-        </div>
-        <div v-else class="text-gray-400 text-center py-4">No responses yet</div>
+            <div v-else class="text-gray-400 text-center py-4">No responses yet</div>
 
-        <Divider />
+            <Divider />
 
-        <div v-if="rfi.status !== 'closed'">
-          <h4 class="font-medium mb-2"><MessageOutlined /> Add Response</h4>
-          <Textarea v-model:value="newResponseContent" :rows="3" placeholder="Type your response..." />
-          <div class="flex items-center justify-between mt-2">
-            <Space>
-              <Switch v-model:checked="isOfficialResponse" />
-              <span>Mark as official response</span>
-            </Space>
-            <Button type="primary" :loading="sendingResponse" @click="handleSendResponse"><SendOutlined /> Send</Button>
-          </div>
-        </div>
+            <div v-if="rfi.status !== 'closed'">
+              <h4 class="font-medium mb-2"><MessageOutlined /> Add Response</h4>
+              <Textarea v-model:value="newResponseContent" :rows="3" placeholder="Type your response..." />
+              <div class="flex items-center justify-between mt-2">
+                <Space>
+                  <Switch v-model:checked="isOfficialResponse" />
+                  <span>Mark as official response</span>
+                </Space>
+                <Button type="primary" :loading="sendingResponse" @click="handleSendResponse"><SendOutlined /> Send</Button>
+              </div>
+            </div>
+          </Tabs.TabPane>
+          <Tabs.TabPane key="activity" tab="Activity">
+            <ActivityThread
+              :model-name="'agcm_rfis'"
+              :record-id="rfiId"
+              :access-token="userStore.accessToken"
+              :api-base="'/api/v1'"
+              :show-messages="true"
+              :show-activities="true"
+            />
+          </Tabs.TabPane>
+        </Tabs>
       </Card>
     </template>
   </Page>

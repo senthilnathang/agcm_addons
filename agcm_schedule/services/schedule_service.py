@@ -11,11 +11,21 @@ from addons.agcm_schedule.models.wbs import WBS
 from addons.agcm_schedule.models.task import Task
 from addons.agcm_schedule.models.dependency import TaskDependency
 from addons.agcm_schedule.schemas.schedule import (
-    ScheduleCreate, ScheduleUpdate,
-    WBSCreate, WBSUpdate,
-    TaskCreate, TaskUpdate,
+    ScheduleCreate,
+    ScheduleUpdate,
+    WBSCreate,
+    WBSUpdate,
+    TaskCreate,
+    TaskUpdate,
     DependencyCreate,
 )
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +55,7 @@ def _next_sequence(db: Session, model_class, company_id: int) -> str:
 
     num = 1
     if last and last[0]:
-        match = re.search(r'(\d+)$', last[0])
+        match = re.search(r"(\d+)$", last[0])
         if match:
             num = int(match.group(1)) + 1
 
@@ -116,7 +126,9 @@ class ScheduleService:
         self.db.refresh(schedule)
         return schedule
 
-    def update_schedule(self, schedule_id: int, data: ScheduleUpdate) -> Optional[Schedule]:
+    def update_schedule(
+        self, schedule_id: int, data: ScheduleUpdate
+    ) -> Optional[Schedule]:
         """Update a schedule."""
         schedule = self.get_schedule(schedule_id)
         if not schedule:
@@ -265,10 +277,13 @@ class ScheduleService:
         search: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
+        include_deleted: bool = False,
     ) -> dict:
         """List tasks with filtering and pagination."""
         page_size = min(page_size, 200)
         query = self.db.query(Task).filter(Task.company_id == self.company_id)
+        if not include_deleted:
+            query = query.filter(Task.is_deleted == False)
 
         if project_id:
             query = query.filter(Task.project_id == project_id)
@@ -279,8 +294,7 @@ class ScheduleService:
         if search:
             search_term = f"%{search}%"
             query = query.filter(
-                (Task.name.ilike(search_term))
-                | (Task.sequence_name.ilike(search_term))
+                (Task.name.ilike(search_term)) | (Task.sequence_name.ilike(search_term))
             )
 
         total = query.count()
@@ -294,16 +308,15 @@ class ScheduleService:
             "page_size": page_size,
         }
 
-    def get_task(self, task_id: int) -> Optional[Task]:
+    def get_task(self, task_id: int, include_deleted: bool = False) -> Optional[Task]:
         """Get a single task by ID."""
-        return (
-            self.db.query(Task)
-            .filter(
-                Task.id == task_id,
-                Task.company_id == self.company_id,
-            )
-            .first()
+        query = self.db.query(Task).filter(
+            Task.id == task_id,
+            Task.company_id == self.company_id,
         )
+        if not include_deleted:
+            query = query.filter(Task.is_deleted == False)
+        return query.first()
 
     def create_task(self, data: TaskCreate) -> Task:
         """Create a new task."""
@@ -327,6 +340,10 @@ class ScheduleService:
         self.db.add(task)
         self.db.commit()
         self.db.refresh(task)
+
+        self._invalidate_task_cache(
+            project_id=data.project_id, schedule_id=data.schedule_id
+        )
         return task
 
     def update_task(self, task_id: int, data: TaskUpdate) -> Optional[Task]:
@@ -342,6 +359,10 @@ class ScheduleService:
 
         self.db.commit()
         self.db.refresh(task)
+
+        self._invalidate_task_cache(
+            task_id=task.id, project_id=task.project_id, schedule_id=task.schedule_id
+        )
         return task
 
     def update_progress(self, task_id: int, progress: int) -> Optional[Task]:
@@ -357,16 +378,56 @@ class ScheduleService:
 
         self.db.commit()
         self.db.refresh(task)
+
+        self._invalidate_task_cache(
+            task_id=task.id, project_id=task.project_id, schedule_id=task.schedule_id
+        )
         return task
 
     def delete_task(self, task_id: int) -> bool:
-        """Delete a task."""
+        """Soft delete a task."""
         task = self.get_task(task_id)
         if not task:
             return False
-        self.db.delete(task)
+        project_id = task.project_id
+        schedule_id = task.schedule_id
+        task.soft_delete(user_id=self.user_id)
         self.db.commit()
+
+        self._invalidate_task_cache(
+            task_id=task_id, project_id=project_id, schedule_id=schedule_id
+        )
         return True
+
+    def restore_task(self, task_id: int) -> Optional[Task]:
+        """Restore a soft-deleted task."""
+        task = self.get_task(task_id, include_deleted=True)
+        if not task or not task.is_deleted:
+            return None
+        task.restore()
+        self.db.commit()
+        self.db.refresh(task)
+        self._invalidate_task_cache(task_id=task.id, project_id=task.project_id)
+        return task
+
+    def _invalidate_task_cache(
+        self, task_id: int = None, project_id: int = None, schedule_id: int = None
+    ):
+        """Invalidate task-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if task_id:
+            cache.invalidate(f"agcm_schedule:task:{self.company_id}:{task_id}")
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_schedule:tasks:project:{self.company_id}:{project_id}:*"
+            )
+        if schedule_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_schedule:tasks:schedule:{self.company_id}:{schedule_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_schedule:tasks:{self.company_id}:*")
 
     # =========================================================================
     # DEPENDENCIES

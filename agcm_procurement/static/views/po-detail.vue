@@ -39,11 +39,13 @@ import {
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
+import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMPODetail' });
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 const BASE = '/agcm_procurement';
 
 const loading = ref(false);
@@ -51,6 +53,7 @@ const saving = ref(false);
 const isNew = ref(false);
 const detail = ref(null);
 const projects = ref([]);
+const activeTab = ref('lines');
 
 // Form data for new/edit
 const form = ref({
@@ -338,34 +341,48 @@ onMounted(async () => {
 
       <Divider />
 
-      <Card title="Line Items">
-        <template #extra>
-          <Button type="primary" size="small" @click="openLineModal()"><PlusOutlined /> Add Line</Button>
-        </template>
-        <Table
-          :columns="lineColumns"
-          :data-source="detail.lines || []"
-          row-key="id"
-          size="small"
-          :pagination="false"
-        >
-          <template #bodyCell="{ column, record }">
-            <template v-if="column.key === 'unit_cost' || column.key === 'total_cost'">
-              {{ formatCurrency(record[column.dataIndex]) }}
+      <Card>
+        <Tabs v-model:activeKey="activeTab">
+          <Tabs.TabPane key="lines" tab="Line Items">
+            <template #extra>
+              <Button type="primary" size="small" @click="openLineModal()"><PlusOutlined /> Add Line</Button>
             </template>
-            <template v-else-if="column.key === 'item_type'">
-              {{ (record.item_type || '').replace(/_/g, ' ') }}
-            </template>
-            <template v-else-if="column.key === 'actions'">
-              <Space>
-                <Button type="link" size="small" @click="openLineModal(record)"><EditOutlined /></Button>
-                <Popconfirm title="Delete line?" @confirm="deleteLine(record.id)">
-                  <Button type="link" size="small" danger><DeleteOutlined /></Button>
-                </Popconfirm>
-              </Space>
-            </template>
-          </template>
-        </Table>
+            <Table
+              :columns="lineColumns"
+              :data-source="detail.lines || []"
+              row-key="id"
+              size="small"
+              :pagination="false"
+            >
+              <template #bodyCell="{ column, record }">
+                <template v-if="column.key === 'unit_cost' || column.key === 'total_cost'">
+                  {{ formatCurrency(record[column.dataIndex]) }}
+                </template>
+                <template v-else-if="column.key === 'item_type'">
+                  {{ (record.item_type || '').replace(/_/g, ' ') }}
+                </template>
+                <template v-else-if="column.key === 'actions'">
+                  <Space>
+                    <Button type="link" size="small" @click="openLineModal(record)"><EditOutlined /></Button>
+                    <Popconfirm title="Delete line?" @confirm="deleteLine(record.id)">
+                      <Button type="link" size="small" danger><DeleteOutlined /></Button>
+                    </Popconfirm>
+                  </Space>
+                </template>
+              </template>
+            </Table>
+          </Tabs.TabPane>
+          <Tabs.TabPane key="activity" tab="Activity">
+            <ActivityThread
+              :model-name="'agcm_purchase_orders'"
+              :record-id="route.query.id"
+              :access-token="userStore.accessToken"
+              :api-base="'/api/v1'"
+              :show-messages="true"
+              :show-activities="true"
+            />
+          </Tabs.TabPane>
+        </Tabs>
       </Card>
     </template>
 

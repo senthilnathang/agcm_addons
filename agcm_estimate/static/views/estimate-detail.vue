@@ -2,7 +2,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { requestClient } from '#/api/request';
-import { message } from 'ant-design-vue';
+import { message, Tabs } from 'ant-design-vue';
 import {
   ArrowLeftOutlined,
   CalculatorOutlined,
@@ -15,12 +15,14 @@ import {
   PlusOutlined,
   SendOutlined,
 } from '@ant-design/icons-vue';
+import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMEstimateDetail' });
 
 const BASE = '/agcm_estimate';
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 
 const estimateId = computed(() => route.params.id);
 const isNew = computed(() => estimateId.value === 'new');
@@ -31,6 +33,7 @@ const estimate = ref(null);
 const groups = ref([]);
 const markups = ref([]);
 const activeGroupKeys = ref([]);
+const activeTab = ref('groups');
 
 // ---- Formatters ----
 function fmtCurrency(val) {
@@ -843,6 +846,18 @@ onMounted(fetchEstimate);
               {{ estimate?.notes || 'Click to add notes...' }}
             </p>
           </template>
+        </ACard>
+
+        <!-- Activity Section -->
+        <ACard title="Activity" class="mt-4">
+          <ActivityThread
+            :model-name="'agcm_estimates'"
+            :record-id="estimateId"
+            :access-token="userStore.accessToken"
+            :api-base="'/api/v1'"
+            :show-messages="true"
+            :show-activities="true"
+          />
         </ACard>
       </ASpin>
     </template>

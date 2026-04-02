@@ -3,31 +3,22 @@
 import enum
 
 from sqlalchemy import (
-    Column, Enum, Float, ForeignKey, Index, Integer, String, Text,
+    Column,
+    Enum,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class CostType(str, enum.Enum):
-    FEE = "fee"
-    SUBCONTRACTOR = "subcontractor"
-    MATERIAL = "material"
-    LABOR = "labor"
-    EQUIPMENT = "equipment"
-    ALLOWANCE = "allowance"
-    GROUP = "group"
-
-
-class EstimationStatus(str, enum.Enum):
-    INCOMPLETE = "incomplete"
-    COMPLETE = "complete"
-    NOT_RELEVANT = "not_relevant"
-
-
-class EstimationItem(Base, TimestampMixin):
+class EstimationItem(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Hierarchical cost estimation item."""
 
     __tablename__ = "agcm_estimation_items"

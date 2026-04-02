@@ -8,9 +8,26 @@ from typing import List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from addons.agcm_rfi.models.rfi import RFI, RFILabel, agcm_rfi_label_rel, agcm_rfi_assignees
+from addons.agcm_rfi.models.rfi import (
+    RFI,
+    RFILabel,
+    agcm_rfi_label_rel,
+    agcm_rfi_assignees,
+)
 from addons.agcm_rfi.models.rfi_response import RFIResponse
-from addons.agcm_rfi.schemas.rfi import RFICreate, RFIUpdate, RFIResponseCreate, RFIResponseUpdate
+from addons.agcm_rfi.schemas.rfi import (
+    RFICreate,
+    RFIUpdate,
+    RFIResponseCreate,
+    RFIResponseUpdate,
+)
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +44,7 @@ def _next_rfi_sequence(db: Session, company_id: int) -> str:
     )
     num = 1
     if last and last[0]:
-        match = re.search(r'(\d+)$', last[0])
+        match = re.search(r"(\d+)$", last[0])
         if match:
             num = int(match.group(1)) + 1
     return f"{SEQUENCE_PREFIX}{num:0{SEQUENCE_PADDING}d}"
@@ -51,9 +68,14 @@ class RFIService:
         search: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
+        include_deleted: bool = False,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(RFI).filter(RFI.company_id == self.company_id)
+        query = self.db.query(RFI).filter(
+            RFI.company_id == self.company_id,
+        )
+        if not include_deleted:
+            query = query.filter(RFI.is_deleted == False)
 
         if project_id:
             query = query.filter(RFI.project_id == project_id)
@@ -73,14 +95,17 @@ class RFIService:
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
-    def get_rfi(self, rfi_id: int) -> Optional[RFI]:
-        return (
-            self.db.query(RFI)
-            .filter(RFI.id == rfi_id, RFI.company_id == self.company_id)
-            .first()
+    def get_rfi(self, rfi_id: int, include_deleted: bool = False) -> Optional[RFI]:
+        query = self.db.query(RFI).filter(
+            RFI.id == rfi_id,
+            RFI.company_id == self.company_id,
         )
+        if not include_deleted:
+            query = query.filter(RFI.is_deleted == False)
+        return query.first()
 
-    def get_rfi_detail(self, rfi_id: int) -> Optional[dict]:
+    def _get_rfi_detail_uncached(self, rfi_id: int) -> Optional[dict]:
+        """Internal method to get RFI detail without caching."""
         rfi = self.get_rfi(rfi_id)
         if not rfi:
             return None
@@ -88,7 +113,8 @@ class RFIService:
         response_count = (
             self.db.query(func.count(RFIResponse.id))
             .filter(RFIResponse.rfi_id == rfi_id)
-            .scalar() or 0
+            .scalar()
+            or 0
         )
 
         responses = (
@@ -106,20 +132,59 @@ class RFIService:
                 "content": r.content,
                 "is_official_response": r.is_official_response,
                 "responded_by": r.responded_by,
-                "created_at": r.created_at,
-                "updated_at": r.updated_at,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
             }
             for r in responses
         ]
 
+        result = {}
+        for c in rfi.__table__.columns:
+            val = getattr(rfi, c.key, None)
+            if hasattr(val, "isoformat"):
+                val = val.isoformat()
+            result[c.key] = val
+
         return {
-            **{c.key: getattr(rfi, c.key) for c in rfi.__table__.columns},
+            **result,
             "assignee_ids": [u.id for u in rfi.assignees],
             "label_ids": [l.id for l in rfi.labels],
-            "labels": [{"id": l.id, "name": l.name, "color": l.color} for l in rfi.labels],
+            "labels": [
+                {"id": l.id, "name": l.name, "color": l.color} for l in rfi.labels
+            ],
             "response_count": response_count,
             "responses": response_dicts,
         }
+
+    def get_rfi_detail(self, rfi_id: int) -> Optional[dict]:
+        """Get RFI detail with related data (cached)."""
+        cache_key = f"agcm_rfi:detail:{self.company_id}:{rfi_id}"
+
+        if CACHE_AVAILABLE:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return cached
+
+        detail = self._get_rfi_detail_uncached(rfi_id)
+
+        if detail and CACHE_AVAILABLE:
+            cache.set(cache_key, detail, ttl=300)
+
+        return detail
+
+    def _invalidate_rfi_cache(self, rfi_id: int = None, project_id: int = None):
+        """Invalidate RFI-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if rfi_id:
+            cache.invalidate(f"agcm_rfi:detail:{self.company_id}:{rfi_id}")
+
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_rfi:list:{self.company_id}:project:{project_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_rfi:list:{self.company_id}:*")
 
     def create_rfi(self, data: RFICreate) -> RFI:
         rfi = RFI(
@@ -146,6 +211,8 @@ class RFIService:
 
         self.db.commit()
         self.db.refresh(rfi)
+
+        self._invalidate_rfi_cache(project_id=data.project_id)
         return rfi
 
     def update_rfi(self, rfi_id: int, data: RFIUpdate) -> Optional[RFI]:
@@ -168,15 +235,29 @@ class RFIService:
 
         self.db.commit()
         self.db.refresh(rfi)
+
+        self._invalidate_rfi_cache(rfi_id=rfi.id, project_id=rfi.project_id)
         return rfi
 
     def delete_rfi(self, rfi_id: int) -> bool:
         rfi = self.get_rfi(rfi_id)
         if not rfi:
             return False
-        self.db.delete(rfi)
+        project_id = rfi.project_id
+        rfi.soft_delete(user_id=self.user_id)
         self.db.commit()
+        self._invalidate_rfi_cache(rfi_id=rfi_id, project_id=project_id)
         return True
+
+    def restore_rfi(self, rfi_id: int) -> Optional[RFI]:
+        rfi = self.get_rfi(rfi_id, include_deleted=True)
+        if not rfi or not rfi.is_deleted:
+            return None
+        rfi.restore()
+        self.db.commit()
+        self.db.refresh(rfi)
+        self._invalidate_rfi_cache(rfi_id=rfi.id, project_id=rfi.project_id)
+        return rfi
 
     def close_rfi(self, rfi_id: int) -> Optional[RFI]:
         rfi = self.get_rfi(rfi_id)
@@ -187,6 +268,7 @@ class RFIService:
         rfi.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(rfi)
+        self._invalidate_rfi_cache(rfi_id=rfi_id, project_id=rfi.project_id)
         return rfi
 
     def reopen_rfi(self, rfi_id: int) -> Optional[RFI]:
@@ -198,11 +280,14 @@ class RFIService:
         rfi.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(rfi)
+        self._invalidate_rfi_cache(rfi_id=rfi_id, project_id=rfi.project_id)
         return rfi
 
     # --- Responses ---
 
-    def create_response(self, rfi_id: int, data: RFIResponseCreate) -> Optional[RFIResponse]:
+    def create_response(
+        self, rfi_id: int, data: RFIResponseCreate
+    ) -> Optional[RFIResponse]:
         rfi = self.get_rfi(rfi_id)
         if not rfi:
             return None
@@ -223,12 +308,18 @@ class RFIService:
 
         self.db.commit()
         self.db.refresh(resp)
+
+        self._invalidate_rfi_cache(rfi_id=rfi_id, project_id=rfi.project_id)
         return resp
 
-    def update_response(self, response_id: int, data: RFIResponseUpdate) -> Optional[RFIResponse]:
+    def update_response(
+        self, response_id: int, data: RFIResponseUpdate
+    ) -> Optional[RFIResponse]:
         resp = (
             self.db.query(RFIResponse)
-            .filter(RFIResponse.id == response_id, RFIResponse.company_id == self.company_id)
+            .filter(
+                RFIResponse.id == response_id, RFIResponse.company_id == self.company_id
+            )
             .first()
         )
         if not resp:
@@ -240,6 +331,8 @@ class RFIService:
 
         self.db.commit()
         self.db.refresh(resp)
+
+        self._invalidate_rfi_cache(rfi_id=resp.rfi_id)
         return resp
 
     # --- Labels ---

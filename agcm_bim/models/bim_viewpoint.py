@@ -1,15 +1,20 @@
 """BIM Viewpoint - saved camera positions, section planes, and annotations"""
 
 from sqlalchemy import (
-    Column, ForeignKey, Integer, String, Text, Index,
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class BIMViewpoint(Base, TimestampMixin):
+class BIMViewpoint(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """
     Saved camera position / annotation on a BIM model.
 
@@ -17,6 +22,7 @@ class BIMViewpoint(Base, TimestampMixin):
     Can be linked to other entities like RFIs, issues, or clash results
     via entity_type + entity_id polymorphic link.
     """
+
     __tablename__ = "agcm_bim_viewpoints"
     _description = "BCF-style viewpoints with camera, sections, and annotations"
 
@@ -41,28 +47,32 @@ class BIMViewpoint(Base, TimestampMixin):
 
     # Camera state (JSON)
     camera_position = Column(Text, nullable=True)  # {x, y, z, rx, ry, rz, fov}
-    camera_target = Column(Text, nullable=True)     # {x, y, z}
+    camera_target = Column(Text, nullable=True)  # {x, y, z}
 
     # Section planes (JSON array)
-    section_planes = Column(Text, nullable=True)    # [{pos:{x,y,z}, dir:{x,y,z}}]
+    section_planes = Column(Text, nullable=True)  # [{pos:{x,y,z}, dir:{x,y,z}}]
 
     # Visibility (JSON arrays of element GlobalIds)
     visible_elements = Column(Text, nullable=True)
     hidden_elements = Column(Text, nullable=True)
 
     # Markup annotations (JSON array)
-    annotations = Column(Text, nullable=True)       # [{type, x, y, text, color}]
+    annotations = Column(Text, nullable=True)  # [{type, x, y, text, color}]
 
     # Full BCF 2.1 JSON (replaces simple camera_position for full viewpoint persistence)
     bcf_data = Column(Text, nullable=True)
 
     # Thumbnail / snapshot
     screenshot_url = Column(String(500), nullable=True)
-    snapshot_url = Column(String(500), nullable=True)      # PNG screenshot file path
-    snapshot_base64 = Column(Text, nullable=True)           # base64-encoded screenshot for quick display
+    snapshot_url = Column(String(500), nullable=True)  # PNG screenshot file path
+    snapshot_base64 = Column(
+        Text, nullable=True
+    )  # base64-encoded screenshot for quick display
 
     # Polymorphic entity link
-    entity_type = Column(String(100), nullable=True)  # "rfi", "issue", "clash", "submittal"
+    entity_type = Column(
+        String(100), nullable=True
+    )  # "rfi", "issue", "clash", "submittal"
     entity_id = Column(Integer, nullable=True)
 
     # Direct entity FK links (convenience, in addition to polymorphic)
@@ -81,10 +91,13 @@ class BIMViewpoint(Base, TimestampMixin):
 
     # Relationships
     company = relationship("Company", foreign_keys=[company_id], lazy="select")
-    model = relationship("BIMModel", back_populates="viewpoints", foreign_keys=[model_id], lazy="select")
+    model = relationship(
+        "BIMModel", back_populates="viewpoints", foreign_keys=[model_id], lazy="select"
+    )
     creator = relationship("User", foreign_keys=[created_by], lazy="select")
 
     __table_args__ = (
         Index("ix_agcm_bim_viewpoint_model", "model_id"),
         Index("ix_agcm_bim_viewpoint_entity", "entity_type", "entity_id"),
+        {"extend_existing": True},
     )

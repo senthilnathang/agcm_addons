@@ -9,8 +9,25 @@ from sqlalchemy.orm import Session
 from addons.agcm_document.models.folder import ProjectFolder
 from addons.agcm_document.models.document import ProjectDocument
 from addons.agcm_document.schemas.document import (
-    FolderCreate, FolderUpdate, DocumentCreate, DocumentUpdate,
+    FolderCreate,
+    FolderUpdate,
+    DocumentCreate,
+    DocumentUpdate,
 )
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +39,7 @@ SEQUENCE_PADDING = 5
 def _next_doc_sequence(db: Session, company_id: int) -> str:
     """Generate next document sequence: DOC00001, DOC00002, etc."""
     import re
+
     last = (
         db.query(ProjectDocument.sequence_name)
         .filter(ProjectDocument.company_id == company_id)
@@ -31,7 +49,7 @@ def _next_doc_sequence(db: Session, company_id: int) -> str:
     )
     num = 1
     if last and last[0]:
-        match = re.search(r'(\d+)$', last[0])
+        match = re.search(r"(\d+)$", last[0])
         if match:
             num = int(match.group(1)) + 1
     return f"{SEQUENCE_PREFIX}{num:0{SEQUENCE_PADDING}d}"
@@ -44,6 +62,20 @@ class DocumentService:
         self.db = db
         self.company_id = company_id
         self.user_id = user_id
+
+    def _invalidate_document_cache(self, project_id: int = None):
+        """Invalidate document-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_document:tree:{self.company_id}:{project_id}"
+            )
+            cache.invalidate_pattern_distributed(
+                f"agcm_document:project:{self.company_id}:{project_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_document:*")
 
     # --- Folders ---
 
@@ -108,9 +140,12 @@ class DocumentService:
         self.db.add(folder)
         self.db.commit()
         self.db.refresh(folder)
+        self._invalidate_document_cache(data.project_id)
         return folder
 
-    def update_folder(self, folder_id: int, data: FolderUpdate) -> Optional[ProjectFolder]:
+    def update_folder(
+        self, folder_id: int, data: FolderUpdate
+    ) -> Optional[ProjectFolder]:
         """Update a folder (rename or move)."""
         folder = (
             self.db.query(ProjectFolder)
@@ -123,6 +158,7 @@ class DocumentService:
         if not folder:
             return None
 
+        project_id = folder.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(folder, key, value)
@@ -130,6 +166,7 @@ class DocumentService:
 
         self.db.commit()
         self.db.refresh(folder)
+        self._invalidate_document_cache(project_id)
         return folder
 
     def delete_folder(self, folder_id: int) -> bool:
@@ -144,8 +181,10 @@ class DocumentService:
         )
         if not folder:
             return False
+        project_id = folder.project_id
         self.db.delete(folder)
         self.db.commit()
+        self._invalidate_document_cache(project_id)
         return True
 
     # --- Documents ---
@@ -183,7 +222,12 @@ class DocumentService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(ProjectDocument.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(ProjectDocument.id.desc())
+            .offset(skip)
+            .limit(page_size)
+            .all()
+        )
 
         return {
             "items": items,
@@ -203,7 +247,13 @@ class DocumentService:
             .first()
         )
 
-    def create_document(self, data: DocumentCreate, file_name: str = None, file_url: str = None, document_id: int = None) -> ProjectDocument:
+    def create_document(
+        self,
+        data: DocumentCreate,
+        file_name: str = None,
+        file_url: str = None,
+        document_id: int = None,
+    ) -> ProjectDocument:
         """Create a new document record."""
         doc = ProjectDocument(
             company_id=self.company_id,
@@ -223,14 +273,18 @@ class DocumentService:
         self.db.add(doc)
         self.db.commit()
         self.db.refresh(doc)
+        self._invalidate_document_cache(data.project_id)
         return doc
 
-    def update_document(self, doc_id: int, data: DocumentUpdate) -> Optional[ProjectDocument]:
+    def update_document(
+        self, doc_id: int, data: DocumentUpdate
+    ) -> Optional[ProjectDocument]:
         """Update document metadata or status."""
         doc = self.get_document(doc_id)
         if not doc:
             return None
 
+        project_id = doc.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(doc, key, value)
@@ -238,6 +292,7 @@ class DocumentService:
 
         self.db.commit()
         self.db.refresh(doc)
+        self._invalidate_document_cache(project_id)
         return doc
 
     def delete_document(self, doc_id: int) -> bool:
@@ -245,6 +300,8 @@ class DocumentService:
         doc = self.get_document(doc_id)
         if not doc:
             return False
+        project_id = doc.project_id
         self.db.delete(doc)
         self.db.commit()
+        self._invalidate_document_cache(project_id)
         return True

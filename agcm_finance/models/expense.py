@@ -3,23 +3,23 @@
 import enum
 
 from sqlalchemy import (
-    Column, Enum, Float, ForeignKey, Integer, String, Index,
+    Column,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
-class ExpenseStatus(str, enum.Enum):
-    DRAFT = "draft"
-    SUBMITTED = "submitted"
-    APPROVED = "approved"
-    PAID = "paid"
-
-
-class Expense(Base, TimestampMixin, AuditMixin):
+class Expense(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Project expense with line items."""
+
     __tablename__ = "agcm_expenses"
     _description = "Project expenses with line items and approval workflow"
 
@@ -69,6 +69,7 @@ class Expense(Base, TimestampMixin, AuditMixin):
 
 class ExpenseLine(Base, TimestampMixin):
     """Line item for an expense."""
+
     __tablename__ = "agcm_expense_lines"
     _description = "Expense line items"
 
@@ -105,6 +106,4 @@ class ExpenseLine(Base, TimestampMixin):
     # Relationships
     expense = relationship("Expense", back_populates="lines")
 
-    __table_args__ = (
-        Index("ix_agcm_exl_expense", "expense_id"),
-    )
+    __table_args__ = (Index("ix_agcm_exl_expense", "expense_id"),)

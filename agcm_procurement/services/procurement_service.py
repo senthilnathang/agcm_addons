@@ -9,24 +9,53 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from addons.agcm_procurement.models.purchase_order import (
-    PurchaseOrder, PurchaseOrderLine, PurchaseOrderStatus,
+    PurchaseOrder,
+    PurchaseOrderLine,
+    PurchaseOrderStatus,
 )
 from addons.agcm_procurement.models.subcontract import (
-    Subcontract, SubcontractSOVLine, SubcontractComplianceDoc, SubcontractStatus,
+    Subcontract,
+    SubcontractSOVLine,
+    SubcontractComplianceDoc,
+    SubcontractStatus,
 )
 from addons.agcm_procurement.models.vendor_bill import (
-    VendorBill, VendorBillLine, VendorBillPayment, VendorBillStatus,
+    VendorBill,
+    VendorBillLine,
+    VendorBillPayment,
+    VendorBillStatus,
 )
 from addons.agcm_procurement.schemas.procurement import (
-    PurchaseOrderCreate, PurchaseOrderUpdate,
-    PurchaseOrderLineCreate, PurchaseOrderLineUpdate,
-    SubcontractCreate, SubcontractUpdate,
-    SubcontractSOVLineCreate, SubcontractSOVLineUpdate,
-    ComplianceDocCreate, ComplianceDocUpdate,
-    VendorBillCreate, VendorBillUpdate,
-    VendorBillLineCreate, VendorBillLineUpdate,
+    PurchaseOrderCreate,
+    PurchaseOrderUpdate,
+    PurchaseOrderLineCreate,
+    PurchaseOrderLineUpdate,
+    SubcontractCreate,
+    SubcontractUpdate,
+    SubcontractSOVLineCreate,
+    SubcontractSOVLineUpdate,
+    ComplianceDocCreate,
+    ComplianceDocUpdate,
+    VendorBillCreate,
+    VendorBillUpdate,
+    VendorBillLineCreate,
+    VendorBillLineUpdate,
     VendorBillPaymentCreate,
 )
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +86,7 @@ def _next_sequence(db: Session, model_class, company_id: int) -> str:
 
     num = 1
     if last and last[0]:
-        match = re.search(r'(\d+)$', last[0])
+        match = re.search(r"(\d+)$", last[0])
         if match:
             num = int(match.group(1)) + 1
 
@@ -72,6 +101,17 @@ class ProcurementService:
         self.company_id = company_id
         self.user_id = user_id
 
+    def _invalidate_procurement_cache(self, project_id: int = None):
+        """Invalidate procurement-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_procurement:project:{self.company_id}:{project_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_procurement:*")
+
     # =========================================================================
     # PURCHASE ORDERS
     # =========================================================================
@@ -84,8 +124,10 @@ class ProcurementService:
         status: Optional[str] = None,
         search: Optional[str] = None,
     ) -> dict:
+        page_size = min(page_size, 200)
         query = self.db.query(PurchaseOrder).filter(
             PurchaseOrder.company_id == self.company_id,
+            PurchaseOrder.is_deleted == False,
         )
 
         if project_id:
@@ -102,7 +144,9 @@ class ProcurementService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(PurchaseOrder.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(PurchaseOrder.id.desc()).offset(skip).limit(page_size).all()
+        )
 
         return {
             "items": items,
@@ -117,6 +161,7 @@ class ProcurementService:
             .filter(
                 PurchaseOrder.id == po_id,
                 PurchaseOrder.company_id == self.company_id,
+                PurchaseOrder.is_deleted == False,
             )
             .first()
         )
@@ -164,7 +209,7 @@ class ProcurementService:
         self.db.flush()
 
         # Create lines
-        for line_data in (data.lines or []):
+        for line_data in data.lines or []:
             line = PurchaseOrderLine(
                 po_id=po.id,
                 company_id=self.company_id,
@@ -174,7 +219,8 @@ class ProcurementService:
                 quantity=line_data.quantity,
                 unit=line_data.unit,
                 unit_cost=line_data.unit_cost,
-                total_cost=line_data.total_cost or (line_data.quantity * line_data.unit_cost),
+                total_cost=line_data.total_cost
+                or (line_data.quantity * line_data.unit_cost),
                 display_order=line_data.display_order,
                 notes=line_data.notes,
             )
@@ -186,7 +232,9 @@ class ProcurementService:
         self.db.refresh(po)
         return po
 
-    def update_purchase_order(self, po_id: int, data: PurchaseOrderUpdate) -> Optional[PurchaseOrder]:
+    def update_purchase_order(
+        self, po_id: int, data: PurchaseOrderUpdate
+    ) -> Optional[PurchaseOrder]:
         po = self.get_purchase_order(po_id)
         if not po:
             return None
@@ -221,7 +269,9 @@ class ProcurementService:
         self.db.refresh(po)
         return po
 
-    def receive_delivery(self, po_id: int, line_updates: list) -> Optional[PurchaseOrder]:
+    def receive_delivery(
+        self, po_id: int, line_updates: list
+    ) -> Optional[PurchaseOrder]:
         """Update received_qty on PO lines and recalculate PO status."""
         po = self.get_purchase_order(po_id)
         if not po:
@@ -259,7 +309,9 @@ class ProcurementService:
         self.db.refresh(po)
         return po
 
-    def create_po_from_estimate(self, estimate_id: int, vendor_name: str) -> Optional[PurchaseOrder]:
+    def create_po_from_estimate(
+        self, estimate_id: int, vendor_name: str
+    ) -> Optional[PurchaseOrder]:
         """Create a PO from an estimate's line items."""
         from addons.agcm_estimate.models.estimate import Estimate, EstimateLineItem
 
@@ -339,7 +391,9 @@ class ProcurementService:
 
     # -- PO Lines --
 
-    def create_po_line(self, data: PurchaseOrderLineCreate, po_id: int) -> Optional[PurchaseOrderLine]:
+    def create_po_line(
+        self, data: PurchaseOrderLineCreate, po_id: int
+    ) -> Optional[PurchaseOrderLine]:
         po = self.get_purchase_order(po_id)
         if not po:
             return None
@@ -364,7 +418,9 @@ class ProcurementService:
         self.db.refresh(line)
         return line
 
-    def update_po_line(self, line_id: int, data: PurchaseOrderLineUpdate) -> Optional[PurchaseOrderLine]:
+    def update_po_line(
+        self, line_id: int, data: PurchaseOrderLineUpdate
+    ) -> Optional[PurchaseOrderLine]:
         line = (
             self.db.query(PurchaseOrderLine)
             .join(PurchaseOrder)
@@ -425,8 +481,10 @@ class ProcurementService:
         status: Optional[str] = None,
         search: Optional[str] = None,
     ) -> dict:
+        page_size = min(page_size, 200)
         query = self.db.query(Subcontract).filter(
             Subcontract.company_id == self.company_id,
+            Subcontract.is_deleted == False,
         )
 
         if project_id:
@@ -443,7 +501,9 @@ class ProcurementService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(Subcontract.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(Subcontract.id.desc()).offset(skip).limit(page_size).all()
+        )
 
         return {
             "items": items,
@@ -458,6 +518,7 @@ class ProcurementService:
             .filter(
                 Subcontract.id == sc_id,
                 Subcontract.company_id == self.company_id,
+                Subcontract.is_deleted == False,
             )
             .first()
         )
@@ -503,7 +564,7 @@ class ProcurementService:
         self.db.add(sc)
         self.db.flush()
 
-        for line_data in (data.sov_lines or []):
+        for line_data in data.sov_lines or []:
             sov = SubcontractSOVLine(
                 subcontract_id=sc.id,
                 company_id=self.company_id,
@@ -525,7 +586,9 @@ class ProcurementService:
         self.db.refresh(sc)
         return sc
 
-    def update_subcontract(self, sc_id: int, data: SubcontractUpdate) -> Optional[Subcontract]:
+    def update_subcontract(
+        self, sc_id: int, data: SubcontractUpdate
+    ) -> Optional[Subcontract]:
         sc = self.get_subcontract(sc_id)
         if not sc:
             return None
@@ -561,7 +624,9 @@ class ProcurementService:
         self.db.refresh(sc)
         return sc
 
-    def update_sov_billing(self, sc_id: int, sov_updates: list) -> Optional[Subcontract]:
+    def update_sov_billing(
+        self, sc_id: int, sov_updates: list
+    ) -> Optional[Subcontract]:
         """Update billed_current on SOV lines and recalculate subcontract totals."""
         sc = self.get_subcontract(sc_id)
         if not sc:
@@ -581,7 +646,9 @@ class ProcurementService:
             )
             if sov:
                 sov.billed_current = update.get("billed_current", sov.billed_current)
-                sov.stored_materials = update.get("stored_materials", sov.stored_materials)
+                sov.stored_materials = update.get(
+                    "stored_materials", sov.stored_materials
+                )
                 self._calculate_sov_line(sov, sc.retainage_pct)
 
         self._recalculate_subcontract(sc)
@@ -592,8 +659,14 @@ class ProcurementService:
 
     def _calculate_sov_line(self, sov: SubcontractSOVLine, retainage_pct: float):
         """Recalculate computed fields on an SOV line."""
-        sov.total_completed = sov.billed_previous + sov.billed_current + sov.stored_materials
-        sov.pct_complete = (sov.total_completed / sov.scheduled_value * 100) if sov.scheduled_value > 0 else 0
+        sov.total_completed = (
+            sov.billed_previous + sov.billed_current + sov.stored_materials
+        )
+        sov.pct_complete = (
+            (sov.total_completed / sov.scheduled_value * 100)
+            if sov.scheduled_value > 0
+            else 0
+        )
         sov.retainage = sov.total_completed * (retainage_pct or 0) / 100.0
         sov.balance_to_finish = sov.scheduled_value - sov.total_completed
 
@@ -610,7 +683,9 @@ class ProcurementService:
 
     # -- SOV Lines --
 
-    def create_sov_line(self, data: SubcontractSOVLineCreate, subcontract_id: int) -> Optional[SubcontractSOVLine]:
+    def create_sov_line(
+        self, data: SubcontractSOVLineCreate, subcontract_id: int
+    ) -> Optional[SubcontractSOVLine]:
         sc = self.get_subcontract(subcontract_id)
         if not sc:
             return None
@@ -635,7 +710,9 @@ class ProcurementService:
         self.db.refresh(sov)
         return sov
 
-    def update_sov_line(self, line_id: int, data: SubcontractSOVLineUpdate) -> Optional[SubcontractSOVLine]:
+    def update_sov_line(
+        self, line_id: int, data: SubcontractSOVLineUpdate
+    ) -> Optional[SubcontractSOVLine]:
         sov = (
             self.db.query(SubcontractSOVLine)
             .join(Subcontract)
@@ -687,7 +764,9 @@ class ProcurementService:
 
     # -- Compliance Docs --
 
-    def create_compliance_doc(self, data: ComplianceDocCreate) -> Optional[SubcontractComplianceDoc]:
+    def create_compliance_doc(
+        self, data: ComplianceDocCreate
+    ) -> Optional[SubcontractComplianceDoc]:
         sc = self.get_subcontract(data.subcontract_id)
         if not sc:
             return None
@@ -708,7 +787,9 @@ class ProcurementService:
         self.db.refresh(doc)
         return doc
 
-    def update_compliance_doc(self, doc_id: int, data: ComplianceDocUpdate) -> Optional[SubcontractComplianceDoc]:
+    def update_compliance_doc(
+        self, doc_id: int, data: ComplianceDocUpdate
+    ) -> Optional[SubcontractComplianceDoc]:
         doc = (
             self.db.query(SubcontractComplianceDoc)
             .join(Subcontract)
@@ -758,8 +839,10 @@ class ProcurementService:
         record_type: Optional[str] = None,
         search: Optional[str] = None,
     ) -> dict:
+        page_size = min(page_size, 200)
         query = self.db.query(VendorBill).filter(
             VendorBill.company_id == self.company_id,
+            VendorBill.is_deleted == False,
         )
 
         if project_id:
@@ -794,6 +877,7 @@ class ProcurementService:
             .filter(
                 VendorBill.id == bill_id,
                 VendorBill.company_id == self.company_id,
+                VendorBill.is_deleted == False,
             )
             .first()
         )
@@ -840,7 +924,7 @@ class ProcurementService:
         self.db.add(bill)
         self.db.flush()
 
-        for line_data in (data.lines or []):
+        for line_data in data.lines or []:
             line = VendorBillLine(
                 bill_id=bill.id,
                 company_id=self.company_id,
@@ -863,7 +947,9 @@ class ProcurementService:
         self.db.refresh(bill)
         return bill
 
-    def update_vendor_bill(self, bill_id: int, data: VendorBillUpdate) -> Optional[VendorBill]:
+    def update_vendor_bill(
+        self, bill_id: int, data: VendorBillUpdate
+    ) -> Optional[VendorBill]:
         bill = self.get_vendor_bill(bill_id)
         if not bill:
             return None
@@ -896,7 +982,9 @@ class ProcurementService:
         self.db.refresh(bill)
         return bill
 
-    def record_payment(self, bill_id: int, data: VendorBillPaymentCreate) -> Optional[VendorBillPayment]:
+    def record_payment(
+        self, bill_id: int, data: VendorBillPaymentCreate
+    ) -> Optional[VendorBillPayment]:
         """Record a payment against a vendor bill."""
         bill = self.get_vendor_bill(bill_id)
         if not bill:
@@ -980,17 +1068,21 @@ class ProcurementService:
         for po in pos:
             # Score based on amount similarity
             if po.total_amount > 0:
-                diff_pct = abs(po.total_amount - bill.total_amount) / po.total_amount * 100
+                diff_pct = (
+                    abs(po.total_amount - bill.total_amount) / po.total_amount * 100
+                )
             else:
                 diff_pct = 100
-            matches.append({
-                "po_id": po.id,
-                "po_number": po.po_number,
-                "sequence_name": po.sequence_name,
-                "vendor_name": po.vendor_name,
-                "total_amount": po.total_amount,
-                "diff_pct": round(diff_pct, 1),
-            })
+            matches.append(
+                {
+                    "po_id": po.id,
+                    "po_number": po.po_number,
+                    "sequence_name": po.sequence_name,
+                    "vendor_name": po.vendor_name,
+                    "total_amount": po.total_amount,
+                    "diff_pct": round(diff_pct, 1),
+                }
+            )
 
         matches.sort(key=lambda m: m["diff_pct"])
         return {"bill_id": bill_id, "matches": matches[:5]}
@@ -1018,7 +1110,9 @@ class ProcurementService:
 
     # -- Bill Lines --
 
-    def create_bill_line(self, data: VendorBillLineCreate, bill_id: int) -> Optional[VendorBillLine]:
+    def create_bill_line(
+        self, data: VendorBillLineCreate, bill_id: int
+    ) -> Optional[VendorBillLine]:
         bill = self.get_vendor_bill(bill_id)
         if not bill:
             return None
@@ -1044,7 +1138,9 @@ class ProcurementService:
         self.db.refresh(line)
         return line
 
-    def update_bill_line(self, line_id: int, data: VendorBillLineUpdate) -> Optional[VendorBillLine]:
+    def update_bill_line(
+        self, line_id: int, data: VendorBillLineUpdate
+    ) -> Optional[VendorBillLine]:
         line = (
             self.db.query(VendorBillLine)
             .join(VendorBill)

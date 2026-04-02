@@ -58,4 +58,5 @@ class BIMElement(Base):
         Index("ix_agcm_bim_element_model", "model_id"),
         Index("ix_agcm_bim_element_ifc_type", "ifc_type"),
         Index("ix_agcm_bim_element_global_id", "global_id"),
+        {"extend_existing": True},
     )

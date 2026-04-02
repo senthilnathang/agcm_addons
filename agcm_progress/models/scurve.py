@@ -1,14 +1,20 @@
 """S-Curve model for periodic progress snapshots"""
 
 from sqlalchemy import (
-    Column, Date, Float, ForeignKey, Index, Integer, UniqueConstraint,
+    Column,
+    Date,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    UniqueConstraint,
 )
 
 from app.db.base import Base
-from app.models.base import TimestampMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class SCurveData(Base, TimestampMixin):
+class SCurveData(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Periodic progress snapshot for S-curve visualization."""
 
     __tablename__ = "agcm_scurve_data"

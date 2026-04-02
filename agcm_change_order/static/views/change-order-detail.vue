@@ -16,6 +16,7 @@ import {
   Statistic,
   Table,
   Tag,
+  Tabs,
 } from 'ant-design-vue';
 import {
   ArrowLeftOutlined,
@@ -26,16 +27,19 @@ import {
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
+import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMChangeOrderDetail' });
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 const BASE = '/agcm_change_order';
 
 const coId = ref(Number(route.query.id));
 const co = ref(null);
 const loading = ref(false);
+const activeTab = ref('details');
 
 const statusColors = {
   draft: 'default',
@@ -149,26 +153,40 @@ onMounted(fetchChangeOrder);
         </div>
       </Card>
 
-      <!-- Line Items -->
-      <Card title="Line Items" class="mt-4">
-        <Table
-          :columns="lineColumns"
-          :data-source="co.lines || []"
-          row-key="id"
-          size="small"
-          :pagination="false"
-          bordered
-        >
-          <template #bodyCell="{ column, record, index }">
-            <template v-if="column.key === 'index'">{{ index + 1 }}</template>
-            <template v-else-if="column.key === 'unit_cost'">{{ formatCurrency(record.unit_cost) }}</template>
-            <template v-else-if="column.key === 'total_cost'">{{ formatCurrency(record.total_cost) }}</template>
-          </template>
-        </Table>
+      <!-- Tabs for Details and Activity -->
+      <Card class="mt-4">
+        <Tabs v-model:activeKey="activeTab">
+          <Tabs.TabPane key="details" tab="Line Items">
+            <Table
+              :columns="lineColumns"
+              :data-source="co.lines || []"
+              row-key="id"
+              size="small"
+              :pagination="false"
+              bordered
+            >
+              <template #bodyCell="{ column, record, index }">
+                <template v-if="column.key === 'index'">{{ index + 1 }}</template>
+                <template v-else-if="column.key === 'unit_cost'">{{ formatCurrency(record.unit_cost) }}</template>
+                <template v-else-if="column.key === 'total_cost'">{{ formatCurrency(record.total_cost) }}</template>
+              </template>
+            </Table>
 
-        <div class="flex justify-end mt-4">
-          <Statistic title="Total Line Cost" :value="formatCurrency(lineTotalCost)" style="text-align: right;" />
-        </div>
+            <div class="flex justify-end mt-4">
+              <Statistic title="Total Line Cost" :value="formatCurrency(lineTotalCost)" style="text-align: right;" />
+            </div>
+          </Tabs.TabPane>
+          <Tabs.TabPane key="activity" tab="Activity">
+            <ActivityThread
+              :model-name="'agcm_change_orders'"
+              :record-id="coId"
+              :access-token="userStore.accessToken"
+              :api-base="'/api/v1'"
+              :show-messages="true"
+              :show-activities="true"
+            />
+          </Tabs.TabPane>
+        </Tabs>
       </Card>
     </template>
   </Page>

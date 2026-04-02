@@ -8,13 +8,39 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from addons.agcm_safety.models.checklist import ChecklistTemplate, ChecklistTemplateItem
-from addons.agcm_safety.models.inspection import SafetyInspection as Inspection, SafetyInspectionItem as InspectionItem
+from addons.agcm_safety.models.inspection import (
+    SafetyInspection as Inspection,
+    SafetyInspectionItem as InspectionItem,
+)
 from addons.agcm_safety.models.punch_list import PunchListItem
 from addons.agcm_safety.models.incident import IncidentReport
-from addons.agcm_safety.schemas.checklist import ChecklistTemplateCreate, ChecklistTemplateUpdate
+from addons.agcm_safety.schemas.checklist import (
+    ChecklistTemplateCreate,
+    ChecklistTemplateUpdate,
+)
 from addons.agcm_safety.schemas.inspection import InspectionCreate, InspectionUpdate
-from addons.agcm_safety.schemas.punch_list import PunchListItemCreate, PunchListItemUpdate
-from addons.agcm_safety.schemas.incident import IncidentReportCreate, IncidentReportUpdate
+from addons.agcm_safety.schemas.punch_list import (
+    PunchListItemCreate,
+    PunchListItemUpdate,
+)
+from addons.agcm_safety.schemas.incident import (
+    IncidentReportCreate,
+    IncidentReportUpdate,
+)
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +60,15 @@ def _next_sequence(db: Session, model_class, company_id: int) -> str:
     prefix, padding = config
     last = (
         db.query(model_class.sequence_name)
-        .filter(model_class.company_id == company_id, model_class.sequence_name.isnot(None))
+        .filter(
+            model_class.company_id == company_id, model_class.sequence_name.isnot(None)
+        )
         .order_by(model_class.id.desc())
         .first()
     )
     num = 1
     if last and last[0]:
-        match = re.search(r'(\d+)$', last[0])
+        match = re.search(r"(\d+)$", last[0])
         if match:
             num = int(match.group(1)) + 1
     return f"{prefix}{num:0{padding}d}"
@@ -53,6 +81,17 @@ class SafetyService:
         self.db = db
         self.company_id = company_id
         self.user_id = user_id
+
+    def _invalidate_safety_cache(self, project_id: int = None):
+        """Invalidate safety-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_safety:project:{self.company_id}:{project_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_safety:*")
 
     # =========================================================================
     # CHECKLIST TEMPLATES
@@ -80,13 +119,21 @@ class SafetyService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(ChecklistTemplate.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(ChecklistTemplate.id.desc())
+            .offset(skip)
+            .limit(page_size)
+            .all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_template(self, template_id: int) -> Optional[ChecklistTemplate]:
         return (
             self.db.query(ChecklistTemplate)
-            .filter(ChecklistTemplate.id == template_id, ChecklistTemplate.company_id == self.company_id)
+            .filter(
+                ChecklistTemplate.id == template_id,
+                ChecklistTemplate.company_id == self.company_id,
+            )
             .first()
         )
 
@@ -136,16 +183,23 @@ class SafetyService:
                     template_id=tpl.id,
                     company_id=self.company_id,
                     description=item_data.description,
-                    required=item_data.required if item_data.required is not None else True,
-                    display_order=item_data.display_order if item_data.display_order else idx,
+                    required=item_data.required
+                    if item_data.required is not None
+                    else True,
+                    display_order=item_data.display_order
+                    if item_data.display_order
+                    else idx,
                 )
                 self.db.add(item)
 
         self.db.commit()
         self.db.refresh(tpl)
+        self._invalidate_safety_cache()
         return tpl
 
-    def update_template(self, template_id: int, data: ChecklistTemplateUpdate) -> Optional[ChecklistTemplate]:
+    def update_template(
+        self, template_id: int, data: ChecklistTemplateUpdate
+    ) -> Optional[ChecklistTemplate]:
         tpl = self.get_template(template_id)
         if not tpl:
             return None
@@ -173,6 +227,7 @@ class SafetyService:
 
         self.db.commit()
         self.db.refresh(tpl)
+        self._invalidate_safety_cache()
         return tpl
 
     def delete_template(self, template_id: int) -> bool:
@@ -181,6 +236,7 @@ class SafetyService:
             return False
         self.db.delete(tpl)
         self.db.commit()
+        self._invalidate_safety_cache()
         return True
 
     # =========================================================================
@@ -196,7 +252,9 @@ class SafetyService:
         page_size: int = 20,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(Inspection).filter(Inspection.company_id == self.company_id)
+        query = self.db.query(Inspection).filter(
+            Inspection.company_id == self.company_id
+        )
         if project_id:
             query = query.filter(Inspection.project_id == project_id)
         if status:
@@ -217,7 +275,9 @@ class SafetyService:
     def get_inspection(self, inspection_id: int) -> Optional[Inspection]:
         return (
             self.db.query(Inspection)
-            .filter(Inspection.id == inspection_id, Inspection.company_id == self.company_id)
+            .filter(
+                Inspection.id == inspection_id, Inspection.company_id == self.company_id
+            )
             .first()
         )
 
@@ -278,15 +338,20 @@ class SafetyService:
                     result=item_data.result,
                     notes=item_data.notes,
                     photo_url=item_data.photo_url,
-                    display_order=item_data.display_order if item_data.display_order else idx,
+                    display_order=item_data.display_order
+                    if item_data.display_order
+                    else idx,
                 )
                 self.db.add(item)
 
         self.db.commit()
         self.db.refresh(insp)
+        self._invalidate_safety_cache(data.project_id)
         return insp
 
-    def create_inspection_from_template(self, project_id: int, template_id: int, data: InspectionCreate) -> Optional[Inspection]:
+    def create_inspection_from_template(
+        self, project_id: int, template_id: int, data: InspectionCreate
+    ) -> Optional[Inspection]:
         """Create an inspection pre-populated from a checklist template."""
         tpl = self.get_template(template_id)
         if not tpl:
@@ -327,13 +392,17 @@ class SafetyService:
 
         self.db.commit()
         self.db.refresh(insp)
+        self._invalidate_safety_cache(project_id)
         return insp
 
-    def update_inspection(self, inspection_id: int, data: InspectionUpdate) -> Optional[Inspection]:
+    def update_inspection(
+        self, inspection_id: int, data: InspectionUpdate
+    ) -> Optional[Inspection]:
         insp = self.get_inspection(inspection_id)
         if not insp:
             return None
 
+        project_id = insp.project_id
         update_data = data.model_dump(exclude_unset=True)
         items_data = update_data.pop("items", None)
 
@@ -359,23 +428,33 @@ class SafetyService:
 
         self.db.commit()
         self.db.refresh(insp)
+        self._invalidate_safety_cache(project_id)
         return insp
 
     def start_inspection(self, inspection_id: int) -> Optional[Inspection]:
         insp = self.get_inspection(inspection_id)
         if not insp:
             return None
+        project_id = insp.project_id
         insp.status = "in_progress"
         insp.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(insp)
+        self._invalidate_safety_cache(project_id)
         return insp
 
-    def complete_inspection(self, inspection_id: int, overall_result: str) -> Optional[Inspection]:
+    def complete_inspection(
+        self, inspection_id: int, overall_result: str
+    ) -> Optional[Inspection]:
         insp = self.get_inspection(inspection_id)
         if not insp:
             return None
-        insp.status = "passed" if overall_result == "pass" else ("failed" if overall_result == "fail" else "conditional")
+        project_id = insp.project_id
+        insp.status = (
+            "passed"
+            if overall_result == "pass"
+            else ("failed" if overall_result == "fail" else "conditional")
+        )
         insp.overall_result = overall_result
         insp.completed_date = date.today()
         insp.updated_by = self.user_id
@@ -394,7 +473,9 @@ class SafetyService:
             for item in failed_items:
                 punch = PunchListItem(
                     company_id=self.company_id,
-                    sequence_name=_next_sequence(self.db, PunchListItem, self.company_id),
+                    sequence_name=_next_sequence(
+                        self.db, PunchListItem, self.company_id
+                    ),
                     project_id=insp.project_id,
                     title=f"Inspection #{insp.sequence_name}: {item.description}",
                     description=item.notes or "",
@@ -412,14 +493,17 @@ class SafetyService:
         self.db.refresh(insp)
         # Attach punch_count to the returned object for the API layer
         insp._punch_count = punch_count
+        self._invalidate_safety_cache(project_id)
         return insp
 
     def delete_inspection(self, inspection_id: int) -> bool:
         insp = self.get_inspection(inspection_id)
         if not insp:
             return False
+        project_id = insp.project_id
         self.db.delete(insp)
         self.db.commit()
+        self._invalidate_safety_cache(project_id)
         return True
 
     # =========================================================================
@@ -436,7 +520,9 @@ class SafetyService:
         page_size: int = 20,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(PunchListItem).filter(PunchListItem.company_id == self.company_id)
+        query = self.db.query(PunchListItem).filter(
+            PunchListItem.company_id == self.company_id
+        )
         if project_id:
             query = query.filter(PunchListItem.project_id == project_id)
         if status:
@@ -452,13 +538,17 @@ class SafetyService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(PunchListItem.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(PunchListItem.id.desc()).offset(skip).limit(page_size).all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_punch_item(self, item_id: int) -> Optional[PunchListItem]:
         return (
             self.db.query(PunchListItem)
-            .filter(PunchListItem.id == item_id, PunchListItem.company_id == self.company_id)
+            .filter(
+                PunchListItem.id == item_id, PunchListItem.company_id == self.company_id
+            )
             .first()
         )
 
@@ -482,13 +572,17 @@ class SafetyService:
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
+        self._invalidate_safety_cache(data.project_id)
         return item
 
-    def update_punch_item(self, item_id: int, data: PunchListItemUpdate) -> Optional[PunchListItem]:
+    def update_punch_item(
+        self, item_id: int, data: PunchListItemUpdate
+    ) -> Optional[PunchListItem]:
         item = self.get_punch_item(item_id)
         if not item:
             return None
 
+        project_id = item.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(item, key, value)
@@ -496,49 +590,60 @@ class SafetyService:
 
         self.db.commit()
         self.db.refresh(item)
+        self._invalidate_safety_cache(project_id)
         return item
 
-    def assign_punch_item(self, item_id: int, assigned_to: int) -> Optional[PunchListItem]:
+    def assign_punch_item(
+        self, item_id: int, assigned_to: int
+    ) -> Optional[PunchListItem]:
         item = self.get_punch_item(item_id)
         if not item:
             return None
+        project_id = item.project_id
         item.assigned_to = assigned_to
         if item.status == "open":
             item.status = "in_progress"
         item.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(item)
+        self._invalidate_safety_cache(project_id)
         return item
 
     def complete_punch_item(self, item_id: int) -> Optional[PunchListItem]:
         item = self.get_punch_item(item_id)
         if not item:
             return None
+        project_id = item.project_id
         item.status = "completed"
         item.completed_date = date.today()
         item.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(item)
+        self._invalidate_safety_cache(project_id)
         return item
 
     def verify_punch_item(self, item_id: int) -> Optional[PunchListItem]:
         item = self.get_punch_item(item_id)
         if not item:
             return None
+        project_id = item.project_id
         item.status = "verified"
         item.verified_date = date.today()
         item.verified_by = self.user_id
         item.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(item)
+        self._invalidate_safety_cache(project_id)
         return item
 
     def delete_punch_item(self, item_id: int) -> bool:
         item = self.get_punch_item(item_id)
         if not item:
             return False
+        project_id = item.project_id
         self.db.delete(item)
         self.db.commit()
+        self._invalidate_safety_cache(project_id)
         return True
 
     # =========================================================================
@@ -555,7 +660,9 @@ class SafetyService:
         page_size: int = 20,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(IncidentReport).filter(IncidentReport.company_id == self.company_id)
+        query = self.db.query(IncidentReport).filter(
+            IncidentReport.company_id == self.company_id
+        )
         if project_id:
             query = query.filter(IncidentReport.project_id == project_id)
         if severity:
@@ -571,13 +678,18 @@ class SafetyService:
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(IncidentReport.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(IncidentReport.id.desc()).offset(skip).limit(page_size).all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_incident(self, incident_id: int) -> Optional[IncidentReport]:
         return (
             self.db.query(IncidentReport)
-            .filter(IncidentReport.id == incident_id, IncidentReport.company_id == self.company_id)
+            .filter(
+                IncidentReport.id == incident_id,
+                IncidentReport.company_id == self.company_id,
+            )
             .first()
         )
 
@@ -605,13 +717,17 @@ class SafetyService:
         self.db.add(incident)
         self.db.commit()
         self.db.refresh(incident)
+        self._invalidate_safety_cache(data.project_id)
         return incident
 
-    def update_incident(self, incident_id: int, data: IncidentReportUpdate) -> Optional[IncidentReport]:
+    def update_incident(
+        self, incident_id: int, data: IncidentReportUpdate
+    ) -> Optional[IncidentReport]:
         incident = self.get_incident(incident_id)
         if not incident:
             return None
 
+        project_id = incident.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(incident, key, value)
@@ -619,12 +735,16 @@ class SafetyService:
 
         self.db.commit()
         self.db.refresh(incident)
+        self._invalidate_safety_cache(project_id)
         return incident
 
-    def investigate_incident(self, incident_id: int, root_cause: str, corrective_action: str) -> Optional[IncidentReport]:
+    def investigate_incident(
+        self, incident_id: int, root_cause: str, corrective_action: str
+    ) -> Optional[IncidentReport]:
         incident = self.get_incident(incident_id)
         if not incident:
             return None
+        project_id = incident.project_id
         incident.status = "investigating"
         incident.investigated_by = self.user_id
         incident.investigation_date = date.today()
@@ -633,24 +753,31 @@ class SafetyService:
         incident.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(incident)
+        self._invalidate_safety_cache(project_id)
         return incident
 
-    def close_incident(self, incident_id: int, days_lost: int = 0) -> Optional[IncidentReport]:
+    def close_incident(
+        self, incident_id: int, days_lost: int = 0
+    ) -> Optional[IncidentReport]:
         incident = self.get_incident(incident_id)
         if not incident:
             return None
+        project_id = incident.project_id
         incident.status = "closed"
         incident.closed_date = date.today()
         incident.days_lost = days_lost
         incident.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(incident)
+        self._invalidate_safety_cache(project_id)
         return incident
 
     def delete_incident(self, incident_id: int) -> bool:
         incident = self.get_incident(incident_id)
         if not incident:
             return False
+        project_id = incident.project_id
         self.db.delete(incident)
         self.db.commit()
+        self._invalidate_safety_cache(project_id)
         return True

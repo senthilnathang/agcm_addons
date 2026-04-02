@@ -3,7 +3,16 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Boolean, Index,
+    Column,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Boolean,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
@@ -41,6 +50,7 @@ class Weather(Base, TimestampMixin):
     Migrated from Odoo 'weather' model.
     Also used by the CRON-based auto-post system.
     """
+
     __tablename__ = "agcm_weather"
     _description = "Manual weather observations for daily logs"
 
@@ -60,12 +70,12 @@ class Weather(Base, TimestampMixin):
     # Weather data
     temperature = Column(Float, default=0.0, nullable=True)
     temperature_type = Column(
-        Enum(TemperatureUnit),
+        Enum(TemperatureUnit, values_callable=lambda e: [m.value for m in e]),
         default=TemperatureUnit.FAHRENHEIT,
         nullable=True,
     )
     climate_type = Column(
-        Enum(ClimateType),
+        Enum(ClimateType, values_callable=lambda e: [m.value for m in e]),
         default=ClimateType.CLEAR,
         nullable=True,
     )
@@ -101,12 +111,12 @@ class Weather(Base, TimestampMixin):
 
     # Relationships
     company = relationship("Company", foreign_keys=[company_id], lazy="select")
-    dailylog = relationship("agcm_daily_activity_logs", back_populates="weather_lines", lazy="select")
+    dailylog = relationship(
+        "agcm_daily_activity_logs", back_populates="weather_lines", lazy="select"
+    )
     project = relationship("agcm_projects", foreign_keys=[project_id], lazy="select")
 
-    __table_args__ = (
-        Index("ix_agcm_weather_dailylog", "dailylog_id"),
-    )
+    __table_args__ = (Index("ix_agcm_weather_dailylog", "dailylog_id"),)
 
 
 class WeatherForecast(Base, TimestampMixin):
@@ -116,6 +126,7 @@ class WeatherForecast(Base, TimestampMixin):
     Populated from weather.gov (future/present) or open-meteo (historical).
     6 time slots per day: 6am, 9am, 12pm, 3pm, 6pm, 9pm.
     """
+
     __tablename__ = "agcm_weather_forecasts"
     _description = "Auto-fetched weather forecast data at 3-hour intervals"
 
@@ -135,7 +146,7 @@ class WeatherForecast(Base, TimestampMixin):
     # Weather data
     temperature = Column(Float, default=0.0, nullable=True)
     temperature_type = Column(
-        Enum(TemperatureUnit),
+        Enum(TemperatureUnit, values_callable=lambda e: [m.value for m in e]),
         default=TemperatureUnit.FAHRENHEIT,
         nullable=True,
     )
@@ -162,7 +173,11 @@ class WeatherForecast(Base, TimestampMixin):
 
     # Relationships
     company = relationship("Company", foreign_keys=[company_id], lazy="select")
-    dailylog = relationship("agcm_daily_activity_logs", back_populates="weather_forecast_lines", lazy="select")
+    dailylog = relationship(
+        "agcm_daily_activity_logs",
+        back_populates="weather_forecast_lines",
+        lazy="select",
+    )
     project = relationship("agcm_projects", foreign_keys=[project_id], lazy="select")
 
     __table_args__ = (

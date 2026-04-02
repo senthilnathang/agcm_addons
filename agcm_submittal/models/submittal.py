@@ -3,18 +3,27 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, DateTime, Enum, ForeignKey, Integer, String, Table, Text,
+    Column,
+    Date,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
     Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+
 
 class SubmittalStatus(str, enum.Enum):
     DRAFT = "draft"
@@ -67,8 +76,10 @@ agcm_submittal_label_rel = Table(
 # Submittal Packages
 # ---------------------------------------------------------------------------
 
+
 class SubmittalPackage(Base, TimestampMixin):
     """Grouping container for related submittals"""
+
     __tablename__ = "agcm_submittal_packages"
     _description = "Submittal packages for grouping related submittals"
 
@@ -95,8 +106,10 @@ class SubmittalPackage(Base, TimestampMixin):
 # Submittal Types
 # ---------------------------------------------------------------------------
 
+
 class SubmittalType(Base, TimestampMixin):
     """Type classification (product data, shop drawings, samples, etc.)"""
+
     __tablename__ = "agcm_submittal_types"
     _description = "Submittal type classifications"
 
@@ -116,8 +129,10 @@ class SubmittalType(Base, TimestampMixin):
 # Submittal Labels
 # ---------------------------------------------------------------------------
 
+
 class SubmittalLabel(Base, TimestampMixin):
     """Color-coded labels for categorizing submittals"""
+
     __tablename__ = "agcm_submittal_labels"
     _description = "Submittal color-coded labels"
 
@@ -138,8 +153,10 @@ class SubmittalLabel(Base, TimestampMixin):
 # Submittal Approvers
 # ---------------------------------------------------------------------------
 
+
 class SubmittalApprover(Base, TimestampMixin):
     """Multi-step approval chain entry"""
+
     __tablename__ = "agcm_submittal_approvers"
     _description = "Submittal approval chain entries"
 
@@ -178,8 +195,10 @@ class SubmittalApprover(Base, TimestampMixin):
 # Core Submittal
 # ---------------------------------------------------------------------------
 
-class Submittal(Base, TimestampMixin, AuditMixin):
+
+class Submittal(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Core submittal record"""
+
     __tablename__ = "agcm_submittals"
     _description = "Construction submittal records"
 

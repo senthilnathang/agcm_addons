@@ -6,11 +6,20 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db, get_current_user, get_effective_company_id, PaginationParams, get_pagination
+from app.api.deps import (
+    get_db,
+    get_current_user,
+    get_effective_company_id,
+    PaginationParams,
+    get_pagination,
+)
 
 from addons.agcm_schedule.schemas.schedule import (
-    TaskCreate, TaskUpdate, TaskResponse,
-    DependencyCreate, DependencyResponse,
+    TaskCreate,
+    TaskUpdate,
+    TaskResponse,
+    DependencyCreate,
+    DependencyResponse,
 )
 from addons.agcm_schedule.services.schedule_service import ScheduleService
 
@@ -29,6 +38,7 @@ def _get_service(db: Session, current_user) -> ScheduleService:
 # =============================================================================
 # TASKS
 # =============================================================================
+
 
 @router.get("/tasks", response_model=None)
 async def list_tasks(
@@ -50,7 +60,9 @@ async def list_tasks(
         page=pagination.page,
         page_size=pagination.page_size,
     )
-    result["items"] = [TaskResponse.model_validate(t).model_dump() for t in result["items"]]
+    result["items"] = [
+        TaskResponse.model_validate(t).model_dump() for t in result["items"]
+    ]
     return result
 
 
@@ -79,6 +91,7 @@ async def create_task(
     task = svc.create_task(data)
     try:
         from addons.agcm.services.realtime_events import agcm_realtime
+
         await agcm_realtime.task_created(db, task)
     except Exception:
         pass
@@ -101,6 +114,7 @@ async def update_task(
         raise HTTPException(status_code=404, detail="Task not found")
     try:
         from addons.agcm.services.realtime_events import agcm_realtime
+
         new_status = str(task.status) if task.status else None
         if old_status and new_status and old_status != new_status:
             await agcm_realtime.task_status_changed(db, task, old_status, new_status)
@@ -115,10 +129,24 @@ async def delete_task(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),
 ):
-    """Delete a task."""
+    """Soft delete a task."""
     svc = _get_service(db, current_user)
     if not svc.delete_task(task_id):
         raise HTTPException(status_code=404, detail="Task not found")
+
+
+@router.post("/tasks/{task_id}/restore", response_model=None)
+async def restore_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Restore a soft-deleted task."""
+    svc = _get_service(db, current_user)
+    task = svc.restore_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found or not deleted")
+    return TaskResponse.model_validate(task).model_dump()
 
 
 @router.post("/tasks/{task_id}/progress", response_model=None)
@@ -137,8 +165,11 @@ async def update_task_progress(
         raise HTTPException(status_code=404, detail="Task not found")
     try:
         from addons.agcm.services.realtime_events import agcm_realtime
+
         if old_progress != body.progress:
-            await agcm_realtime.task_progress_changed(db, task, old_progress, body.progress)
+            await agcm_realtime.task_progress_changed(
+                db, task, old_progress, body.progress
+            )
     except Exception:
         pass
     return TaskResponse.model_validate(task).model_dump()
@@ -147,6 +178,7 @@ async def update_task_progress(
 # =============================================================================
 # DEPENDENCIES
 # =============================================================================
+
 
 @router.get("/dependencies", response_model=None)
 async def list_dependencies(

@@ -3,24 +3,25 @@
 import enum
 
 from sqlalchemy import (
-    Boolean, Column, Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text, Index,
+    Boolean,
+    Column,
+    Date,
+    DateTime,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
-class ProposalStatus(str, enum.Enum):
-    DRAFT = "draft"
-    SENT = "sent"
-    VIEWED = "viewed"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    EXPIRED = "expired"
-
-
-class Proposal(Base, TimestampMixin, AuditMixin):
+class Proposal(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Client-facing proposal document generated from an estimate."""
 
     __tablename__ = "agcm_proposals"

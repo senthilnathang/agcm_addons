@@ -3,12 +3,20 @@
 import enum
 
 from sqlalchemy import (
-    Boolean, Column, Date, Enum, ForeignKey, Integer, String, Text, Index,
+    Boolean,
+    Column,
+    Date,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
 class IncidentSeverity(str, enum.Enum):
@@ -26,10 +34,13 @@ class IncidentStatus(str, enum.Enum):
     CLOSED = "closed"
 
 
-class IncidentReport(Base, TimestampMixin, AuditMixin):
+class IncidentReport(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Safety incident report with investigation tracking."""
+
     __tablename__ = "agcm_incident_reports"
-    _description = "Safety incident reports with severity, investigation, and OSHA tracking"
+    _description = (
+        "Safety incident reports with severity, investigation, and OSHA tracking"
+    )
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
 

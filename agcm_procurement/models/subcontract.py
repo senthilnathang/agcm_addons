@@ -3,50 +3,23 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, Enum, Float, ForeignKey, Integer, String, Text, Index,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
-class SubcontractStatus(str, enum.Enum):
-    DRAFT = "draft"
-    PENDING_APPROVAL = "pending_approval"
-    APPROVED = "approved"
-    ACTIVE = "active"
-    COMPLETE = "complete"
-    CLOSED = "closed"
-    CANCELLED = "cancelled"
-
-
-class SOVSourceType(str, enum.Enum):
-    ORIGINAL = "original"
-    CHANGE_ORDER = "change_order"
-
-
-class ComplianceDocType(str, enum.Enum):
-    INSURANCE_COI = "insurance_coi"
-    WORKERS_COMP = "workers_comp"
-    BOND = "bond"
-    LICENSE = "license"
-    PERMIT = "permit"
-    LIEN_WAIVER = "lien_waiver"
-    W9 = "w9"
-    SAFETY_CERT = "safety_cert"
-    OTHER = "other"
-
-
-class ComplianceDocStatus(str, enum.Enum):
-    REQUIRED = "required"
-    SUBMITTED = "submitted"
-    APPROVED = "approved"
-    EXPIRED = "expired"
-    REJECTED = "rejected"
-
-
-class Subcontract(Base, TimestampMixin, AuditMixin):
+class Subcontract(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Subcontract for a construction project."""
 
     __tablename__ = "agcm_subcontracts"

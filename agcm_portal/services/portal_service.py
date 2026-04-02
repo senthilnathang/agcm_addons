@@ -7,18 +7,43 @@ from typing import Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
-from addons.agcm_portal.models.selection import Selection, SelectionOption, SelectionStatus
+from addons.agcm_portal.models.selection import (
+    Selection,
+    SelectionOption,
+    SelectionStatus,
+)
 from addons.agcm_portal.models.bid import BidPackage, BidSubmission, BidStatus
 from addons.agcm_portal.models.portal_config import PortalConfig
 from addons.agcm_portal.schemas.selection import (
-    SelectionCreate, SelectionUpdate,
-    SelectionOptionCreate, SelectionOptionUpdate,
+    SelectionCreate,
+    SelectionUpdate,
+    SelectionOptionCreate,
+    SelectionOptionUpdate,
 )
 from addons.agcm_portal.schemas.bid import (
-    BidPackageCreate, BidPackageUpdate,
-    BidSubmissionCreate, BidSubmissionUpdate,
+    BidPackageCreate,
+    BidPackageUpdate,
+    BidSubmissionCreate,
+    BidSubmissionUpdate,
 )
-from addons.agcm_portal.schemas.portal_config import PortalConfigCreate, PortalConfigUpdate
+from addons.agcm_portal.schemas.portal_config import (
+    PortalConfigCreate,
+    PortalConfigUpdate,
+)
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +56,7 @@ SEQUENCE_CONFIG = {
 def _next_bid_sequence(db: Session, company_id: int) -> str:
     """Generate next bid package sequence: BID00001, BID00002, etc."""
     import re
+
     prefix, padding = SEQUENCE_CONFIG["agcm_bid_packages"]
     last = (
         db.query(BidPackage.sequence_name)
@@ -41,7 +67,7 @@ def _next_bid_sequence(db: Session, company_id: int) -> str:
     )
     num = 1
     if last and last[0]:
-        match = re.search(r'(\d+)$', last[0])
+        match = re.search(r"(\d+)$", last[0])
         if match:
             num = int(match.group(1)) + 1
     return f"{prefix}{num:0{padding}d}"
@@ -54,6 +80,17 @@ class PortalService:
         self.db = db
         self.company_id = company_id
         self.user_id = user_id
+
+    def _invalidate_portal_cache(self, project_id: int = None):
+        """Invalidate portal-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_portal:project:{self.company_id}:{project_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_portal:*")
 
     # =========================================================================
     # SELECTIONS
@@ -129,7 +166,7 @@ class PortalService:
         self.db.add(selection)
         self.db.flush()
 
-        for opt_data in (data.options or []):
+        for opt_data in data.options or []:
             option = SelectionOption(
                 selection_id=selection.id,
                 company_id=self.company_id,
@@ -147,9 +184,12 @@ class PortalService:
 
         self.db.commit()
         self.db.refresh(selection)
+        self._invalidate_portal_cache(data.project_id)
         return selection
 
-    def update_selection(self, selection_id: int, data: SelectionUpdate) -> Optional[Selection]:
+    def update_selection(
+        self, selection_id: int, data: SelectionUpdate
+    ) -> Optional[Selection]:
         """Update a selection with partial data."""
         selection = self.get_selection(selection_id)
         if not selection:
@@ -173,7 +213,9 @@ class PortalService:
         self.db.commit()
         return True
 
-    def approve_selection(self, selection_id: int, option_id: int, decided_by: str = None) -> Optional[Selection]:
+    def approve_selection(
+        self, selection_id: int, option_id: int, decided_by: str = None
+    ) -> Optional[Selection]:
         """Approve a selection by choosing an option, updating budget impact."""
         selection = self.get_selection(selection_id)
         if not selection:
@@ -184,10 +226,14 @@ class PortalService:
             opt.is_selected = False
 
         # Find and select the chosen option
-        chosen = self.db.query(SelectionOption).filter(
-            SelectionOption.id == option_id,
-            SelectionOption.selection_id == selection_id,
-        ).first()
+        chosen = (
+            self.db.query(SelectionOption)
+            .filter(
+                SelectionOption.id == option_id,
+                SelectionOption.selection_id == selection_id,
+            )
+            .first()
+        )
         if not chosen:
             return None
 
@@ -209,17 +255,21 @@ class PortalService:
         if not selection:
             return None
 
+        project_id = selection.project_id
         selection.status = SelectionStatus.REJECTED.value
         selection.decided_date = date.today()
         selection.updated_by = self.user_id
 
         self.db.commit()
         self.db.refresh(selection)
+        self._invalidate_portal_cache(project_id)
         return selection
 
     # --- Selection Options ---
 
-    def create_option(self, selection_id: int, data: SelectionOptionCreate) -> Optional[SelectionOption]:
+    def create_option(
+        self, selection_id: int, data: SelectionOptionCreate
+    ) -> Optional[SelectionOption]:
         """Add an option to a selection."""
         selection = self.get_selection(selection_id)
         if not selection:
@@ -243,7 +293,9 @@ class PortalService:
         self.db.refresh(option)
         return option
 
-    def update_option(self, option_id: int, data: SelectionOptionUpdate) -> Optional[SelectionOption]:
+    def update_option(
+        self, option_id: int, data: SelectionOptionUpdate
+    ) -> Optional[SelectionOption]:
         """Update an option."""
         option = (
             self.db.query(SelectionOption)
@@ -256,12 +308,24 @@ class PortalService:
         if not option:
             return None
 
+        # Get project_id through selection
+        selection = (
+            self.db.query(Selection)
+            .filter(
+                Selection.id == option.selection_id,
+                Selection.company_id == self.company_id,
+            )
+            .first()
+        )
+        project_id = selection.project_id if selection else None
+
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(option, key, value)
 
         self.db.commit()
         self.db.refresh(option)
+        self._invalidate_portal_cache(project_id)
         return option
 
     def delete_option(self, option_id: int) -> bool:
@@ -276,8 +340,21 @@ class PortalService:
         )
         if not option:
             return False
+
+        # Get project_id through selection
+        selection = (
+            self.db.query(Selection)
+            .filter(
+                Selection.id == option.selection_id,
+                Selection.company_id == self.company_id,
+            )
+            .first()
+        )
+        project_id = selection.project_id if selection else None
+
         self.db.delete(option)
         self.db.commit()
+        self._invalidate_portal_cache(project_id)
         return True
 
     # =========================================================================
@@ -350,14 +427,18 @@ class PortalService:
         self.db.add(bp)
         self.db.commit()
         self.db.refresh(bp)
+        self._invalidate_portal_cache(data.project_id)
         return bp
 
-    def update_bid_package(self, bid_package_id: int, data: BidPackageUpdate) -> Optional[BidPackage]:
+    def update_bid_package(
+        self, bid_package_id: int, data: BidPackageUpdate
+    ) -> Optional[BidPackage]:
         """Update a bid package."""
         bp = self.get_bid_package(bid_package_id)
         if not bp:
             return None
 
+        project_id = bp.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(bp, key, value)
@@ -365,6 +446,7 @@ class PortalService:
 
         self.db.commit()
         self.db.refresh(bp)
+        self._invalidate_portal_cache(project_id)
         return bp
 
     def delete_bid_package(self, bid_package_id: int) -> bool:
@@ -372,20 +454,25 @@ class PortalService:
         bp = self.get_bid_package(bid_package_id)
         if not bp:
             return False
+        project_id = bp.project_id
         self.db.delete(bp)
         self.db.commit()
+        self._invalidate_portal_cache(project_id)
         return True
 
     # =========================================================================
     # BID SUBMISSIONS
     # =========================================================================
 
-    def create_submission(self, bid_package_id: int, data: BidSubmissionCreate) -> Optional[BidSubmission]:
+    def create_submission(
+        self, bid_package_id: int, data: BidSubmissionCreate
+    ) -> Optional[BidSubmission]:
         """Add a submission to a bid package."""
         bp = self.get_bid_package(bid_package_id)
         if not bp:
             return None
 
+        project_id = bp.project_id
         sub = BidSubmission(
             bid_package_id=bid_package_id,
             company_id=self.company_id,
@@ -403,9 +490,12 @@ class PortalService:
         self.db.add(sub)
         self.db.commit()
         self.db.refresh(sub)
+        self._invalidate_portal_cache(project_id)
         return sub
 
-    def update_submission(self, submission_id: int, data: BidSubmissionUpdate) -> Optional[BidSubmission]:
+    def update_submission(
+        self, submission_id: int, data: BidSubmissionUpdate
+    ) -> Optional[BidSubmission]:
         """Update a bid submission."""
         sub = (
             self.db.query(BidSubmission)
@@ -418,12 +508,17 @@ class PortalService:
         if not sub:
             return None
 
+        # Get project_id through bid_package
+        bp = self.get_bid_package(sub.bid_package_id)
+        project_id = bp.project_id if bp else None
+
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(sub, key, value)
 
         self.db.commit()
         self.db.refresh(sub)
+        self._invalidate_portal_cache(project_id)
         return sub
 
     def delete_submission(self, submission_id: int) -> bool:
@@ -438,8 +533,14 @@ class PortalService:
         )
         if not sub:
             return False
+
+        # Get project_id through bid_package
+        bp = self.get_bid_package(sub.bid_package_id)
+        project_id = bp.project_id if bp else None
+
         self.db.delete(sub)
         self.db.commit()
+        self._invalidate_portal_cache(project_id)
         return True
 
     def award_bid(self, submission_id: int) -> Optional[BidSubmission]:
@@ -455,6 +556,10 @@ class PortalService:
         if not sub:
             return None
 
+        # Get project_id before any changes
+        bp = self.get_bid_package(sub.bid_package_id)
+        project_id = bp.project_id if bp else None
+
         # Reject all other submissions in this package
         self.db.query(BidSubmission).filter(
             BidSubmission.bid_package_id == sub.bid_package_id,
@@ -465,7 +570,6 @@ class PortalService:
         sub.status = BidStatus.AWARDED.value
 
         # Mark package as awarded
-        bp = self.get_bid_package(sub.bid_package_id)
         if bp:
             bp.status = "awarded"
 
@@ -485,12 +589,11 @@ class PortalService:
             )
             sc_num = 1
             if last and last[0]:
-                match = _re.search(r'(\d+)$', last[0])
+                match = _re.search(r"(\d+)$", last[0])
                 if match:
                     sc_num = int(match.group(1)) + 1
             sc_seq = f"SC{sc_num:05d}"
 
-            project_id = bp.project_id if bp else None
             sc = Subcontract(
                 company_id=self.company_id,
                 project_id=project_id,
@@ -514,7 +617,9 @@ class PortalService:
             subcontract_id = sc.id
             logger.info("Auto-created subcontract %s from bid award %s", sc_seq, sub.id)
         except ImportError:
-            logger.debug("agcm_procurement not installed — skipping subcontract creation")
+            logger.debug(
+                "agcm_procurement not installed — skipping subcontract creation"
+            )
         except Exception as e:
             logger.warning("Failed to auto-create subcontract from bid award: %s", e)
 
@@ -522,6 +627,7 @@ class PortalService:
         self.db.refresh(sub)
         # Attach subcontract_id for the API response
         sub._subcontract_id = subcontract_id
+        self._invalidate_portal_cache(project_id)
         return sub
 
     # =========================================================================
@@ -548,6 +654,7 @@ class PortalService:
                 setattr(existing, key, value)
             self.db.commit()
             self.db.refresh(existing)
+            self._invalidate_portal_cache(data.project_id)
             return existing
 
         config = PortalConfig(
@@ -565,9 +672,12 @@ class PortalService:
         self.db.add(config)
         self.db.commit()
         self.db.refresh(config)
+        self._invalidate_portal_cache(data.project_id)
         return config
 
-    def update_portal_config(self, config_id: int, data: PortalConfigUpdate) -> Optional[PortalConfig]:
+    def update_portal_config(
+        self, config_id: int, data: PortalConfigUpdate
+    ) -> Optional[PortalConfig]:
         """Update a portal config."""
         config = (
             self.db.query(PortalConfig)
@@ -580,12 +690,14 @@ class PortalService:
         if not config:
             return None
 
+        project_id = config.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(config, key, value)
 
         self.db.commit()
         self.db.refresh(config)
+        self._invalidate_portal_cache(project_id)
         return config
 
     def delete_portal_config(self, config_id: int) -> bool:
@@ -600,8 +712,10 @@ class PortalService:
         )
         if not config:
             return False
+        project_id = config.project_id
         self.db.delete(config)
         self.db.commit()
+        self._invalidate_portal_cache(project_id)
         return True
 
     # =========================================================================
@@ -640,7 +754,9 @@ class PortalService:
             },
         }
 
-    def get_sub_dashboard(self, project_id: int, vendor_name: Optional[str] = None) -> dict:
+    def get_sub_dashboard(
+        self, project_id: int, vendor_name: Optional[str] = None
+    ) -> dict:
         """Get subcontractor dashboard data for a project."""
         bp_query = self.db.query(BidPackage).filter(
             BidPackage.project_id == project_id,
@@ -649,9 +765,13 @@ class PortalService:
         total_packages = bp_query.count()
         open_packages = bp_query.filter(BidPackage.status == "open").count()
 
-        sub_query = self.db.query(BidSubmission).join(BidPackage).filter(
-            BidPackage.project_id == project_id,
-            BidSubmission.company_id == self.company_id,
+        sub_query = (
+            self.db.query(BidSubmission)
+            .join(BidPackage)
+            .filter(
+                BidPackage.project_id == project_id,
+                BidSubmission.company_id == self.company_id,
+            )
         )
         if vendor_name:
             sub_query = sub_query.filter(BidSubmission.vendor_name == vendor_name)

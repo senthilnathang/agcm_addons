@@ -3,12 +3,20 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, Enum, Float, ForeignKey, Integer, String, Text, Index,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
 class ChangeOrderStatus(str, enum.Enum):
@@ -19,8 +27,9 @@ class ChangeOrderStatus(str, enum.Enum):
     VOID = "void"
 
 
-class ChangeOrder(Base, TimestampMixin, AuditMixin):
-    """Construction change order with approval workflow."""
+class ChangeOrder(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
+    """Construction change order with approval workflow and activity logging."""
+
     __tablename__ = "agcm_change_orders"
     _description = "Construction change orders with line items and approval workflow"
 
@@ -48,8 +57,8 @@ class ChangeOrder(Base, TimestampMixin, AuditMixin):
     cost_impact = Column(Float, nullable=True, default=0.0)
     schedule_impact_days = Column(Integer, nullable=True, default=0)
 
-    requested_date = Column(Date, nullable=True)
-    approved_date = Column(Date, nullable=True)
+    requested_date = Column(Date, nullable=True, index=True)
+    approved_date = Column(Date, nullable=True, index=True)
 
     project_id = Column(
         Integer,
@@ -62,12 +71,14 @@ class ChangeOrder(Base, TimestampMixin, AuditMixin):
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     approved_by = Column(
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     # Relationships
@@ -89,6 +100,7 @@ class ChangeOrder(Base, TimestampMixin, AuditMixin):
 
 class ChangeOrderLine(Base, TimestampMixin):
     """Line item for a change order."""
+
     __tablename__ = "agcm_change_order_lines"
     _description = "Change order line items"
 
@@ -117,6 +129,4 @@ class ChangeOrderLine(Base, TimestampMixin):
     # Relationships
     change_order = relationship("ChangeOrder", back_populates="lines")
 
-    __table_args__ = (
-        Index("ix_agcm_col_change_order", "change_order_id"),
-    )
+    __table_args__ = (Index("ix_agcm_col_change_order", "change_order_id"),)

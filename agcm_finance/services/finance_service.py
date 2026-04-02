@@ -14,19 +14,42 @@ from addons.agcm_finance.models.expense import Expense, ExpenseLine
 from addons.agcm_finance.models.invoice import Invoice
 from addons.agcm_finance.models.bill import Bill
 from addons.agcm_finance.schemas.finance import (
-    CostCodeCreate, CostCodeUpdate,
-    BudgetCreate, BudgetUpdate,
-    ExpenseCreate, ExpenseUpdate,
-    ExpenseLineCreate, ExpenseLineUpdate,
-    InvoiceCreate, InvoiceUpdate,
-    BillCreate, BillUpdate,
+    CostCodeCreate,
+    CostCodeUpdate,
+    BudgetCreate,
+    BudgetUpdate,
+    ExpenseCreate,
+    ExpenseUpdate,
+    ExpenseLineCreate,
+    ExpenseLineUpdate,
+    InvoiceCreate,
+    InvoiceUpdate,
+    BillCreate,
+    BillUpdate,
     RecordPayment,
 )
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
+
 
 # Lazy imports to avoid circular dependency issues
 def _get_change_order_model():
     from addons.agcm_change_order.models.change_order import ChangeOrder
+
     return ChangeOrder
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,13 +65,15 @@ def _next_sequence(db: Session, model_class, company_id: int, seq_key: str) -> s
     prefix, padding = SEQUENCES[seq_key]
     last = (
         db.query(model_class.sequence_name)
-        .filter(model_class.company_id == company_id, model_class.sequence_name.isnot(None))
+        .filter(
+            model_class.company_id == company_id, model_class.sequence_name.isnot(None)
+        )
         .order_by(model_class.id.desc())
         .first()
     )
     num = 1
     if last and last[0]:
-        match = re.search(r'(\d+)$', last[0])
+        match = re.search(r"(\d+)$", last[0])
         if match:
             num = int(match.group(1)) + 1
     return f"{prefix}{num:0{padding}d}"
@@ -62,6 +87,20 @@ class FinanceService:
         self.company_id = company_id
         self.user_id = user_id
 
+    def _invalidate_finance_cache(self, project_id: int = None):
+        """Invalidate finance-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_finance:budget_summary:{self.company_id}:{project_id}"
+            )
+            cache.invalidate_pattern_distributed(
+                f"agcm_finance:forecast:{self.company_id}:{project_id}"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_finance:*")
+
     # =========================================================================
     # COST CODES
     # =========================================================================
@@ -69,7 +108,10 @@ class FinanceService:
     def list_cost_codes(self, project_id: int) -> List[CostCode]:
         return (
             self.db.query(CostCode)
-            .filter(CostCode.company_id == self.company_id, CostCode.project_id == project_id)
+            .filter(
+                CostCode.company_id == self.company_id,
+                CostCode.project_id == project_id,
+            )
             .order_by(CostCode.code)
             .all()
         )
@@ -148,28 +190,57 @@ class FinanceService:
     def list_budgets(self, project_id: int) -> List[Budget]:
         return (
             self.db.query(Budget)
-            .filter(Budget.company_id == self.company_id, Budget.project_id == project_id)
+            .filter(
+                Budget.company_id == self.company_id,
+                Budget.project_id == project_id,
+                Budget.is_deleted == False,
+            )
             .order_by(Budget.id)
             .all()
         )
 
     def get_budget_summary(self, project_id: int) -> dict:
+        cache_key = f"agcm_finance:budget_summary:{self.company_id}:{project_id}"
+
+        if CACHE_AVAILABLE:
+            cached = cache.get(cache_key)
+            if cached is not None:
+                return cached
+
         budgets = self.list_budgets(project_id)
         total_planned = sum(b.planned_amount or 0 for b in budgets)
         total_actual = sum(b.actual_amount or 0 for b in budgets)
         total_committed = sum(b.committed_amount or 0 for b in budgets)
-        return {
+        result = {
             "total_planned": total_planned,
             "total_actual": total_actual,
             "total_committed": total_committed,
             "variance": total_planned - total_actual - total_committed,
-            "lines": budgets,
+            "lines": [
+                {
+                    "id": b.id,
+                    "description": b.description,
+                    "planned_amount": b.planned_amount,
+                    "actual_amount": b.actual_amount,
+                    "committed_amount": b.committed_amount,
+                }
+                for b in budgets
+            ],
         }
+
+        if CACHE_AVAILABLE:
+            cache.set(cache_key, result, ttl=300)
+
+        return result
 
     def get_budget(self, budget_id: int) -> Optional[Budget]:
         return (
             self.db.query(Budget)
-            .filter(Budget.id == budget_id, Budget.company_id == self.company_id)
+            .filter(
+                Budget.id == budget_id,
+                Budget.company_id == self.company_id,
+                Budget.is_deleted == False,
+            )
             .first()
         )
 
@@ -182,10 +253,22 @@ class FinanceService:
             actual_amount=data.actual_amount or 0,
             committed_amount=data.committed_amount or 0,
             company_id=self.company_id,
+            created_by=self.user_id,
         )
         self.db.add(budget)
         self.db.commit()
         self.db.refresh(budget)
+
+        self._invalidate_finance_cache(data.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            budget.log_activity(
+                self.db,
+                ActivityAction.CREATE,
+                user_id=self.user_id,
+                description=f"Budget line '{budget.description}' created",
+            )
+
         return budget
 
     def update_budget(self, budget_id: int, data: BudgetUpdate) -> Optional[Budget]:
@@ -195,16 +278,41 @@ class FinanceService:
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(budget, key, value)
+        budget.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(budget)
+
+        self._invalidate_finance_cache(budget.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            budget.log_activity(
+                self.db,
+                ActivityAction.UPDATE,
+                user_id=self.user_id,
+                description=f"Budget line '{budget.description}' updated",
+            )
+
         return budget
 
     def delete_budget(self, budget_id: int) -> bool:
         budget = self.get_budget(budget_id)
         if not budget:
             return False
-        self.db.delete(budget)
+        project_id = budget.project_id
+        description = budget.description
+        budget.soft_delete(user_id=self.user_id)
         self.db.commit()
+
+        self._invalidate_finance_cache(project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            budget.log_activity(
+                self.db,
+                ActivityAction.ARCHIVE,
+                user_id=self.user_id,
+                description=f"Budget line '{description}' archived",
+            )
+
         return True
 
     # =========================================================================
@@ -219,7 +327,10 @@ class FinanceService:
         page_size: int = 20,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(Expense).filter(Expense.company_id == self.company_id)
+        query = self.db.query(Expense).filter(
+            Expense.company_id == self.company_id,
+            Expense.is_deleted == False,
+        )
 
         if project_id:
             query = query.filter(Expense.project_id == project_id)
@@ -234,7 +345,11 @@ class FinanceService:
     def get_expense(self, expense_id: int) -> Optional[Expense]:
         return (
             self.db.query(Expense)
-            .filter(Expense.id == expense_id, Expense.company_id == self.company_id)
+            .filter(
+                Expense.id == expense_id,
+                Expense.company_id == self.company_id,
+                Expense.is_deleted == False,
+            )
             .first()
         )
 
@@ -268,8 +383,15 @@ class FinanceService:
             for l in lines
         ]
 
+        result = {}
+        for c in exp.__table__.columns:
+            val = getattr(exp, c.key, None)
+            if hasattr(val, "isoformat"):
+                val = val.isoformat()
+            result[c.key] = val
+
         return {
-            **{c.key: getattr(exp, c.key) for c in exp.__table__.columns},
+            **result,
             "lines": line_dicts,
         }
 
@@ -303,6 +425,17 @@ class FinanceService:
 
         self.db.commit()
         self.db.refresh(exp)
+
+        self._invalidate_finance_cache(data.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            exp.log_activity(
+                self.db,
+                ActivityAction.CREATE,
+                user_id=self.user_id,
+                description=f"Expense '{exp.description}' created",
+            )
+
         return exp
 
     def update_expense(self, expense_id: int, data: ExpenseUpdate) -> Optional[Expense]:
@@ -318,7 +451,9 @@ class FinanceService:
         exp.updated_by = self.user_id
 
         if lines_data is not None:
-            self.db.query(ExpenseLine).filter(ExpenseLine.expense_id == expense_id).delete()
+            self.db.query(ExpenseLine).filter(
+                ExpenseLine.expense_id == expense_id
+            ).delete()
             for line_data in lines_data:
                 line = ExpenseLine(
                     expense_id=expense_id,
@@ -335,19 +470,45 @@ class FinanceService:
 
         self.db.commit()
         self.db.refresh(exp)
+
+        self._invalidate_finance_cache(exp.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            exp.log_activity(
+                self.db,
+                ActivityAction.UPDATE,
+                user_id=self.user_id,
+                description=f"Expense '{exp.description}' updated",
+            )
+
         return exp
 
     def delete_expense(self, expense_id: int) -> bool:
         exp = self.get_expense(expense_id)
         if not exp:
             return False
-        self.db.delete(exp)
+        project_id = exp.project_id
+        description = exp.description
+        exp.soft_delete(user_id=self.user_id)
         self.db.commit()
+
+        self._invalidate_finance_cache(project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            exp.log_activity(
+                self.db,
+                ActivityAction.ARCHIVE,
+                user_id=self.user_id,
+                description=f"Expense '{description}' archived",
+            )
+
         return True
 
     # --- Expense Line standalone CRUD ---
 
-    def add_expense_line(self, data: ExpenseLineCreate, expense_id: int) -> Optional[ExpenseLine]:
+    def add_expense_line(
+        self, data: ExpenseLineCreate, expense_id: int
+    ) -> Optional[ExpenseLine]:
         exp = self.get_expense(expense_id)
         if not exp:
             return None
@@ -367,10 +528,14 @@ class FinanceService:
         self.db.refresh(line)
         return line
 
-    def update_expense_line(self, line_id: int, data: ExpenseLineUpdate) -> Optional[ExpenseLine]:
+    def update_expense_line(
+        self, line_id: int, data: ExpenseLineUpdate
+    ) -> Optional[ExpenseLine]:
         line = (
             self.db.query(ExpenseLine)
-            .filter(ExpenseLine.id == line_id, ExpenseLine.company_id == self.company_id)
+            .filter(
+                ExpenseLine.id == line_id, ExpenseLine.company_id == self.company_id
+            )
             .first()
         )
         if not line:
@@ -385,7 +550,9 @@ class FinanceService:
     def delete_expense_line(self, line_id: int) -> bool:
         line = (
             self.db.query(ExpenseLine)
-            .filter(ExpenseLine.id == line_id, ExpenseLine.company_id == self.company_id)
+            .filter(
+                ExpenseLine.id == line_id, ExpenseLine.company_id == self.company_id
+            )
             .first()
         )
         if not line:
@@ -406,7 +573,10 @@ class FinanceService:
         page_size: int = 20,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(Invoice).filter(Invoice.company_id == self.company_id)
+        query = self.db.query(Invoice).filter(
+            Invoice.company_id == self.company_id,
+            Invoice.is_deleted == False,
+        )
 
         if project_id:
             query = query.filter(Invoice.project_id == project_id)
@@ -421,7 +591,11 @@ class FinanceService:
     def get_invoice(self, invoice_id: int) -> Optional[Invoice]:
         return (
             self.db.query(Invoice)
-            .filter(Invoice.id == invoice_id, Invoice.company_id == self.company_id)
+            .filter(
+                Invoice.id == invoice_id,
+                Invoice.company_id == self.company_id,
+                Invoice.is_deleted == False,
+            )
             .first()
         )
 
@@ -446,6 +620,17 @@ class FinanceService:
         self.db.add(inv)
         self.db.commit()
         self.db.refresh(inv)
+
+        self._invalidate_finance_cache(data.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            inv.log_activity(
+                self.db,
+                ActivityAction.CREATE,
+                user_id=self.user_id,
+                description=f"Invoice {inv.sequence_name} created for {inv.client_name}",
+            )
+
         return inv
 
     def update_invoice(self, invoice_id: int, data: InvoiceUpdate) -> Optional[Invoice]:
@@ -456,22 +641,47 @@ class FinanceService:
         for key, value in update_data.items():
             setattr(inv, key, value)
 
-        # Recalculate balance if amounts changed
         inv.balance_due = (inv.total_amount or 0) - (inv.paid_amount or 0)
         inv.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(inv)
+
+        self._invalidate_finance_cache(inv.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            inv.log_activity(
+                self.db,
+                ActivityAction.UPDATE,
+                user_id=self.user_id,
+                description=f"Invoice {inv.sequence_name} updated",
+            )
+
         return inv
 
     def delete_invoice(self, invoice_id: int) -> bool:
         inv = self.get_invoice(invoice_id)
         if not inv:
             return False
-        self.db.delete(inv)
+        project_id = inv.project_id
+        sequence = inv.sequence_name
+        inv.soft_delete(user_id=self.user_id)
         self.db.commit()
+
+        self._invalidate_finance_cache(project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            inv.log_activity(
+                self.db,
+                ActivityAction.ARCHIVE,
+                user_id=self.user_id,
+                description=f"Invoice {sequence} archived",
+            )
+
         return True
 
-    def record_invoice_payment(self, invoice_id: int, payment: RecordPayment) -> Optional[Invoice]:
+    def record_invoice_payment(
+        self, invoice_id: int, payment: RecordPayment
+    ) -> Optional[Invoice]:
         inv = self.get_invoice(invoice_id)
         if not inv:
             return None
@@ -487,6 +697,17 @@ class FinanceService:
         inv.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(inv)
+
+        self._invalidate_finance_cache(inv.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            inv.log_activity(
+                self.db,
+                ActivityAction.UPDATE,
+                user_id=self.user_id,
+                description=f"Payment of {payment.amount} recorded for invoice {inv.sequence_name}",
+            )
+
         return inv
 
     # =========================================================================
@@ -501,7 +722,10 @@ class FinanceService:
         page_size: int = 20,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(Bill).filter(Bill.company_id == self.company_id)
+        query = self.db.query(Bill).filter(
+            Bill.company_id == self.company_id,
+            Bill.is_deleted == False,
+        )
 
         if project_id:
             query = query.filter(Bill.project_id == project_id)
@@ -516,7 +740,11 @@ class FinanceService:
     def get_bill(self, bill_id: int) -> Optional[Bill]:
         return (
             self.db.query(Bill)
-            .filter(Bill.id == bill_id, Bill.company_id == self.company_id)
+            .filter(
+                Bill.id == bill_id,
+                Bill.company_id == self.company_id,
+                Bill.is_deleted == False,
+            )
             .first()
         )
 
@@ -540,6 +768,17 @@ class FinanceService:
         self.db.add(bill)
         self.db.commit()
         self.db.refresh(bill)
+
+        self._invalidate_finance_cache(data.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            bill.log_activity(
+                self.db,
+                ActivityAction.CREATE,
+                user_id=self.user_id,
+                description=f"Bill {bill.sequence_name} created for {bill.vendor_name}",
+            )
+
         return bill
 
     def update_bill(self, bill_id: int, data: BillUpdate) -> Optional[Bill]:
@@ -552,17 +791,43 @@ class FinanceService:
         bill.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(bill)
+
+        self._invalidate_finance_cache(bill.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            bill.log_activity(
+                self.db,
+                ActivityAction.UPDATE,
+                user_id=self.user_id,
+                description=f"Bill {bill.sequence_name} updated",
+            )
+
         return bill
 
     def delete_bill(self, bill_id: int) -> bool:
         bill = self.get_bill(bill_id)
         if not bill:
             return False
-        self.db.delete(bill)
+        project_id = bill.project_id
+        sequence = bill.sequence_name
+        bill.soft_delete(user_id=self.user_id)
         self.db.commit()
+
+        self._invalidate_finance_cache(project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            bill.log_activity(
+                self.db,
+                ActivityAction.ARCHIVE,
+                user_id=self.user_id,
+                description=f"Bill {sequence} archived",
+            )
+
         return True
 
-    def record_bill_payment(self, bill_id: int, payment: RecordPayment) -> Optional[Bill]:
+    def record_bill_payment(
+        self, bill_id: int, payment: RecordPayment
+    ) -> Optional[Bill]:
         bill = self.get_bill(bill_id)
         if not bill:
             return None
@@ -577,6 +842,17 @@ class FinanceService:
         bill.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(bill)
+
+        self._invalidate_finance_cache(bill.project_id)
+
+        if ACTIVITY_LOGGING_AVAILABLE:
+            bill.log_activity(
+                self.db,
+                ActivityAction.UPDATE,
+                user_id=self.user_id,
+                description=f"Payment of {payment.amount} recorded for bill {bill.sequence_name}",
+            )
+
         return bill
 
     # =========================================================================
@@ -625,21 +901,27 @@ class FinanceService:
         estimate_to_complete = max(estimated_at_completion - actual_spent, 0)
         variance = revised_budget - estimated_at_completion
         pct_complete = (actual_spent / revised_budget * 100) if revised_budget else 0
-        cpi = (revised_budget / estimated_at_completion) if estimated_at_completion else 0
+        cpi = (
+            (revised_budget / estimated_at_completion) if estimated_at_completion else 0
+        )
 
         # Build per-cost-code breakdown
         by_cost_code = []
         for b in budgets:
-            cc_forecast = (b.actual_amount or 0) + max((b.committed_amount or 0) - (b.actual_amount or 0), 0) * trend_factor
-            by_cost_code.append({
-                "budget_id": b.id,
-                "cost_code_id": b.cost_code_id,
-                "description": b.description,
-                "planned": b.planned_amount or 0,
-                "committed": b.committed_amount or 0,
-                "actual": b.actual_amount or 0,
-                "forecast": round(cc_forecast, 2),
-            })
+            cc_forecast = (b.actual_amount or 0) + max(
+                (b.committed_amount or 0) - (b.actual_amount or 0), 0
+            ) * trend_factor
+            by_cost_code.append(
+                {
+                    "budget_id": b.id,
+                    "cost_code_id": b.cost_code_id,
+                    "description": b.description,
+                    "planned": b.planned_amount or 0,
+                    "committed": b.committed_amount or 0,
+                    "actual": b.actual_amount or 0,
+                    "forecast": round(cc_forecast, 2),
+                }
+            )
 
         return {
             "original_budget": round(original_budget, 2),

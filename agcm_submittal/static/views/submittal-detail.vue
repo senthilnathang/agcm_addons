@@ -33,16 +33,19 @@ import {
 } from '@ant-design/icons-vue';
 
 import { requestClient } from '#/api/request';
+import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMSubmittalDetail' });
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 const BASE = '/agcm_submittal';
 
 const submittalId = computed(() => route.params.id);
 const loading = ref(false);
 const submittal = ref(null);
+const activeTab = ref('details');
 
 const statusColors = {
   draft: 'default',
@@ -223,82 +226,99 @@ onMounted(fetchSubmittal);
           </div>
         </ACard>
 
-        <!-- Details -->
-        <ACard title="Details" class="mb-4">
-          <ADescriptions :column="3" bordered size="small">
-            <ADescriptionsItem label="Package">{{ submittal.package_name || '-' }}</ADescriptionsItem>
-            <ADescriptionsItem label="Type">{{ submittal.type_name || '-' }}</ADescriptionsItem>
-            <ADescriptionsItem label="Due Date">{{ submittal.due_date || '-' }}</ADescriptionsItem>
-            <ADescriptionsItem label="Submitted Date">{{ submittal.submitted_date || '-' }}</ADescriptionsItem>
-            <ADescriptionsItem label="Received Date">{{ submittal.received_date || '-' }}</ADescriptionsItem>
-            <ADescriptionsItem label="Revision">{{ submittal.revision }}</ADescriptionsItem>
-          </ADescriptions>
-          <div v-if="submittal.description" class="mt-4">
-            <h4 class="font-semibold mb-2">Description</h4>
-            <p style="white-space: pre-wrap;">{{ submittal.description }}</p>
-          </div>
-        </ACard>
-
-        <!-- Approval Chain -->
-        <ACard title="Approval Chain" class="mb-4">
-          <div v-if="(submittal.approvers || []).length === 0" class="text-gray-400">
-            No approvers assigned.
-          </div>
-          <ATimeline v-else>
-            <ATimelineItem
-              v-for="approver in submittal.approvers"
-              :key="approver.id"
-              :color="approverStatusColors[approver.status] || '#999'"
-            >
-              <div class="flex items-center gap-3">
-                <div>
-                  <component
-                    :is="approverStatusIcons[approver.status] || ClockCircleOutlined"
-                    :style="{ color: approverStatusColors[approver.status] || '#999', fontSize: '18px' }"
-                  />
-                </div>
-                <div style="flex: 1;">
-                  <div class="font-semibold">
-                    Step {{ approver.sequence }}: {{ approver.user_name || `User #${approver.user_id}` }}
-                  </div>
-                  <ATag
-                    :color="approverStatusColors[approver.status]"
-                    size="small"
-                    style="margin-top: 4px;"
-                  >
-                    {{ approverStatusLabels[approver.status] || approver.status }}
-                  </ATag>
-                  <div v-if="approver.comments" class="text-gray-500 mt-1" style="font-size: 13px;">
-                    {{ approver.comments }}
-                  </div>
-                  <div v-if="approver.signed_at" class="text-gray-400 mt-1" style="font-size: 12px;">
-                    Signed: {{ new Date(approver.signed_at).toLocaleString() }}
-                  </div>
-                </div>
+        <!-- Tabs -->
+        <ACard>
+          <ATabs v-model:activeKey="activeTab">
+            <ATabs.TabPane key="details" tab="Details">
+              <!-- Details Section -->
+              <ADescriptions :column="3" bordered size="small" class="mb-4">
+                <ADescriptionsItem label="Package">{{ submittal.package_name || '-' }}</ADescriptionsItem>
+                <ADescriptionsItem label="Type">{{ submittal.type_name || '-' }}</ADescriptionsItem>
+                <ADescriptionsItem label="Due Date">{{ submittal.due_date || '-' }}</ADescriptionsItem>
+                <ADescriptionsItem label="Submitted Date">{{ submittal.submitted_date || '-' }}</ADescriptionsItem>
+                <ADescriptionsItem label="Received Date">{{ submittal.received_date || '-' }}</ADescriptionsItem>
+                <ADescriptionsItem label="Revision">{{ submittal.revision }}</ADescriptionsItem>
+              </ADescriptions>
+              <div v-if="submittal.description" class="mt-4">
+                <h4 class="font-semibold mb-2">Description</h4>
+                <p style="white-space: pre-wrap;">{{ submittal.description }}</p>
               </div>
-            </ATimelineItem>
-          </ATimeline>
+            </ATabs.TabPane>
 
-          <!-- Action buttons for approvers -->
-          <ADivider v-if="(submittal.approvers || []).length > 0" />
-          <ASpace v-if="(submittal.approvers || []).length > 0">
-            <AButton type="primary" @click="openApproveModal('approve')">
-              <template #icon><CheckCircleOutlined /></template>
-              Approve
-            </AButton>
-            <AButton @click="openApproveModal('approved_as_noted')">
-              <template #icon><ExclamationCircleOutlined /></template>
-              Approve as Noted
-            </AButton>
-            <AButton danger @click="openApproveModal('reject')">
-              <template #icon><CloseCircleOutlined /></template>
-              Reject
-            </AButton>
-            <AButton @click="openApproveModal('revise_and_submit')">
-              <template #icon><ReloadOutlined /></template>
-              Revise & Submit
-            </AButton>
-          </ASpace>
+            <!-- Approval Chain Tab -->
+            <ATabs.TabPane key="approvers" tab="Approval Chain">
+              <div v-if="(submittal.approvers || []).length === 0" class="text-gray-400">
+                No approvers assigned.
+              </div>
+              <ATimeline v-else>
+                <ATimelineItem
+                  v-for="approver in submittal.approvers"
+                  :key="approver.id"
+                  :color="approverStatusColors[approver.status] || '#999'"
+                >
+                  <div class="flex items-center gap-3">
+                    <div>
+                      <component
+                        :is="approverStatusIcons[approver.status] || ClockCircleOutlined"
+                        :style="{ color: approverStatusColors[approver.status] || '#999', fontSize: '18px' }"
+                      />
+                    </div>
+                    <div style="flex: 1;">
+                      <div class="font-semibold">
+                        Step {{ approver.sequence }}: {{ approver.user_name || `User #${approver.user_id}` }}
+                      </div>
+                      <ATag
+                        :color="approverStatusColors[approver.status]"
+                        size="small"
+                        style="margin-top: 4px;"
+                      >
+                        {{ approverStatusLabels[approver.status] || approver.status }}
+                      </ATag>
+                      <div v-if="approver.comments" class="text-gray-500 mt-1" style="font-size: 13px;">
+                        {{ approver.comments }}
+                      </div>
+                      <div v-if="approver.signed_at" class="text-gray-400 mt-1" style="font-size: 12px;">
+                        Signed: {{ new Date(approver.signed_at).toLocaleString() }}
+                      </div>
+                    </div>
+                  </div>
+                </ATimelineItem>
+              </ATimeline>
+
+              <!-- Action buttons for approvers -->
+              <ADivider v-if="(submittal.approvers || []).length > 0" />
+              <ASpace v-if="(submittal.approvers || []).length > 0">
+                <AButton type="primary" @click="openApproveModal('approve')">
+                  <template #icon><CheckCircleOutlined /></template>
+                  Approve
+                </AButton>
+                <AButton @click="openApproveModal('approved_as_noted')">
+                  <template #icon><ExclamationCircleOutlined /></template>
+                  Approve as Noted
+                </AButton>
+                <AButton danger @click="openApproveModal('reject')">
+                  <template #icon><CloseCircleOutlined /></template>
+                  Reject
+                </AButton>
+                <AButton @click="openApproveModal('revise_and_submit')">
+                  <template #icon><ReloadOutlined /></template>
+                  Revise & Submit
+                </AButton>
+              </ASpace>
+            </ATabs.TabPane>
+
+            <!-- Activity Tab -->
+            <ATabs.TabPane key="activity" tab="Activity">
+              <ActivityThread
+                :model-name="'agcm_submittals'"
+                :record-id="submittalId"
+                :access-token="userStore.accessToken"
+                :api-base="'/api/v1'"
+                :show-messages="true"
+                :show-activities="true"
+              />
+            </ATabs.TabPane>
+          </ATabs>
         </ACard>
       </template>
 

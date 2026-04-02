@@ -13,6 +13,20 @@ from addons.agcm_progress.models.estimation import EstimationItem
 from addons.agcm_progress.models.scurve import SCurveData
 from addons.agcm_progress.models.project_image import ProjectImage
 
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
+
 logger = logging.getLogger(__name__)
 
 # Sequence configuration: tablename -> (prefix, padding)
@@ -30,6 +44,17 @@ class ProgressService:
         self.db = db
         self.company_id = company_id
         self.user_id = user_id
+
+    def _invalidate_progress_cache(self, project_id: int = None):
+        """Invalidate progress-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_progress:project:{self.company_id}:{project_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_progress:*")
 
     # -------------------------------------------------------------------------
     # Sequence generation
@@ -51,7 +76,7 @@ class ProgressService:
 
         num = 1
         if last and last[0]:
-            match = re.search(r'(\d+)$', last[0])
+            match = re.search(r"(\d+)$", last[0])
             if match:
                 num = int(match.group(1)) + 1
 
@@ -64,7 +89,10 @@ class ProgressService:
     def list_milestones(self, project_id: int) -> List[Dict[str, Any]]:
         items = (
             self.db.query(Milestone)
-            .filter(Milestone.project_id == project_id, Milestone.company_id == self.company_id)
+            .filter(
+                Milestone.project_id == project_id,
+                Milestone.company_id == self.company_id,
+            )
             .order_by(Milestone.planned_date.asc().nullslast(), Milestone.id.asc())
             .all()
         )
@@ -85,17 +113,21 @@ class ProgressService:
         self.db.add(milestone)
         self.db.commit()
         self.db.refresh(milestone)
+        self._invalidate_progress_cache(data.project_id)
         return milestone
 
     def update_milestone(self, milestone_id: int, data) -> Optional[Milestone]:
         milestone = (
             self.db.query(Milestone)
-            .filter(Milestone.id == milestone_id, Milestone.company_id == self.company_id)
+            .filter(
+                Milestone.id == milestone_id, Milestone.company_id == self.company_id
+            )
             .first()
         )
         if not milestone:
             return None
 
+        project_id = milestone.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(milestone, key, value)
@@ -103,29 +135,37 @@ class ProgressService:
 
         self.db.commit()
         self.db.refresh(milestone)
+        self._invalidate_progress_cache(project_id)
         return milestone
 
     def delete_milestone(self, milestone_id: int) -> bool:
         milestone = (
             self.db.query(Milestone)
-            .filter(Milestone.id == milestone_id, Milestone.company_id == self.company_id)
+            .filter(
+                Milestone.id == milestone_id, Milestone.company_id == self.company_id
+            )
             .first()
         )
         if not milestone:
             return False
+        project_id = milestone.project_id
         self.db.delete(milestone)
         self.db.commit()
+        self._invalidate_progress_cache(project_id)
         return True
 
     def toggle_completed(self, milestone_id: int) -> Optional[Milestone]:
         milestone = (
             self.db.query(Milestone)
-            .filter(Milestone.id == milestone_id, Milestone.company_id == self.company_id)
+            .filter(
+                Milestone.id == milestone_id, Milestone.company_id == self.company_id
+            )
             .first()
         )
         if not milestone:
             return None
 
+        project_id = milestone.project_id
         milestone.is_completed = not milestone.is_completed
         if milestone.is_completed and not milestone.actual_date:
             milestone.actual_date = date.today()
@@ -133,6 +173,7 @@ class ProgressService:
 
         self.db.commit()
         self.db.refresh(milestone)
+        self._invalidate_progress_cache(project_id)
         return milestone
 
     def _milestone_to_dict(self, m: Milestone) -> Dict[str, Any]:
@@ -164,9 +205,8 @@ class ProgressService:
         page: int = 1,
         page_size: int = 20,
     ) -> Dict[str, Any]:
-        query = (
-            self.db.query(Issue)
-            .filter(Issue.project_id == project_id, Issue.company_id == self.company_id)
+        query = self.db.query(Issue).filter(
+            Issue.project_id == project_id, Issue.company_id == self.company_id
         )
 
         if status:
@@ -185,8 +225,7 @@ class ProgressService:
 
         total = query.count()
         items = (
-            query
-            .order_by(Issue.id.desc())
+            query.order_by(Issue.id.desc())
             .offset((page - 1) * page_size)
             .limit(page_size)
             .all()
@@ -228,6 +267,7 @@ class ProgressService:
         self.db.add(issue)
         self.db.commit()
         self.db.refresh(issue)
+        self._invalidate_progress_cache(data.project_id)
         return issue
 
     def update_issue(self, issue_id: int, data) -> Optional[Issue]:
@@ -239,6 +279,7 @@ class ProgressService:
         if not issue:
             return None
 
+        project_id = issue.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(issue, key, value)
@@ -246,6 +287,7 @@ class ProgressService:
 
         self.db.commit()
         self.db.refresh(issue)
+        self._invalidate_progress_cache(project_id)
         return issue
 
     def delete_issue(self, issue_id: int) -> bool:
@@ -256,8 +298,10 @@ class ProgressService:
         )
         if not issue:
             return False
+        project_id = issue.project_id
         self.db.delete(issue)
         self.db.commit()
+        self._invalidate_progress_cache(project_id)
         return True
 
     def resolve_issue(self, issue_id: int) -> Optional[Issue]:
@@ -269,12 +313,14 @@ class ProgressService:
         if not issue:
             return None
 
+        project_id = issue.project_id
         issue.status = IssueStatus.RESOLVED
         issue.resolved_date = date.today()
         issue.updated_by = self.user_id
 
         self.db.commit()
         self.db.refresh(issue)
+        self._invalidate_progress_cache(project_id)
         return issue
 
     def close_issue(self, issue_id: int) -> Optional[Issue]:
@@ -286,6 +332,7 @@ class ProgressService:
         if not issue:
             return None
 
+        project_id = issue.project_id
         issue.status = IssueStatus.CLOSED
         if not issue.resolved_date:
             issue.resolved_date = date.today()
@@ -293,6 +340,7 @@ class ProgressService:
 
         self.db.commit()
         self.db.refresh(issue)
+        self._invalidate_progress_cache(project_id)
         return issue
 
     def _issue_to_dict(self, i: Issue) -> Dict[str, Any]:
@@ -323,7 +371,10 @@ class ProgressService:
         """Get hierarchical estimation items with rollup totals."""
         items = (
             self.db.query(EstimationItem)
-            .filter(EstimationItem.project_id == project_id, EstimationItem.company_id == self.company_id)
+            .filter(
+                EstimationItem.project_id == project_id,
+                EstimationItem.company_id == self.company_id,
+            )
             .order_by(EstimationItem.id.asc())
             .all()
         )
@@ -382,17 +433,22 @@ class ProgressService:
         self.db.add(item)
         self.db.commit()
         self.db.refresh(item)
+        self._invalidate_progress_cache(data.project_id)
         return item
 
     def update_estimation_item(self, item_id: int, data) -> Optional[EstimationItem]:
         item = (
             self.db.query(EstimationItem)
-            .filter(EstimationItem.id == item_id, EstimationItem.company_id == self.company_id)
+            .filter(
+                EstimationItem.id == item_id,
+                EstimationItem.company_id == self.company_id,
+            )
             .first()
         )
         if not item:
             return None
 
+        project_id = item.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(item, key, value)
@@ -404,18 +460,24 @@ class ProgressService:
 
         self.db.commit()
         self.db.refresh(item)
+        self._invalidate_progress_cache(project_id)
         return item
 
     def delete_estimation_item(self, item_id: int) -> bool:
         item = (
             self.db.query(EstimationItem)
-            .filter(EstimationItem.id == item_id, EstimationItem.company_id == self.company_id)
+            .filter(
+                EstimationItem.id == item_id,
+                EstimationItem.company_id == self.company_id,
+            )
             .first()
         )
         if not item:
             return False
+        project_id = item.project_id
         self.db.delete(item)
         self.db.commit()
+        self._invalidate_progress_cache(project_id)
         return True
 
     def _estimation_to_dict(self, e: EstimationItem) -> Dict[str, Any]:
@@ -443,7 +505,10 @@ class ProgressService:
     def get_scurve_chart_data(self, project_id: int) -> List[Dict[str, Any]]:
         items = (
             self.db.query(SCurveData)
-            .filter(SCurveData.project_id == project_id, SCurveData.company_id == self.company_id)
+            .filter(
+                SCurveData.project_id == project_id,
+                SCurveData.company_id == self.company_id,
+            )
             .order_by(SCurveData.date.asc())
             .all()
         )
@@ -466,35 +531,44 @@ class ProgressService:
         self.db.add(scurve)
         self.db.commit()
         self.db.refresh(scurve)
+        self._invalidate_progress_cache(data.project_id)
         return scurve
 
     def update_scurve_data(self, scurve_id: int, data) -> Optional[SCurveData]:
         scurve = (
             self.db.query(SCurveData)
-            .filter(SCurveData.id == scurve_id, SCurveData.company_id == self.company_id)
+            .filter(
+                SCurveData.id == scurve_id, SCurveData.company_id == self.company_id
+            )
             .first()
         )
         if not scurve:
             return None
 
+        project_id = scurve.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(scurve, key, value)
 
         self.db.commit()
         self.db.refresh(scurve)
+        self._invalidate_progress_cache(project_id)
         return scurve
 
     def delete_scurve_data(self, scurve_id: int) -> bool:
         scurve = (
             self.db.query(SCurveData)
-            .filter(SCurveData.id == scurve_id, SCurveData.company_id == self.company_id)
+            .filter(
+                SCurveData.id == scurve_id, SCurveData.company_id == self.company_id
+            )
             .first()
         )
         if not scurve:
             return False
+        project_id = scurve.project_id
         self.db.delete(scurve)
         self.db.commit()
+        self._invalidate_progress_cache(project_id)
         return True
 
     def _scurve_to_dict(self, s: SCurveData) -> Dict[str, Any]:
@@ -522,7 +596,10 @@ class ProgressService:
     def list_project_images(self, project_id: int) -> List[Dict[str, Any]]:
         items = (
             self.db.query(ProjectImage)
-            .filter(ProjectImage.project_id == project_id, ProjectImage.company_id == self.company_id)
+            .filter(
+                ProjectImage.project_id == project_id,
+                ProjectImage.company_id == self.company_id,
+            )
             .order_by(ProjectImage.display_order.asc(), ProjectImage.id.desc())
             .all()
         )
@@ -557,17 +634,21 @@ class ProgressService:
         self.db.add(img)
         self.db.commit()
         self.db.refresh(img)
+        self._invalidate_progress_cache(project_id)
         return img
 
     def update_project_image(self, image_id: int, data) -> Optional[ProjectImage]:
         img = (
             self.db.query(ProjectImage)
-            .filter(ProjectImage.id == image_id, ProjectImage.company_id == self.company_id)
+            .filter(
+                ProjectImage.id == image_id, ProjectImage.company_id == self.company_id
+            )
             .first()
         )
         if not img:
             return None
 
+        project_id = img.project_id
         update_data = data.model_dump(exclude_unset=True)
         for key, value in update_data.items():
             setattr(img, key, value)
@@ -575,18 +656,23 @@ class ProgressService:
 
         self.db.commit()
         self.db.refresh(img)
+        self._invalidate_progress_cache(project_id)
         return img
 
     def delete_project_image(self, image_id: int) -> bool:
         img = (
             self.db.query(ProjectImage)
-            .filter(ProjectImage.id == image_id, ProjectImage.company_id == self.company_id)
+            .filter(
+                ProjectImage.id == image_id, ProjectImage.company_id == self.company_id
+            )
             .first()
         )
         if not img:
             return False
+        project_id = img.project_id
         self.db.delete(img)
         self.db.commit()
+        self._invalidate_progress_cache(project_id)
         return True
 
     def _image_to_dict(self, img: ProjectImage) -> Dict[str, Any]:

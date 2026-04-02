@@ -3,12 +3,19 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, Enum, ForeignKey, Integer, String, Text, Index,
+    Column,
+    Date,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
 class PunchItemStatus(str, enum.Enum):
@@ -25,8 +32,9 @@ class PunchItemPriority(str, enum.Enum):
     CRITICAL = "critical"
 
 
-class PunchListItem(Base, TimestampMixin, AuditMixin):
+class PunchListItem(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Punch list item for tracking construction deficiencies."""
+
     __tablename__ = "agcm_punch_list_items"
     _description = "Punch list items with status, priority, and assignment tracking"
 

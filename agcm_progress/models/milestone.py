@@ -1,15 +1,22 @@
 """Milestone model for project progress tracking"""
 
 from sqlalchemy import (
-    Boolean, Column, Date, ForeignKey, Index, Integer, String, Text,
+    Boolean,
+    Column,
+    Date,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
-class Milestone(Base, TimestampMixin, AuditMixin):
+class Milestone(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Project milestone with planned and actual dates."""
 
     __tablename__ = "agcm_milestones"

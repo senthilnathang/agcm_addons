@@ -12,9 +12,12 @@ import {
   Descriptions,
   DescriptionsItem,
   Drawer,
+  Dropdown,
   Form,
   FormItem,
   Input,
+  Menu,
+  MenuItem,
   message,
   Modal,
   Popconfirm,
@@ -32,6 +35,8 @@ import {
   DownloadOutlined,
   EditOutlined,
   EyeOutlined,
+  FilePdfOutlined,
+  FileExcelOutlined,
   PlayCircleOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -193,9 +198,9 @@ async function handleExecute(record) {
   }
 }
 
-function handleExport(record) {
+function handleExport(record, format = 'csv') {
   const token = localStorage.getItem('accessToken') || '';
-  const params = new URLSearchParams({ format: 'csv' });
+  const params = new URLSearchParams({ format });
   if (token) params.append('token', token);
   window.open(`/api/v1${BASE_URL}/reports/${record.id}/export?${params.toString()}`, '_blank');
 }
@@ -263,7 +268,16 @@ onMounted(() => {
               <Button size="small" type="primary" ghost @click="handleExecute(record)">
                 <PlayCircleOutlined /> Run
               </Button>
-              <Button size="small" @click="handleExport(record)"><DownloadOutlined /></Button>
+              <Dropdown>
+                <Button size="small"><DownloadOutlined /></Button>
+                <template #overlay>
+                  <Menu @click="({ key }) => handleExport(record, key)">
+                    <MenuItem key="csv"><DownloadOutlined /> CSV</MenuItem>
+                    <MenuItem key="pdf"><FilePdfOutlined /> PDF</MenuItem>
+                    <MenuItem key="excel"><FileExcelOutlined /> Excel</MenuItem>
+                  </Menu>
+                </template>
+              </Dropdown>
               <Button size="small" @click="openEdit(record)" :disabled="record.is_system"><EditOutlined /></Button>
               <Popconfirm title="Delete this report?" @confirm="handleDelete(record.id)">
                 <Button size="small" danger :disabled="record.is_system"><DeleteOutlined /></Button>

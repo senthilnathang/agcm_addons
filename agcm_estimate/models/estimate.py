@@ -3,40 +3,24 @@
 import enum
 
 from sqlalchemy import (
-    Boolean, Column, Date, Enum, Float, ForeignKey, Integer, String, Text, Index,
+    Boolean,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
-class EstimateStatus(str, enum.Enum):
-    DRAFT = "draft"
-    IN_REVIEW = "in_review"
-    APPROVED = "approved"
-    REJECTED = "rejected"
-    SUPERSEDED = "superseded"
-
-
-class EstimateType(str, enum.Enum):
-    PRELIMINARY = "preliminary"
-    SCHEMATIC = "schematic"
-    DETAILED = "detailed"
-    CHANGE_ORDER = "change_order"
-
-
-class LineItemType(str, enum.Enum):
-    MATERIAL = "material"
-    LABOR = "labor"
-    EQUIPMENT = "equipment"
-    SUBCONTRACTOR = "subcontractor"
-    FEE = "fee"
-    ALLOWANCE = "allowance"
-    ASSEMBLY = "assembly"
-
-
-class Estimate(Base, TimestampMixin, AuditMixin):
+class Estimate(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Top-level estimate for a construction project."""
 
     __tablename__ = "agcm_estimates"

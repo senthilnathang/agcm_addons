@@ -3,12 +3,19 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, Enum, ForeignKey, Index, Integer, String, Text,
+    Column,
+    Date,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
 class IssueSeverity(str, enum.Enum):
@@ -31,7 +38,7 @@ class IssuePriority(str, enum.Enum):
     HIGH = "high"
 
 
-class Issue(Base, TimestampMixin, AuditMixin):
+class Issue(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Project issue with severity, status, and priority workflow."""
 
     __tablename__ = "agcm_issues"

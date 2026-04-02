@@ -6,7 +6,7 @@ from sqlalchemy import Column, Enum, ForeignKey, Integer, String, Index
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
 class DocumentType(str, enum.Enum):
@@ -33,8 +33,9 @@ class DocumentStatus(str, enum.Enum):
     ARCHIVED = "archived"
 
 
-class ProjectDocument(Base, TimestampMixin, AuditMixin):
+class ProjectDocument(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Project document with type, status, and folder organization."""
+
     __tablename__ = "agcm_project_documents"
     _description = "Project documents with folder organization and status workflow"
 

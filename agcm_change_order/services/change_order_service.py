@@ -25,13 +25,15 @@ SEQUENCE_PADDING = 5
 def _next_co_sequence(db: Session, company_id: int) -> str:
     last = (
         db.query(ChangeOrder.sequence_name)
-        .filter(ChangeOrder.company_id == company_id, ChangeOrder.sequence_name.isnot(None))
+        .filter(
+            ChangeOrder.company_id == company_id, ChangeOrder.sequence_name.isnot(None)
+        )
         .order_by(ChangeOrder.id.desc())
         .first()
     )
     num = 1
     if last and last[0]:
-        match = re.search(r'(\d+)$', last[0])
+        match = re.search(r"(\d+)$", last[0])
         if match:
             num = int(match.group(1)) + 1
     return f"{SEQUENCE_PREFIX}{num:0{SEQUENCE_PADDING}d}"
@@ -54,9 +56,14 @@ class ChangeOrderService:
         search: Optional[str] = None,
         page: int = 1,
         page_size: int = 20,
+        include_deleted: bool = False,
     ) -> dict:
         page_size = min(page_size, 200)
-        query = self.db.query(ChangeOrder).filter(ChangeOrder.company_id == self.company_id)
+        query = self.db.query(ChangeOrder).filter(
+            ChangeOrder.company_id == self.company_id
+        )
+        if not include_deleted:
+            query = query.filter(ChangeOrder.is_deleted == False)
 
         if project_id:
             query = query.filter(ChangeOrder.project_id == project_id)
@@ -65,21 +72,28 @@ class ChangeOrderService:
         if search:
             term = f"%{search}%"
             query = query.filter(
-                (ChangeOrder.title.ilike(term)) | (ChangeOrder.sequence_name.ilike(term))
+                (ChangeOrder.title.ilike(term))
+                | (ChangeOrder.sequence_name.ilike(term))
             )
 
         total = query.count()
         skip = (page - 1) * page_size
-        items = query.order_by(ChangeOrder.id.desc()).offset(skip).limit(page_size).all()
+        items = (
+            query.order_by(ChangeOrder.id.desc()).offset(skip).limit(page_size).all()
+        )
 
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
-    def get_change_order(self, co_id: int) -> Optional[ChangeOrder]:
-        return (
-            self.db.query(ChangeOrder)
-            .filter(ChangeOrder.id == co_id, ChangeOrder.company_id == self.company_id)
-            .first()
+    def get_change_order(
+        self, co_id: int, include_deleted: bool = False
+    ) -> Optional[ChangeOrder]:
+        query = self.db.query(ChangeOrder).filter(
+            ChangeOrder.id == co_id,
+            ChangeOrder.company_id == self.company_id,
         )
+        if not include_deleted:
+            query = query.filter(ChangeOrder.is_deleted == False)
+        return query.first()
 
     def get_change_order_detail(self, co_id: int) -> Optional[dict]:
         co = self.get_change_order(co_id)
@@ -149,7 +163,9 @@ class ChangeOrderService:
         self.db.refresh(co)
         return co
 
-    def update_change_order(self, co_id: int, data: ChangeOrderUpdate) -> Optional[ChangeOrder]:
+    def update_change_order(
+        self, co_id: int, data: ChangeOrderUpdate
+    ) -> Optional[ChangeOrder]:
         co = self.get_change_order(co_id)
         if not co:
             return None
@@ -189,9 +205,19 @@ class ChangeOrderService:
         co = self.get_change_order(co_id)
         if not co:
             return False
-        self.db.delete(co)
+        co.soft_delete(user_id=self.user_id)
         self.db.commit()
         return True
+
+    def restore_change_order(self, co_id: int) -> Optional[ChangeOrder]:
+        """Restore a soft-deleted change order."""
+        co = self.get_change_order(co_id, include_deleted=True)
+        if not co or not co.is_deleted:
+            return None
+        co.restore()
+        self.db.commit()
+        self.db.refresh(co)
+        return co
 
     def approve_change_order(self, co_id: int) -> Optional[ChangeOrder]:
         co = self.get_change_order(co_id)
@@ -218,7 +244,9 @@ class ChangeOrderService:
                     .first()
                 )
                 if budget_line:
-                    budget_line.committed_amount = (budget_line.committed_amount or 0) + co.cost_impact
+                    budget_line.committed_amount = (
+                        budget_line.committed_amount or 0
+                    ) + co.cost_impact
                 else:
                     budget_line = Budget(
                         project_id=co.project_id,
@@ -251,7 +279,9 @@ class ChangeOrderService:
 
     # --- Line Item CRUD ---
 
-    def add_line(self, co_id: int, data: ChangeOrderLineCreate) -> Optional[ChangeOrderLine]:
+    def add_line(
+        self, co_id: int, data: ChangeOrderLineCreate
+    ) -> Optional[ChangeOrderLine]:
         co = self.get_change_order(co_id)
         if not co:
             return None
@@ -270,10 +300,15 @@ class ChangeOrderService:
         self.db.refresh(line)
         return line
 
-    def update_line(self, line_id: int, data: ChangeOrderLineUpdate) -> Optional[ChangeOrderLine]:
+    def update_line(
+        self, line_id: int, data: ChangeOrderLineUpdate
+    ) -> Optional[ChangeOrderLine]:
         line = (
             self.db.query(ChangeOrderLine)
-            .filter(ChangeOrderLine.id == line_id, ChangeOrderLine.company_id == self.company_id)
+            .filter(
+                ChangeOrderLine.id == line_id,
+                ChangeOrderLine.company_id == self.company_id,
+            )
             .first()
         )
         if not line:
@@ -290,7 +325,10 @@ class ChangeOrderService:
     def delete_line(self, line_id: int) -> bool:
         line = (
             self.db.query(ChangeOrderLine)
-            .filter(ChangeOrderLine.id == line_id, ChangeOrderLine.company_id == self.company_id)
+            .filter(
+                ChangeOrderLine.id == line_id,
+                ChangeOrderLine.company_id == self.company_id,
+            )
             .first()
         )
         if not line:

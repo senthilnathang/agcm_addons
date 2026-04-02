@@ -11,26 +11,54 @@ from sqlalchemy.orm import Session
 from addons.agcm_estimate.models.cost_catalog import CostCatalog, CostItem
 from addons.agcm_estimate.models.assembly import Assembly, AssemblyItem
 from addons.agcm_estimate.models.estimate import (
-    Estimate, EstimateGroup, EstimateLineItem, EstimateStatus,
+    Estimate,
+    EstimateGroup,
+    EstimateLineItem,
+    EstimateStatus,
 )
 from addons.agcm_estimate.models.estimate_markup import EstimateMarkup, MarkupType
 from addons.agcm_estimate.models.proposal import Proposal, ProposalStatus
 from addons.agcm_estimate.models.takeoff import TakeoffSheet, TakeoffMeasurement
 
 from addons.agcm_estimate.schemas.estimate import (
-    CostCatalogCreate, CostCatalogUpdate,
-    CostItemCreate, CostItemUpdate,
-    AssemblyCreate, AssemblyUpdate,
-    AssemblyItemCreate, AssemblyItemUpdate,
-    EstimateCreate, EstimateUpdate,
-    EstimateGroupCreate, EstimateGroupUpdate,
-    EstimateLineItemCreate, EstimateLineItemUpdate,
-    EstimateMarkupCreate, EstimateMarkupUpdate,
-    ProposalCreate, ProposalUpdate,
-    TakeoffSheetCreate, TakeoffSheetUpdate,
-    TakeoffMeasurementCreate, TakeoffMeasurementUpdate,
+    CostCatalogCreate,
+    CostCatalogUpdate,
+    CostItemCreate,
+    CostItemUpdate,
+    AssemblyCreate,
+    AssemblyUpdate,
+    AssemblyItemCreate,
+    AssemblyItemUpdate,
+    EstimateCreate,
+    EstimateUpdate,
+    EstimateGroupCreate,
+    EstimateGroupUpdate,
+    EstimateLineItemCreate,
+    EstimateLineItemUpdate,
+    EstimateMarkupCreate,
+    EstimateMarkupUpdate,
+    ProposalCreate,
+    ProposalUpdate,
+    TakeoffSheetCreate,
+    TakeoffSheetUpdate,
+    TakeoffMeasurementCreate,
+    TakeoffMeasurementUpdate,
     EstimateSummary,
 )
+
+try:
+    from app.core.cache import cache
+
+    CACHE_AVAILABLE = True
+except ImportError:
+    CACHE_AVAILABLE = False
+
+try:
+    from app.models.base import ActivityAction
+
+    ACTIVITY_LOGGING_AVAILABLE = True
+except ImportError:
+    ACTIVITY_LOGGING_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +70,21 @@ class EstimateService:
         self.db = db
         self.company_id = company_id
         self.user_id = user_id
+
+    def _invalidate_estimate_cache(
+        self, estimate_id: int = None, project_id: int = None
+    ):
+        """Invalidate estimate-related cache."""
+        if not CACHE_AVAILABLE:
+            return
+
+        if estimate_id:
+            cache.invalidate(f"agcm_estimate:detail:{self.company_id}:{estimate_id}")
+        if project_id:
+            cache.invalidate_pattern_distributed(
+                f"agcm_estimate:project:{self.company_id}:{project_id}:*"
+            )
+        cache.invalidate_pattern_distributed(f"agcm_estimate:*")
 
     # =========================================================================
     # SEQUENCE GENERATION
@@ -58,7 +101,7 @@ class EstimateService:
         )
         num = 1
         if last and last[0]:
-            match = re.search(r'(\d+)$', last[0])
+            match = re.search(r"(\d+)$", last[0])
             if match:
                 num = int(match.group(1)) + 1
         return f"{prefix}{num:0{padding}d}"
@@ -72,7 +115,12 @@ class EstimateService:
             CostCatalog.company_id == self.company_id
         )
         total = query.count()
-        items = query.order_by(CostCatalog.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        items = (
+            query.order_by(CostCatalog.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def create_catalog(self, data: CostCatalogCreate) -> CostCatalog:
@@ -94,11 +142,17 @@ class EstimateService:
         self.db.refresh(catalog)
         return catalog
 
-    def update_catalog(self, catalog_id: int, data: CostCatalogUpdate) -> Optional[CostCatalog]:
-        catalog = self.db.query(CostCatalog).filter(
-            CostCatalog.id == catalog_id,
-            CostCatalog.company_id == self.company_id,
-        ).first()
+    def update_catalog(
+        self, catalog_id: int, data: CostCatalogUpdate
+    ) -> Optional[CostCatalog]:
+        catalog = (
+            self.db.query(CostCatalog)
+            .filter(
+                CostCatalog.id == catalog_id,
+                CostCatalog.company_id == self.company_id,
+            )
+            .first()
+        )
         if not catalog:
             return None
         update_data = data.model_dump(exclude_unset=True)
@@ -116,10 +170,14 @@ class EstimateService:
         return catalog
 
     def delete_catalog(self, catalog_id: int) -> bool:
-        catalog = self.db.query(CostCatalog).filter(
-            CostCatalog.id == catalog_id,
-            CostCatalog.company_id == self.company_id,
-        ).first()
+        catalog = (
+            self.db.query(CostCatalog)
+            .filter(
+                CostCatalog.id == catalog_id,
+                CostCatalog.company_id == self.company_id,
+            )
+            .first()
+        )
         if not catalog:
             return False
         self.db.delete(catalog)
@@ -138,9 +196,7 @@ class EstimateService:
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
-        query = self.db.query(CostItem).filter(
-            CostItem.company_id == self.company_id
-        )
+        query = self.db.query(CostItem).filter(CostItem.company_id == self.company_id)
         if catalog_id:
             query = query.filter(CostItem.catalog_id == catalog_id)
         if item_type:
@@ -153,7 +209,12 @@ class EstimateService:
                 | (CostItem.vendor.ilike(term))
             )
         total = query.count()
-        items = query.order_by(CostItem.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        items = (
+            query.order_by(CostItem.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def create_cost_item(self, data: CostItemCreate) -> CostItem:
@@ -177,11 +238,17 @@ class EstimateService:
         self.db.refresh(item)
         return item
 
-    def update_cost_item(self, item_id: int, data: CostItemUpdate) -> Optional[CostItem]:
-        item = self.db.query(CostItem).filter(
-            CostItem.id == item_id,
-            CostItem.company_id == self.company_id,
-        ).first()
+    def update_cost_item(
+        self, item_id: int, data: CostItemUpdate
+    ) -> Optional[CostItem]:
+        item = (
+            self.db.query(CostItem)
+            .filter(
+                CostItem.id == item_id,
+                CostItem.company_id == self.company_id,
+            )
+            .first()
+        )
         if not item:
             return None
         for key, value in data.model_dump(exclude_unset=True).items():
@@ -191,10 +258,14 @@ class EstimateService:
         return item
 
     def delete_cost_item(self, item_id: int) -> bool:
-        item = self.db.query(CostItem).filter(
-            CostItem.id == item_id,
-            CostItem.company_id == self.company_id,
-        ).first()
+        item = (
+            self.db.query(CostItem)
+            .filter(
+                CostItem.id == item_id,
+                CostItem.company_id == self.company_id,
+            )
+            .first()
+        )
         if not item:
             return False
         self.db.delete(item)
@@ -208,20 +279,27 @@ class EstimateService:
     def list_assemblies(
         self, category: Optional[str] = None, page: int = 1, page_size: int = 20
     ) -> dict:
-        query = self.db.query(Assembly).filter(
-            Assembly.company_id == self.company_id
-        )
+        query = self.db.query(Assembly).filter(Assembly.company_id == self.company_id)
         if category:
             query = query.filter(Assembly.category == category)
         total = query.count()
-        items = query.order_by(Assembly.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        items = (
+            query.order_by(Assembly.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_assembly(self, assembly_id: int) -> Optional[Assembly]:
-        return self.db.query(Assembly).filter(
-            Assembly.id == assembly_id,
-            Assembly.company_id == self.company_id,
-        ).first()
+        return (
+            self.db.query(Assembly)
+            .filter(
+                Assembly.id == assembly_id,
+                Assembly.company_id == self.company_id,
+            )
+            .first()
+        )
 
     def create_assembly(self, data: AssemblyCreate) -> Assembly:
         assembly = Assembly(
@@ -235,7 +313,7 @@ class EstimateService:
         self.db.add(assembly)
         self.db.flush()
 
-        for item_data in (data.items or []):
+        for item_data in data.items or []:
             ai = AssemblyItem(
                 assembly_id=assembly.id,
                 company_id=self.company_id,
@@ -254,7 +332,9 @@ class EstimateService:
         self.db.refresh(assembly)
         return assembly
 
-    def update_assembly(self, assembly_id: int, data: AssemblyUpdate) -> Optional[Assembly]:
+    def update_assembly(
+        self, assembly_id: int, data: AssemblyUpdate
+    ) -> Optional[Assembly]:
         assembly = self.get_assembly(assembly_id)
         if not assembly:
             return None
@@ -273,7 +353,9 @@ class EstimateService:
         self.db.commit()
         return True
 
-    def create_assembly_item(self, data: AssemblyItemCreate, assembly_id: int) -> AssemblyItem:
+    def create_assembly_item(
+        self, data: AssemblyItemCreate, assembly_id: int
+    ) -> AssemblyItem:
         # Verify assembly belongs to this company (IDOR protection)
         assembly = self.get_assembly(assembly_id)
         if not assembly:
@@ -295,11 +377,17 @@ class EstimateService:
         self.db.refresh(item)
         return item
 
-    def update_assembly_item(self, item_id: int, data: AssemblyItemUpdate) -> Optional[AssemblyItem]:
-        item = self.db.query(AssemblyItem).filter(
-            AssemblyItem.id == item_id,
-            AssemblyItem.company_id == self.company_id,
-        ).first()
+    def update_assembly_item(
+        self, item_id: int, data: AssemblyItemUpdate
+    ) -> Optional[AssemblyItem]:
+        item = (
+            self.db.query(AssemblyItem)
+            .filter(
+                AssemblyItem.id == item_id,
+                AssemblyItem.company_id == self.company_id,
+            )
+            .first()
+        )
         if not item:
             return None
         for key, value in data.model_dump(exclude_unset=True).items():
@@ -309,10 +397,14 @@ class EstimateService:
         return item
 
     def delete_assembly_item(self, item_id: int) -> bool:
-        item = self.db.query(AssemblyItem).filter(
-            AssemblyItem.id == item_id,
-            AssemblyItem.company_id == self.company_id,
-        ).first()
+        item = (
+            self.db.query(AssemblyItem)
+            .filter(
+                AssemblyItem.id == item_id,
+                AssemblyItem.company_id == self.company_id,
+            )
+            .first()
+        )
         if not item:
             return False
         self.db.delete(item)
@@ -330,22 +422,29 @@ class EstimateService:
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
-        query = self.db.query(Estimate).filter(
-            Estimate.company_id == self.company_id
-        )
+        query = self.db.query(Estimate).filter(Estimate.company_id == self.company_id)
         if project_id:
             query = query.filter(Estimate.project_id == project_id)
         if status:
             query = query.filter(Estimate.status == status)
         total = query.count()
-        items = query.order_by(Estimate.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        items = (
+            query.order_by(Estimate.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_estimate(self, estimate_id: int) -> Optional[Estimate]:
-        return self.db.query(Estimate).filter(
-            Estimate.id == estimate_id,
-            Estimate.company_id == self.company_id,
-        ).first()
+        return (
+            self.db.query(Estimate)
+            .filter(
+                Estimate.id == estimate_id,
+                Estimate.company_id == self.company_id,
+            )
+            .first()
+        )
 
     def get_estimate_detail(self, estimate_id: int) -> Optional[dict]:
         """Full detail with groups, line items, markups, and summary."""
@@ -360,19 +459,19 @@ class EstimateService:
         for group in estimate.groups:
             li_list = []
             for li in group.line_items:
-                li_list.append({
-                    c.key: getattr(li, c.key) for c in li.__table__.columns
-                })
-            groups_data.append({
-                **{c.key: getattr(group, c.key) for c in group.__table__.columns},
-                "line_items": li_list,
-            })
+                li_list.append(
+                    {c.key: getattr(li, c.key) for c in li.__table__.columns}
+                )
+            groups_data.append(
+                {
+                    **{c.key: getattr(group, c.key) for c in group.__table__.columns},
+                    "line_items": li_list,
+                }
+            )
 
         markups_data = []
         for m in estimate.markups:
-            markups_data.append({
-                c.key: getattr(m, c.key) for c in m.__table__.columns
-            })
+            markups_data.append({c.key: getattr(m, c.key) for c in m.__table__.columns})
 
         summary = {
             "subtotal": estimate.subtotal or 0,
@@ -407,7 +506,9 @@ class EstimateService:
         self.db.refresh(estimate)
         return estimate
 
-    def update_estimate(self, estimate_id: int, data: EstimateUpdate) -> Optional[Estimate]:
+    def update_estimate(
+        self, estimate_id: int, data: EstimateUpdate
+    ) -> Optional[Estimate]:
         estimate = self.get_estimate(estimate_id)
         if not estimate:
             return None
@@ -462,7 +563,10 @@ class EstimateService:
         running_base = subtotal_price
 
         for markup in markups:
-            if markup.markup_type == MarkupType.PERCENTAGE.value or markup.markup_type == MarkupType.PERCENTAGE:
+            if (
+                markup.markup_type == MarkupType.PERCENTAGE.value
+                or markup.markup_type == MarkupType.PERCENTAGE
+            ):
                 if markup.is_compounding:
                     markup.calculated_amount = running_base * (markup.value / 100)
                 else:
@@ -591,11 +695,15 @@ class EstimateService:
         if not estimate:
             return {"success": False, "message": "Estimate not found"}
 
-        line_items = self.db.query(EstimateLineItem).filter(
-            EstimateLineItem.estimate_id == estimate_id,
-            EstimateLineItem.cost_code.isnot(None),
-            EstimateLineItem.cost_code != "",
-        ).all()
+        line_items = (
+            self.db.query(EstimateLineItem)
+            .filter(
+                EstimateLineItem.estimate_id == estimate_id,
+                EstimateLineItem.cost_code.isnot(None),
+                EstimateLineItem.cost_code != "",
+            )
+            .all()
+        )
 
         # Group by cost_code
         budget_lines = {}
@@ -633,14 +741,18 @@ class EstimateService:
 
                 # UPSERT: check if budget line already exists
                 existing = (
-                    self.db.query(Budget)
-                    .filter(
-                        Budget.project_id == estimate.project_id,
-                        Budget.cost_code_id == cost_code_id,
-                        Budget.company_id == self.company_id,
+                    (
+                        self.db.query(Budget)
+                        .filter(
+                            Budget.project_id == estimate.project_id,
+                            Budget.cost_code_id == cost_code_id,
+                            Budget.company_id == self.company_id,
+                        )
+                        .first()
                     )
-                    .first()
-                ) if cost_code_id else None
+                    if cost_code_id
+                    else None
+                )
 
                 desc = f"From Estimate {estimate.sequence_name} - {bl['description']}"
 
@@ -669,7 +781,9 @@ class EstimateService:
                 sum(b["planned_amount"] for b in budget_lines.values()),
             )
         except ImportError:
-            logger.warning("agcm_finance module not installed — budget integration skipped")
+            logger.warning(
+                "agcm_finance module not installed — budget integration skipped"
+            )
             created_count = len(budget_lines)
         except Exception as e:
             logger.warning("Budget integration error: %s", e)
@@ -703,7 +817,11 @@ class EstimateService:
     # =========================================================================
 
     def add_assembly_to_estimate(
-        self, estimate_id: int, group_id: int, assembly_id: int, quantity_multiplier: float = 1.0,
+        self,
+        estimate_id: int,
+        group_id: int,
+        assembly_id: int,
+        quantity_multiplier: float = 1.0,
     ) -> list:
         """Expand assembly items into estimate line items within a group."""
         # Verify estimate belongs to this company (IDOR protection)
@@ -711,11 +829,15 @@ class EstimateService:
         if not estimate:
             return []
         # Verify group belongs to this estimate and company
-        group = self.db.query(EstimateGroup).filter(
-            EstimateGroup.id == group_id,
-            EstimateGroup.estimate_id == estimate_id,
-            EstimateGroup.company_id == self.company_id,
-        ).first()
+        group = (
+            self.db.query(EstimateGroup)
+            .filter(
+                EstimateGroup.id == group_id,
+                EstimateGroup.estimate_id == estimate_id,
+                EstimateGroup.company_id == self.company_id,
+            )
+            .first()
+        )
         if not group:
             return []
         assembly = self.get_assembly(assembly_id)
@@ -723,9 +845,12 @@ class EstimateService:
             return []
 
         # Get max display_order in group
-        max_order = self.db.query(func.max(EstimateLineItem.display_order)).filter(
-            EstimateLineItem.group_id == group_id
-        ).scalar() or 0
+        max_order = (
+            self.db.query(func.max(EstimateLineItem.display_order))
+            .filter(EstimateLineItem.group_id == group_id)
+            .scalar()
+            or 0
+        )
 
         created_items = []
         for idx, ai in enumerate(assembly.items):
@@ -765,7 +890,9 @@ class EstimateService:
     # GENERATE PROPOSAL
     # =========================================================================
 
-    def generate_proposal(self, estimate_id: int, data: ProposalCreate) -> Optional[Proposal]:
+    def generate_proposal(
+        self, estimate_id: int, data: ProposalCreate
+    ) -> Optional[Proposal]:
         estimate = self.get_estimate(estimate_id)
         if not estimate:
             return None
@@ -818,11 +945,17 @@ class EstimateService:
         self.db.refresh(group)
         return group
 
-    def update_group(self, group_id: int, data: EstimateGroupUpdate) -> Optional[EstimateGroup]:
-        group = self.db.query(EstimateGroup).filter(
-            EstimateGroup.id == group_id,
-            EstimateGroup.company_id == self.company_id,
-        ).first()
+    def update_group(
+        self, group_id: int, data: EstimateGroupUpdate
+    ) -> Optional[EstimateGroup]:
+        group = (
+            self.db.query(EstimateGroup)
+            .filter(
+                EstimateGroup.id == group_id,
+                EstimateGroup.company_id == self.company_id,
+            )
+            .first()
+        )
         if not group:
             return None
         for key, value in data.model_dump(exclude_unset=True).items():
@@ -833,10 +966,14 @@ class EstimateService:
 
     def delete_group(self, group_id: int) -> Optional[int]:
         """Delete group and return the estimate_id for recalculation."""
-        group = self.db.query(EstimateGroup).filter(
-            EstimateGroup.id == group_id,
-            EstimateGroup.company_id == self.company_id,
-        ).first()
+        group = (
+            self.db.query(EstimateGroup)
+            .filter(
+                EstimateGroup.id == group_id,
+                EstimateGroup.company_id == self.company_id,
+            )
+            .first()
+        )
         if not group:
             return None
         estimate_id = group.estimate_id
@@ -855,11 +992,15 @@ class EstimateService:
         if not estimate:
             raise ValueError("Estimate not found or access denied")
         # Verify group belongs to this estimate
-        group = self.db.query(EstimateGroup).filter(
-            EstimateGroup.id == data.group_id,
-            EstimateGroup.estimate_id == data.estimate_id,
-            EstimateGroup.company_id == self.company_id,
-        ).first()
+        group = (
+            self.db.query(EstimateGroup)
+            .filter(
+                EstimateGroup.id == data.group_id,
+                EstimateGroup.estimate_id == data.estimate_id,
+                EstimateGroup.company_id == self.company_id,
+            )
+            .first()
+        )
         if not group:
             raise ValueError("Group not found or does not belong to this estimate")
 
@@ -896,11 +1037,17 @@ class EstimateService:
         self.db.refresh(li)
         return li
 
-    def update_line_item(self, item_id: int, data: EstimateLineItemUpdate) -> Optional[EstimateLineItem]:
-        li = self.db.query(EstimateLineItem).filter(
-            EstimateLineItem.id == item_id,
-            EstimateLineItem.company_id == self.company_id,
-        ).first()
+    def update_line_item(
+        self, item_id: int, data: EstimateLineItemUpdate
+    ) -> Optional[EstimateLineItem]:
+        li = (
+            self.db.query(EstimateLineItem)
+            .filter(
+                EstimateLineItem.id == item_id,
+                EstimateLineItem.company_id == self.company_id,
+            )
+            .first()
+        )
         if not li:
             return None
         for key, value in data.model_dump(exclude_unset=True).items():
@@ -914,10 +1061,14 @@ class EstimateService:
 
     def delete_line_item(self, item_id: int) -> Optional[int]:
         """Delete line item and return the estimate_id for recalculation."""
-        li = self.db.query(EstimateLineItem).filter(
-            EstimateLineItem.id == item_id,
-            EstimateLineItem.company_id == self.company_id,
-        ).first()
+        li = (
+            self.db.query(EstimateLineItem)
+            .filter(
+                EstimateLineItem.id == item_id,
+                EstimateLineItem.company_id == self.company_id,
+            )
+            .first()
+        )
         if not li:
             return None
         estimate_id = li.estimate_id
@@ -953,11 +1104,17 @@ class EstimateService:
         self.db.refresh(markup)
         return markup
 
-    def update_markup(self, markup_id: int, data: EstimateMarkupUpdate) -> Optional[EstimateMarkup]:
-        markup = self.db.query(EstimateMarkup).filter(
-            EstimateMarkup.id == markup_id,
-            EstimateMarkup.company_id == self.company_id,
-        ).first()
+    def update_markup(
+        self, markup_id: int, data: EstimateMarkupUpdate
+    ) -> Optional[EstimateMarkup]:
+        markup = (
+            self.db.query(EstimateMarkup)
+            .filter(
+                EstimateMarkup.id == markup_id,
+                EstimateMarkup.company_id == self.company_id,
+            )
+            .first()
+        )
         if not markup:
             return None
         for key, value in data.model_dump(exclude_unset=True).items():
@@ -969,10 +1126,14 @@ class EstimateService:
         return markup
 
     def delete_markup(self, markup_id: int) -> Optional[int]:
-        markup = self.db.query(EstimateMarkup).filter(
-            EstimateMarkup.id == markup_id,
-            EstimateMarkup.company_id == self.company_id,
-        ).first()
+        markup = (
+            self.db.query(EstimateMarkup)
+            .filter(
+                EstimateMarkup.id == markup_id,
+                EstimateMarkup.company_id == self.company_id,
+            )
+            .first()
+        )
         if not markup:
             return None
         estimate_id = markup.estimate_id
@@ -992,24 +1153,33 @@ class EstimateService:
         page: int = 1,
         page_size: int = 20,
     ) -> dict:
-        query = self.db.query(Proposal).filter(
-            Proposal.company_id == self.company_id
-        )
+        query = self.db.query(Proposal).filter(Proposal.company_id == self.company_id)
         if project_id:
             query = query.filter(Proposal.project_id == project_id)
         if status:
             query = query.filter(Proposal.status == status)
         total = query.count()
-        items = query.order_by(Proposal.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        items = (
+            query.order_by(Proposal.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_proposal(self, proposal_id: int) -> Optional[Proposal]:
-        return self.db.query(Proposal).filter(
-            Proposal.id == proposal_id,
-            Proposal.company_id == self.company_id,
-        ).first()
+        return (
+            self.db.query(Proposal)
+            .filter(
+                Proposal.id == proposal_id,
+                Proposal.company_id == self.company_id,
+            )
+            .first()
+        )
 
-    def update_proposal(self, proposal_id: int, data: ProposalUpdate) -> Optional[Proposal]:
+    def update_proposal(
+        self, proposal_id: int, data: ProposalUpdate
+    ) -> Optional[Proposal]:
         proposal = self.get_proposal(proposal_id)
         if not proposal:
             return None
@@ -1073,14 +1243,23 @@ class EstimateService:
         if project_id:
             query = query.filter(TakeoffSheet.project_id == project_id)
         total = query.count()
-        items = query.order_by(TakeoffSheet.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        items = (
+            query.order_by(TakeoffSheet.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def get_takeoff_sheet(self, sheet_id: int) -> Optional[TakeoffSheet]:
-        return self.db.query(TakeoffSheet).filter(
-            TakeoffSheet.id == sheet_id,
-            TakeoffSheet.company_id == self.company_id,
-        ).first()
+        return (
+            self.db.query(TakeoffSheet)
+            .filter(
+                TakeoffSheet.id == sheet_id,
+                TakeoffSheet.company_id == self.company_id,
+            )
+            .first()
+        )
 
     def create_takeoff_sheet(self, data: TakeoffSheetCreate) -> TakeoffSheet:
         sheet = TakeoffSheet(
@@ -1102,7 +1281,9 @@ class EstimateService:
         self.db.refresh(sheet)
         return sheet
 
-    def update_takeoff_sheet(self, sheet_id: int, data: TakeoffSheetUpdate) -> Optional[TakeoffSheet]:
+    def update_takeoff_sheet(
+        self, sheet_id: int, data: TakeoffSheetUpdate
+    ) -> Optional[TakeoffSheet]:
         sheet = self.get_takeoff_sheet(sheet_id)
         if not sheet:
             return None
@@ -1130,7 +1311,12 @@ class EstimateService:
         if sheet_id:
             query = query.filter(TakeoffMeasurement.sheet_id == sheet_id)
         total = query.count()
-        items = query.order_by(TakeoffMeasurement.id.desc()).offset((page - 1) * page_size).limit(page_size).all()
+        items = (
+            query.order_by(TakeoffMeasurement.id.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
         return {"items": items, "total": total, "page": page, "page_size": page_size}
 
     def create_measurement(self, data: TakeoffMeasurementCreate) -> TakeoffMeasurement:
@@ -1151,11 +1337,17 @@ class EstimateService:
         self.db.refresh(measurement)
         return measurement
 
-    def update_measurement(self, measurement_id: int, data: TakeoffMeasurementUpdate) -> Optional[TakeoffMeasurement]:
-        m = self.db.query(TakeoffMeasurement).filter(
-            TakeoffMeasurement.id == measurement_id,
-            TakeoffMeasurement.company_id == self.company_id,
-        ).first()
+    def update_measurement(
+        self, measurement_id: int, data: TakeoffMeasurementUpdate
+    ) -> Optional[TakeoffMeasurement]:
+        m = (
+            self.db.query(TakeoffMeasurement)
+            .filter(
+                TakeoffMeasurement.id == measurement_id,
+                TakeoffMeasurement.company_id == self.company_id,
+            )
+            .first()
+        )
         if not m:
             return None
         for key, value in data.model_dump(exclude_unset=True).items():
@@ -1165,28 +1357,42 @@ class EstimateService:
         return m
 
     def delete_measurement(self, measurement_id: int) -> bool:
-        m = self.db.query(TakeoffMeasurement).filter(
-            TakeoffMeasurement.id == measurement_id,
-            TakeoffMeasurement.company_id == self.company_id,
-        ).first()
+        m = (
+            self.db.query(TakeoffMeasurement)
+            .filter(
+                TakeoffMeasurement.id == measurement_id,
+                TakeoffMeasurement.company_id == self.company_id,
+            )
+            .first()
+        )
         if not m:
             return False
         self.db.delete(m)
         self.db.commit()
         return True
 
-    def link_measurement_to_line(self, measurement_id: int, line_item_id: int) -> Optional[TakeoffMeasurement]:
-        m = self.db.query(TakeoffMeasurement).filter(
-            TakeoffMeasurement.id == measurement_id,
-            TakeoffMeasurement.company_id == self.company_id,
-        ).first()
+    def link_measurement_to_line(
+        self, measurement_id: int, line_item_id: int
+    ) -> Optional[TakeoffMeasurement]:
+        m = (
+            self.db.query(TakeoffMeasurement)
+            .filter(
+                TakeoffMeasurement.id == measurement_id,
+                TakeoffMeasurement.company_id == self.company_id,
+            )
+            .first()
+        )
         if not m:
             return None
         # Verify line item belongs to this company (IDOR protection)
-        li = self.db.query(EstimateLineItem).filter(
-            EstimateLineItem.id == line_item_id,
-            EstimateLineItem.company_id == self.company_id,
-        ).first()
+        li = (
+            self.db.query(EstimateLineItem)
+            .filter(
+                EstimateLineItem.id == line_item_id,
+                EstimateLineItem.company_id == self.company_id,
+            )
+            .first()
+        )
         if not li:
             return None
         m.estimate_line_item_id = line_item_id

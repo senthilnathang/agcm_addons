@@ -12,15 +12,18 @@ import {
 } from '@ant-design/icons-vue';
 
 import { getProjectApi } from '#/api/agcm';
+import { useUserStore } from '#/store/user';
 
 defineOptions({ name: 'AGCMProjectDetail' });
 
 const route = useRoute();
 const router = useRouter();
+const userStore = useUserStore();
 const projectId = computed(() => route.params.id);
 
 const loading = ref(false);
 const project = ref(null);
+const activeTab = ref('details');
 
 const statusColors = {
   new: 'blue',
@@ -168,6 +171,25 @@ onMounted(fetchProject);
               View All Logs
             </AButton>
           </div>
+        </ACard>
+
+        <!-- Activity Tab -->
+        <ACard class="mt-4">
+          <ATabs v-model:activeKey="activeTab">
+            <ATabs.TabPane key="details" tab="Details">
+              <!-- Details content is above -->
+            </ATabs.TabPane>
+            <ATabs.TabPane key="activity" tab="Activity">
+              <ActivityThread
+                :model-name="'agcm_projects'"
+                :record-id="projectId"
+                :access-token="userStore.accessToken"
+                :api-base="'/api/v1'"
+                :show-messages="true"
+                :show-activities="true"
+              />
+            </ATabs.TabPane>
+          </ATabs>
         </ACard>
       </template>
 

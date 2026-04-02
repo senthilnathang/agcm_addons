@@ -85,10 +85,10 @@ def seed():
     BidSubmission = mod_bid.BidSubmission
     PortalConfig = mod_portal_cfg.PortalConfig
 
-    ReportDefinition = mod_report_def.ReportDefinition
-    ReportSchedule = mod_report_def.ReportSchedule
-    DashboardLayout = mod_dash_widget.DashboardLayout
-    DashboardWidget = mod_dash_widget.DashboardWidget
+    ReportDefinition = mod_report_def.AGCMReportDefinition
+    ReportSchedule = mod_report_def.AGCMReportSchedule
+    DashboardLayout = mod_dash_widget.AGCMDashboardLayout
+    DashboardWidget = mod_dash_widget.AGCMDashboardWidget
 
     from app.db.base import Base
     from sqlalchemy import text as _text, inspect as _inspect

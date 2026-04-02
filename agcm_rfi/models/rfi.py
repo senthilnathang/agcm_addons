@@ -3,12 +3,21 @@
 import enum
 
 from sqlalchemy import (
-    Column, Date, Enum, Float, ForeignKey, Integer, String, Table, Text, Index,
+    Column,
+    Date,
+    Enum,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    Index,
 )
 from sqlalchemy.orm import relationship
 
 from app.db.base import Base
-from app.models.base import TimestampMixin, AuditMixin
+from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
 class RFIStatus(str, enum.Enum):
@@ -29,21 +38,39 @@ class RFIPriority(str, enum.Enum):
 agcm_rfi_label_rel = Table(
     "agcm_rfi_label_rel",
     Base.metadata,
-    Column("rfi_id", Integer, ForeignKey("agcm_rfis.id", ondelete="CASCADE"), primary_key=True),
-    Column("label_id", Integer, ForeignKey("agcm_rfi_labels.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "rfi_id",
+        Integer,
+        ForeignKey("agcm_rfis.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "label_id",
+        Integer,
+        ForeignKey("agcm_rfi_labels.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
 )
 
 # Many-to-many: RFI <-> Assignees
 agcm_rfi_assignees = Table(
     "agcm_rfi_assignees",
     Base.metadata,
-    Column("rfi_id", Integer, ForeignKey("agcm_rfis.id", ondelete="CASCADE"), primary_key=True),
-    Column("user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
+    Column(
+        "rfi_id",
+        Integer,
+        ForeignKey("agcm_rfis.id", ondelete="CASCADE"),
+        primary_key=True,
+    ),
+    Column(
+        "user_id", Integer, ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    ),
 )
 
 
 class RFILabel(Base, TimestampMixin):
     """Custom labels for RFI categorization."""
+
     __tablename__ = "agcm_rfi_labels"
     _description = "RFI custom labels"
 
@@ -60,8 +87,9 @@ class RFILabel(Base, TimestampMixin):
     company = relationship("Company", foreign_keys=[company_id], lazy="select")
 
 
-class RFI(Base, TimestampMixin, AuditMixin):
-    """Request for Information - core record."""
+class RFI(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
+    """Request for Information - core record with activity logging."""
+
     __tablename__ = "agcm_rfis"
     _description = "Request for Information with status workflow"
 
@@ -94,8 +122,8 @@ class RFI(Base, TimestampMixin, AuditMixin):
     schedule_impact_days = Column(Integer, nullable=True, default=0)
     cost_impact = Column(Float, nullable=True, default=0.0)
 
-    due_date = Column(Date, nullable=True)
-    closed_date = Column(Date, nullable=True)
+    due_date = Column(Date, nullable=True, index=True)
+    closed_date = Column(Date, nullable=True, index=True)
 
     project_id = Column(
         Integer,
@@ -108,6 +136,7 @@ class RFI(Base, TimestampMixin, AuditMixin):
         Integer,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     # Relationships
