@@ -51,9 +51,9 @@ Request for Information (RFI) management for construction projects.
     },
     "menus": [
         {
-            "name": "RFI",
+            "name": "Orders",
             "path": "/agcm/rfi",
-            "icon": "lucide:message-circle-question",
+            "icon": "lucide:clipboard-list",
             "sequence": 35,
             "children": [
                 {
@@ -67,7 +67,7 @@ Request for Information (RFI) management for construction projects.
                     "name": "RFI Labels",
                     "path": "/agcm/rfi/labels",
                     "icon": "lucide:tags",
-                    "sequence": 2,
+                    "sequence": 10,
                     "viewName": "settings-rfi-labels",
                 },
             ],

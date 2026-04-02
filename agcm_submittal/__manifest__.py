@@ -51,30 +51,24 @@ Manage construction submittals with approval workflows.
     "menus": [
         {
             "name": "Submittals",
-            "path": "/agcm/submittals",
+            "parent": "agcm_rfi",
+            "path": "/agcm/submittals/list",
             "icon": "lucide:file-check-2",
-            "sequence": 36,
-            "children": [
-                {
-                    "name": "Submittals",
-                    "path": "/agcm/submittals/list",
-                    "icon": "lucide:file-check-2",
-                    "sequence": 1,
-                    "viewName": "submittals",
-                },
-                {
-                    "name": "Submittal Types",
-                    "path": "/agcm/submittals/types",
-                    "icon": "lucide:file-type",
-                    "sequence": 2,
-                    "viewName": "settings-submittal-types",
-                },
-            ],
+            "sequence": 3,
+            "viewName": "submittals",
+        },
+        {
+            "name": "Submittal Types",
+            "parent": "agcm_rfi",
+            "path": "/agcm/submittals/types",
+            "icon": "lucide:file-type",
+            "sequence": 4,
+            "viewName": "settings-submittal-types",
         },
         {
             "name": "Submittal Form",
             "path": "/agcm/submittals/form",
-            "parent": "/agcm/submittals",
+            "parent": "/agcm/rfi",
             "hideInMenu": True,
             "viewName": "submittal-form",
             "sequence": 110,
@@ -82,7 +76,7 @@ Manage construction submittals with approval workflows.
         {
             "name": "Submittal Detail",
             "path": "/agcm/submittals/detail",
-            "parent": "/agcm/submittals",
+            "parent": "/agcm/rfi",
             "hideInMenu": True,
             "viewName": "submittal-detail",
             "sequence": 111,
