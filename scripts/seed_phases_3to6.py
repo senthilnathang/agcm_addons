@@ -36,13 +36,37 @@ def seed():
         return mod
 
     # Load base agcm models
-    for mf in ["lookups", "project", "daily_activity_log", "manpower", "weather", "notes",
-                "inspection", "accident", "visitor", "safety_violation", "delay", "deficiency", "photo"]:
+    for mf in [
+        "lookups",
+        "project",
+        "daily_activity_log",
+        "manpower",
+        "weather",
+        "notes",
+        "inspection",
+        "accident",
+        "visitor",
+        "safety_violation",
+        "delay",
+        "deficiency",
+        "photo",
+    ]:
         load_model(f"_b_{mf}", os.path.join(addon, "agcm", "models", f"{mf}.py"))
-    for mf in ["cost_catalog", "assembly", "estimate", "estimate_markup", "proposal", "takeoff"]:
-        load_model(f"_e_{mf}", os.path.join(addon, "agcm_estimate", "models", f"{mf}.py"))
+    for mf in [
+        "cost_catalog",
+        "assembly",
+        "estimate",
+        "estimate_markup",
+        "proposal",
+        "takeoff",
+    ]:
+        load_model(
+            f"_e_{mf}", os.path.join(addon, "agcm_estimate", "models", f"{mf}.py")
+        )
     for mf in ["purchase_order", "subcontract", "vendor_bill"]:
-        load_model(f"_p_{mf}", os.path.join(addon, "agcm_procurement", "models", f"{mf}.py"))
+        load_model(
+            f"_p_{mf}", os.path.join(addon, "agcm_procurement", "models", f"{mf}.py")
+        )
 
     try:
         from app.models import User, Company
@@ -50,22 +74,53 @@ def seed():
         pass
 
     # Load Phase 3-6 models
-    mod_worker = load_model("_r_worker", os.path.join(addon, "agcm_resource", "models", "worker.py"))
-    mod_equipment = load_model("_r_equipment", os.path.join(addon, "agcm_resource", "models", "equipment.py"))
-    mod_timesheet = load_model("_r_timesheet", os.path.join(addon, "agcm_resource", "models", "timesheet.py"))
-    mod_equip_assign = load_model("_r_equip_assign", os.path.join(addon, "agcm_resource", "models", "equipment_assignment.py"))
+    mod_worker = load_model(
+        "_r_worker", os.path.join(addon, "agcm_resource", "models", "worker.py")
+    )
+    mod_equipment = load_model(
+        "_r_equipment", os.path.join(addon, "agcm_resource", "models", "equipment.py")
+    )
+    mod_timesheet = load_model(
+        "_r_timesheet", os.path.join(addon, "agcm_resource", "models", "timesheet.py")
+    )
+    mod_equip_assign = load_model(
+        "_r_equip_assign",
+        os.path.join(addon, "agcm_resource", "models", "equipment_assignment.py"),
+    )
 
-    mod_checklist = load_model("_s_checklist", os.path.join(addon, "agcm_safety", "models", "checklist.py"))
-    mod_inspection = load_model("_s_inspection", os.path.join(addon, "agcm_safety", "models", "inspection.py"))
-    mod_punch = load_model("_s_punch", os.path.join(addon, "agcm_safety", "models", "punch_list.py"))
-    mod_incident = load_model("_s_incident", os.path.join(addon, "agcm_safety", "models", "incident.py"))
+    mod_checklist = load_model(
+        "_s_checklist", os.path.join(addon, "agcm_safety", "models", "checklist.py")
+    )
+    mod_inspection = load_model(
+        "_s_inspection", os.path.join(addon, "agcm_safety", "models", "inspection.py")
+    )
+    mod_punch = load_model(
+        "_s_punch", os.path.join(addon, "agcm_safety", "models", "punch_list.py")
+    )
+    mod_incident = load_model(
+        "_s_incident", os.path.join(addon, "agcm_safety", "models", "incident.py")
+    )
 
-    mod_selection = load_model("_portal_selection", os.path.join(addon, "agcm_portal", "models", "selection.py"))
-    mod_bid = load_model("_portal_bid", os.path.join(addon, "agcm_portal", "models", "bid.py"))
-    mod_portal_cfg = load_model("_portal_config", os.path.join(addon, "agcm_portal", "models", "portal_config.py"))
+    mod_selection = load_model(
+        "_portal_selection",
+        os.path.join(addon, "agcm_portal", "models", "selection.py"),
+    )
+    mod_bid = load_model(
+        "_portal_bid", os.path.join(addon, "agcm_portal", "models", "bid.py")
+    )
+    mod_portal_cfg = load_model(
+        "_portal_config",
+        os.path.join(addon, "agcm_portal", "models", "portal_config.py"),
+    )
 
-    mod_report_def = load_model("_rpt_def", os.path.join(addon, "agcm_reporting", "models", "report_definition.py"))
-    mod_dash_widget = load_model("_rpt_dash", os.path.join(addon, "agcm_reporting", "models", "dashboard_widget.py"))
+    mod_report_def = load_model(
+        "_rpt_def",
+        os.path.join(addon, "agcm_reporting", "models", "report_definition.py"),
+    )
+    mod_dash_widget = load_model(
+        "_rpt_dash",
+        os.path.join(addon, "agcm_reporting", "models", "dashboard_widget.py"),
+    )
 
     Worker = mod_worker.Worker
     Equipment = mod_equipment.Equipment
@@ -97,22 +152,34 @@ def seed():
     inspector = _inspect(engine)
     existing_tables = set(inspector.get_table_names())
     target_tables = [
-        "agcm_workers", "agcm_equipment", "agcm_timesheets", "agcm_equipment_assignments",
-        "agcm_checklist_templates", "agcm_checklist_template_items",
-        "agcm_safety_inspections", "agcm_safety_inspection_items",
-        "agcm_punch_list_items", "agcm_incident_reports",
-        "agcm_selections", "agcm_selection_options",
-        "agcm_bid_packages", "agcm_bid_submissions",
+        "agcm_workers",
+        "agcm_equipment",
+        "agcm_timesheets",
+        "agcm_equipment_assignments",
+        "agcm_checklist_templates",
+        "agcm_checklist_template_items",
+        "agcm_safety_inspections",
+        "agcm_safety_inspection_items",
+        "agcm_punch_list_items",
+        "agcm_incident_reports",
+        "agcm_selections",
+        "agcm_selection_options",
+        "agcm_bid_packages",
+        "agcm_bid_submissions",
         "agcm_portal_configs",
-        "agcm_report_definitions", "agcm_report_schedules",
-        "agcm_dashboard_layouts", "agcm_dashboard_widgets",
+        "agcm_report_definitions",
+        "agcm_report_schedules",
+        "agcm_dashboard_layouts",
+        "agcm_dashboard_widgets",
     ]
     missing = [t for t in target_tables if t not in existing_tables]
     if missing:
         # Drop conflicting indexes from the old inspections_v2 table that clash with new model index names
         with engine.begin() as conn:
             for idx_name in [
-                "ix_agcm_insp_v2_project", "ix_agcm_insp_v2_status", "ix_agcm_insp_v2_company",
+                "ix_agcm_insp_v2_project",
+                "ix_agcm_insp_v2_status",
+                "ix_agcm_insp_v2_company",
                 "ix_agcm_insp_item_inspection",
             ]:
                 try:
@@ -120,7 +187,9 @@ def seed():
                 except Exception:
                     pass
 
-        tables_to_create = [Base.metadata.tables[t] for t in missing if t in Base.metadata.tables]
+        tables_to_create = [
+            Base.metadata.tables[t] for t in missing if t in Base.metadata.tables
+        ]
         if tables_to_create:
             with engine.begin() as conn:
                 for tbl in tables_to_create:
@@ -136,36 +205,155 @@ def seed():
     # Reference data
     # ===================================================================
     TRADES = [
-        "Electrician", "Plumber", "Carpenter", "Iron Worker", "Mason",
-        "HVAC Technician", "Painter", "Roofer", "Glazier", "Welder",
-        "Concrete Finisher", "Drywall Installer", "Tile Setter", "Insulator",
-        "Sheet Metal Worker", "Pipefitter", "Laborer", "Equipment Operator",
+        "Electrician",
+        "Plumber",
+        "Carpenter",
+        "Iron Worker",
+        "Mason",
+        "HVAC Technician",
+        "Painter",
+        "Roofer",
+        "Glazier",
+        "Welder",
+        "Concrete Finisher",
+        "Drywall Installer",
+        "Tile Setter",
+        "Insulator",
+        "Sheet Metal Worker",
+        "Pipefitter",
+        "Laborer",
+        "Equipment Operator",
     ]
 
     FIRST_NAMES = [
-        "James", "Robert", "Michael", "William", "David", "Richard", "Joseph", "Thomas",
-        "Charles", "Daniel", "Matthew", "Anthony", "Mark", "Donald", "Steven", "Paul",
-        "Andrew", "Joshua", "Kenneth", "Kevin", "Maria", "Patricia", "Linda", "Barbara",
-        "Elizabeth", "Jennifer", "Susan", "Jessica", "Sarah", "Karen", "Lisa", "Nancy",
-        "Betty", "Sandra", "Margaret", "Ashley", "Dorothy", "Kimberly", "Emily", "Donna",
-        "Carlos", "Miguel", "Jose", "Juan", "Pedro", "Luis", "Jorge", "Alejandro",
-        "Fernando", "Ricardo", "Diego", "Marco", "Rafael", "Roberto", "Francisco", "Eduardo",
-        "Hector", "Oscar", "Victor", "Sergio", "Angel", "Ramon", "Andres", "Manuel",
+        "James",
+        "Robert",
+        "Michael",
+        "William",
+        "David",
+        "Richard",
+        "Joseph",
+        "Thomas",
+        "Charles",
+        "Daniel",
+        "Matthew",
+        "Anthony",
+        "Mark",
+        "Donald",
+        "Steven",
+        "Paul",
+        "Andrew",
+        "Joshua",
+        "Kenneth",
+        "Kevin",
+        "Maria",
+        "Patricia",
+        "Linda",
+        "Barbara",
+        "Elizabeth",
+        "Jennifer",
+        "Susan",
+        "Jessica",
+        "Sarah",
+        "Karen",
+        "Lisa",
+        "Nancy",
+        "Betty",
+        "Sandra",
+        "Margaret",
+        "Ashley",
+        "Dorothy",
+        "Kimberly",
+        "Emily",
+        "Donna",
+        "Carlos",
+        "Miguel",
+        "Jose",
+        "Juan",
+        "Pedro",
+        "Luis",
+        "Jorge",
+        "Alejandro",
+        "Fernando",
+        "Ricardo",
+        "Diego",
+        "Marco",
+        "Rafael",
+        "Roberto",
+        "Francisco",
+        "Eduardo",
+        "Hector",
+        "Oscar",
+        "Victor",
+        "Sergio",
+        "Angel",
+        "Ramon",
+        "Andres",
+        "Manuel",
     ]
     LAST_NAMES = [
-        "Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis",
-        "Rodriguez", "Martinez", "Hernandez", "Lopez", "Gonzalez", "Wilson", "Anderson",
-        "Thomas", "Taylor", "Moore", "Jackson", "Martin", "Lee", "Perez", "Thompson",
-        "White", "Harris", "Sanchez", "Clark", "Ramirez", "Lewis", "Robinson",
-        "Walker", "Young", "Allen", "King", "Wright", "Scott", "Torres", "Nguyen",
-        "Hill", "Flores", "Green", "Adams", "Nelson", "Baker", "Hall", "Rivera",
+        "Smith",
+        "Johnson",
+        "Williams",
+        "Brown",
+        "Jones",
+        "Garcia",
+        "Miller",
+        "Davis",
+        "Rodriguez",
+        "Martinez",
+        "Hernandez",
+        "Lopez",
+        "Gonzalez",
+        "Wilson",
+        "Anderson",
+        "Thomas",
+        "Taylor",
+        "Moore",
+        "Jackson",
+        "Martin",
+        "Lee",
+        "Perez",
+        "Thompson",
+        "White",
+        "Harris",
+        "Sanchez",
+        "Clark",
+        "Ramirez",
+        "Lewis",
+        "Robinson",
+        "Walker",
+        "Young",
+        "Allen",
+        "King",
+        "Wright",
+        "Scott",
+        "Torres",
+        "Nguyen",
+        "Hill",
+        "Flores",
+        "Green",
+        "Adams",
+        "Nelson",
+        "Baker",
+        "Hall",
+        "Rivera",
     ]
 
     CERTIFICATIONS_POOL = [
-        "OSHA 10-Hour", "OSHA 30-Hour", "First Aid/CPR", "Confined Space Entry",
-        "Fall Protection Certified", "Scaffold Competent Person", "Forklift Certified",
-        "Crane Operator NCCCO", "AWS Certified Welder", "EPA 608 Universal",
-        "Master Electrician License", "Journeyman Plumber License", "CDL Class A",
+        "OSHA 10-Hour",
+        "OSHA 30-Hour",
+        "First Aid/CPR",
+        "Confined Space Entry",
+        "Fall Protection Certified",
+        "Scaffold Competent Person",
+        "Forklift Certified",
+        "Crane Operator NCCCO",
+        "AWS Certified Welder",
+        "EPA 608 Universal",
+        "Master Electrician License",
+        "Journeyman Plumber License",
+        "CDL Class A",
     ]
 
     EQUIPMENT_DATA = [
@@ -176,34 +364,125 @@ def seed():
         ("JLG 600S Boom Lift", "Boom Lift", "JLG", "600S", 950, 130),
         ("Genie S-65 Boom Lift", "Boom Lift", "Genie", "S-65", 900, 125),
         ("CAT D6 Dozer", "Dozer", "Caterpillar", "D6T", 3200, 430),
-        ("Volvo A30G Articulated Truck", "Articulated Truck", "Volvo", "A30G", 2400, 325),
+        (
+            "Volvo A30G Articulated Truck",
+            "Articulated Truck",
+            "Volvo",
+            "A30G",
+            2400,
+            325,
+        ),
         ("Bomag BW213 Compactor", "Compactor", "Bomag", "BW213D-5", 1100, 150),
         ("Toyota 8FGU25 Forklift", "Forklift", "Toyota", "8FGU25", 450, 65),
         ("Hyster H80FT Forklift", "Forklift", "Hyster", "H80FT", 480, 70),
-        ("Wacker Neuson DPU6555 Plate Compactor", "Plate Compactor", "Wacker Neuson", "DPU6555", 180, 25),
+        (
+            "Wacker Neuson DPU6555 Plate Compactor",
+            "Plate Compactor",
+            "Wacker Neuson",
+            "DPU6555",
+            180,
+            25,
+        ),
         ("Multiquip Concrete Mixer", "Concrete Mixer", "Multiquip", "MC94SH", 350, 50),
-        ("Putzmeister BSF 36Z Concrete Pump", "Concrete Pump", "Putzmeister", "BSF 36Z.16H", 4200, 570),
+        (
+            "Putzmeister BSF 36Z Concrete Pump",
+            "Concrete Pump",
+            "Putzmeister",
+            "BSF 36Z.16H",
+            4200,
+            570,
+        ),
         ("CAT 930M Wheel Loader", "Wheel Loader", "Caterpillar", "930M", 1800, 245),
         ("Bobcat T770 Track Loader", "Track Loader", "Bobcat", "T770", 950, 130),
-        ("Ingersoll Rand P185 Compressor", "Air Compressor", "Ingersoll Rand", "P185WJD", 350, 50),
-        ("Atlas Copco XAS 185 Compressor", "Air Compressor", "Atlas Copco", "XAS 185", 380, 55),
-        ("Wacker Neuson SW16 Skid Steer", "Skid Steer", "Wacker Neuson", "SW16", 650, 90),
-        ("Link-Belt TCC-750 Telescopic Crane", "Crane", "Link-Belt", "TCC-750", 4800, 650),
+        (
+            "Ingersoll Rand P185 Compressor",
+            "Air Compressor",
+            "Ingersoll Rand",
+            "P185WJD",
+            350,
+            50,
+        ),
+        (
+            "Atlas Copco XAS 185 Compressor",
+            "Air Compressor",
+            "Atlas Copco",
+            "XAS 185",
+            380,
+            55,
+        ),
+        (
+            "Wacker Neuson SW16 Skid Steer",
+            "Skid Steer",
+            "Wacker Neuson",
+            "SW16",
+            650,
+            90,
+        ),
+        (
+            "Link-Belt TCC-750 Telescopic Crane",
+            "Crane",
+            "Link-Belt",
+            "TCC-750",
+            4800,
+            650,
+        ),
         ("John Deere 310L Backhoe", "Backhoe", "John Deere", "310L", 1400, 190),
-        ("Kubota KX040 Mini Excavator", "Mini Excavator", "Kubota", "KX040-4", 850, 115),
+        (
+            "Kubota KX040 Mini Excavator",
+            "Mini Excavator",
+            "Kubota",
+            "KX040-4",
+            850,
+            115,
+        ),
         ("Hilti TE 3000-AVR Breaker", "Breaker", "Hilti", "TE 3000-AVR", 250, 35),
         ("Husqvarna K 770 Concrete Saw", "Concrete Saw", "Husqvarna", "K 770", 120, 18),
         ("Genie GS-1930 Scissor Lift", "Scissor Lift", "Genie", "GS-1930", 350, 50),
         ("JLG 3246ES Scissor Lift", "Scissor Lift", "JLG", "3246ES", 380, 55),
-        ("Vermeer D24x40 Drill", "Directional Drill", "Vermeer", "D24x40 S3", 2200, 300),
-        ("CAT 308 Mini Excavator", "Mini Excavator", "Caterpillar", "308 CR", 1100, 150),
+        (
+            "Vermeer D24x40 Drill",
+            "Directional Drill",
+            "Vermeer",
+            "D24x40 S3",
+            2200,
+            300,
+        ),
+        (
+            "CAT 308 Mini Excavator",
+            "Mini Excavator",
+            "Caterpillar",
+            "308 CR",
+            1100,
+            150,
+        ),
         ("Volvo EC220E Excavator", "Excavator", "Volvo", "EC220E", 2500, 340),
         ("Terex RT 555-1 Crane", "Crane", "Terex", "RT 555-1", 3800, 520),
         ("Wacker Neuson 6003 Dumper", "Dumper", "Wacker Neuson", "6003", 550, 75),
-        ("Takeuchi TL12V2 Track Loader", "Track Loader", "Takeuchi", "TL12V2", 900, 125),
+        (
+            "Takeuchi TL12V2 Track Loader",
+            "Track Loader",
+            "Takeuchi",
+            "TL12V2",
+            900,
+            125,
+        ),
         ("DeWalt DW745 Table Saw", "Table Saw", "DeWalt", "DW745", 85, 12),
-        ("Lincoln Electric Ranger 250 GXT Welder", "Welder/Generator", "Lincoln Electric", "Ranger 250 GXT", 300, 42),
-        ("Miller Trailblazer 325 Welder", "Welder/Generator", "Miller", "Trailblazer 325", 320, 45),
+        (
+            "Lincoln Electric Ranger 250 GXT Welder",
+            "Welder/Generator",
+            "Lincoln Electric",
+            "Ranger 250 GXT",
+            300,
+            42,
+        ),
+        (
+            "Miller Trailblazer 325 Welder",
+            "Welder/Generator",
+            "Miller",
+            "Trailblazer 325",
+            320,
+            45,
+        ),
         ("Generac XC6500 Generator", "Generator", "Generac", "XC6500E", 250, 35),
         ("Honda EU7000iS Generator", "Generator", "Honda", "EU7000iS", 280, 40),
         ("Manitou MT 1840 Telehandler", "Telehandler", "Manitou", "MT 1840", 1600, 220),
@@ -214,26 +493,60 @@ def seed():
     ]
 
     LOCATIONS = [
-        "Building A - Ground Floor", "Building A - 2nd Floor", "Building A - 3rd Floor",
-        "Building A - Roof", "Building B - Ground Floor", "Building B - 2nd Floor",
-        "Building C - Basement", "Building C - Ground Floor", "Parking Garage Level 1",
-        "Parking Garage Level 2", "Site Entrance", "Loading Dock", "Mechanical Room",
-        "Electrical Room", "Elevator Shaft", "Stairwell A", "Stairwell B",
-        "Lobby", "Conference Wing", "Cafeteria", "Restrooms 1st Floor", "Utility Corridor",
-        "North Exterior Wall", "South Exterior Wall", "East Wing", "West Wing",
+        "Building A - Ground Floor",
+        "Building A - 2nd Floor",
+        "Building A - 3rd Floor",
+        "Building A - Roof",
+        "Building B - Ground Floor",
+        "Building B - 2nd Floor",
+        "Building C - Basement",
+        "Building C - Ground Floor",
+        "Parking Garage Level 1",
+        "Parking Garage Level 2",
+        "Site Entrance",
+        "Loading Dock",
+        "Mechanical Room",
+        "Electrical Room",
+        "Elevator Shaft",
+        "Stairwell A",
+        "Stairwell B",
+        "Lobby",
+        "Conference Wing",
+        "Cafeteria",
+        "Restrooms 1st Floor",
+        "Utility Corridor",
+        "North Exterior Wall",
+        "South Exterior Wall",
+        "East Wing",
+        "West Wing",
     ]
 
     TASK_DESCRIPTIONS = [
-        "Rough electrical wiring installation", "Plumbing rough-in for 2nd floor",
-        "Framing interior walls", "Installing ductwork", "Concrete pour preparation",
-        "Steel beam installation", "Drywall hanging", "Tile installation bathroom",
-        "Paint prep and priming", "Roofing membrane application",
-        "Window installation", "Fire sprinkler piping", "Insulation installation",
-        "Conduit routing and pull", "Pipe fitting and soldering",
-        "Block wall construction", "Ceiling grid installation", "Floor leveling compound",
-        "Cabinet installation", "Finish carpentry trim work",
-        "Fire alarm wiring", "Elevator shaft framing", "Waterproofing application",
-        "Grading and compaction", "Slab on grade forming",
+        "Rough electrical wiring installation",
+        "Plumbing rough-in for 2nd floor",
+        "Framing interior walls",
+        "Installing ductwork",
+        "Concrete pour preparation",
+        "Steel beam installation",
+        "Drywall hanging",
+        "Tile installation bathroom",
+        "Paint prep and priming",
+        "Roofing membrane application",
+        "Window installation",
+        "Fire sprinkler piping",
+        "Insulation installation",
+        "Conduit routing and pull",
+        "Pipe fitting and soldering",
+        "Block wall construction",
+        "Ceiling grid installation",
+        "Floor leveling compound",
+        "Cabinet installation",
+        "Finish carpentry trim work",
+        "Fire alarm wiring",
+        "Elevator shaft framing",
+        "Waterproofing application",
+        "Grading and compaction",
+        "Slab on grade forming",
     ]
 
     # ===================================================================
@@ -245,8 +558,23 @@ def seed():
     worker_count = 0
     worker_ids = []
     worker_rates = {}  # worker_id -> (hourly_rate, overtime_rate)
-    skill_levels = ["apprentice", "journeyman", "journeyman", "master", "foreman", "superintendent"]
-    worker_statuses = ["active", "active", "active", "active", "active", "inactive", "on_leave"]
+    skill_levels = [
+        "apprentice",
+        "journeyman",
+        "journeyman",
+        "master",
+        "foreman",
+        "superintendent",
+    ]
+    worker_statuses = [
+        "active",
+        "active",
+        "active",
+        "active",
+        "active",
+        "inactive",
+        "on_leave",
+    ]
 
     for pid in PROJECT_IDS:
         for i in range(5):
@@ -265,7 +593,11 @@ def seed():
             hr = round(base_rate, 2)
             otr = round(hr * 1.5, 2)
             num_certs = random.randint(1, 4)
-            certs = json.dumps(random.sample(CERTIFICATIONS_POOL, min(num_certs, len(CERTIFICATIONS_POOL))))
+            certs = json.dumps(
+                random.sample(
+                    CERTIFICATIONS_POOL, min(num_certs, len(CERTIFICATIONS_POOL))
+                )
+            )
 
             w = Worker(
                 company_id=COMPANY_ID,
@@ -274,7 +606,7 @@ def seed():
                 last_name=ln,
                 full_name=f"{fn} {ln}",
                 email=f"{fn.lower()}.{ln.lower()}{worker_count}@construction.example.com",
-                phone=f"(512) {random.randint(200,999)}-{random.randint(1000,9999)}",
+                phone=f"(512) {random.randint(200, 999)}-{random.randint(1000, 9999)}",
                 status=random.choice(worker_statuses),
                 skill_level=skill,
                 trade=trade,
@@ -297,7 +629,14 @@ def seed():
     equip_ids = []
     equip_rates = {}  # equip_id -> daily_rate
     ownership_types = ["owned", "owned", "rented", "rented", "leased"]
-    equip_statuses = ["available", "in_use", "in_use", "in_use", "maintenance", "retired"]
+    equip_statuses = [
+        "available",
+        "in_use",
+        "in_use",
+        "in_use",
+        "maintenance",
+        "retired",
+    ]
 
     for name, etype, make, model_name, daily, hourly in EQUIPMENT_DATA:
         equip_count += 1
@@ -336,7 +675,15 @@ def seed():
 
     # --- Timesheets ---
     ts_count = 0
-    ts_statuses = ["draft", "submitted", "submitted", "approved", "approved", "approved", "rejected"]
+    ts_statuses = [
+        "draft",
+        "submitted",
+        "submitted",
+        "approved",
+        "approved",
+        "approved",
+        "rejected",
+    ]
     base_date = date(2025, 3, 1)
 
     for pid in PROJECT_IDS:
@@ -361,7 +708,9 @@ def seed():
                 status = random.choice(ts_statuses)
 
                 clock_in_hr = random.choice([6, 7])
-                clock_in = datetime(ts_date.year, ts_date.month, ts_date.day, clock_in_hr, 0)
+                clock_in = datetime(
+                    ts_date.year, ts_date.month, ts_date.day, clock_in_hr, 0
+                )
                 clock_out = clock_in + timedelta(hours=total_h)
 
                 ts = Timesheet(
@@ -381,7 +730,9 @@ def seed():
                     clock_out=clock_out,
                     status=status,
                     approved_by=USER_ID if status == "approved" else None,
-                    approved_date=ts_date + timedelta(days=1) if status == "approved" else None,
+                    approved_date=ts_date + timedelta(days=1)
+                    if status == "approved"
+                    else None,
                     task_description=random.choice(TASK_DESCRIPTIONS),
                     location=random.choice(LOCATIONS),
                 )
@@ -428,91 +779,131 @@ def seed():
 
     # --- Checklist Templates & Items ---
     TEMPLATES = [
-        ("Foundation Inspection", "structural", [
-            "Verify footing dimensions match approved drawings",
-            "Check rebar placement, size, and spacing",
-            "Inspect formwork alignment and bracing",
-            "Confirm anchor bolt placement and projection",
-            "Verify soil bearing capacity test results",
-            "Check waterproofing membrane installation",
-            "Inspect vapor barrier continuity",
-        ]),
-        ("Framing Inspection", "structural", [
-            "Verify stud spacing and size per plans",
-            "Check header sizes over openings",
-            "Inspect hold-down and strap connections",
-            "Verify sheathing nailing pattern",
-            "Check fire blocking installation",
-            "Inspect top plate lap splices",
-        ]),
-        ("Electrical Rough-In", "MEP", [
-            "Verify wire gauge matches circuit amperage",
-            "Check box fill calculations compliance",
-            "Inspect grounding and bonding continuity",
-            "Verify AFCI/GFCI protection per code",
-            "Check conduit support and spacing",
-            "Inspect panel schedule matches installed circuits",
-            "Verify emergency circuit separation",
-        ]),
-        ("Plumbing Rough-In", "MEP", [
-            "Verify pipe sizing per fixture unit calculation",
-            "Check DWV slope (1/4\" per foot minimum)",
-            "Inspect pressure test results (min 50 PSI 15 min)",
-            "Verify cleanout locations per code",
-            "Check water heater installation clearances",
-            "Inspect backflow prevention devices",
-        ]),
-        ("HVAC Installation", "MEP", [
-            "Verify duct sizing per load calculation",
-            "Check duct sealing at all joints (mastic/tape)",
-            "Inspect refrigerant line brazing quality",
-            "Verify thermostat placement (5ft, interior wall)",
-            "Check condensate drain routing and trap",
-            "Inspect equipment clearances for service access",
-        ]),
-        ("Roofing Inspection", "envelope", [
-            "Verify underlayment installation and overlap",
-            "Check flashing at all penetrations",
-            "Inspect valley and ridge details",
-            "Verify drip edge installation",
-            "Check gutter and downspout sizing",
-            "Inspect attic ventilation (1:150 ratio)",
-        ]),
-        ("Fire Protection", "life_safety", [
-            "Verify sprinkler head spacing per NFPA 13",
-            "Check fire alarm device placement per NFPA 72",
-            "Inspect fire-rated assembly penetrations",
-            "Verify fire door ratings and hardware",
-            "Check fire extinguisher placement (75ft travel)",
-            "Inspect fire pump test results",
-            "Verify standpipe connection accessibility",
-        ]),
-        ("Concrete Placement", "structural", [
-            "Verify mix design matches specifications",
-            "Check slump test results (4\" +/- 1\")",
-            "Inspect rebar coverage and chair placement",
-            "Verify control joint layout",
-            "Check curing compound application",
-            "Inspect cylinder test schedule compliance",
-        ]),
-        ("Waterproofing Inspection", "envelope", [
-            "Verify surface preparation and priming",
-            "Check membrane thickness (wet mil gauge)",
-            "Inspect lap seams and termination details",
-            "Verify drainage board installation",
-            "Check protection board over membrane",
-            "Inspect flood test results (24-hour minimum)",
-        ]),
-        ("Final / Punch Walk", "closeout", [
-            "Verify all finish surfaces free of damage",
-            "Check all hardware operation (doors, locks, closers)",
-            "Inspect paint touch-ups and wall finish quality",
-            "Verify all MEP systems operational",
-            "Check flooring transitions and thresholds",
-            "Inspect all signage and room numbering",
-            "Verify ADA compliance (grab bars, clearances)",
-            "Check life safety systems tested and tagged",
-        ]),
+        (
+            "Foundation Inspection",
+            "structural",
+            [
+                "Verify footing dimensions match approved drawings",
+                "Check rebar placement, size, and spacing",
+                "Inspect formwork alignment and bracing",
+                "Confirm anchor bolt placement and projection",
+                "Verify soil bearing capacity test results",
+                "Check waterproofing membrane installation",
+                "Inspect vapor barrier continuity",
+            ],
+        ),
+        (
+            "Framing Inspection",
+            "structural",
+            [
+                "Verify stud spacing and size per plans",
+                "Check header sizes over openings",
+                "Inspect hold-down and strap connections",
+                "Verify sheathing nailing pattern",
+                "Check fire blocking installation",
+                "Inspect top plate lap splices",
+            ],
+        ),
+        (
+            "Electrical Rough-In",
+            "MEP",
+            [
+                "Verify wire gauge matches circuit amperage",
+                "Check box fill calculations compliance",
+                "Inspect grounding and bonding continuity",
+                "Verify AFCI/GFCI protection per code",
+                "Check conduit support and spacing",
+                "Inspect panel schedule matches installed circuits",
+                "Verify emergency circuit separation",
+            ],
+        ),
+        (
+            "Plumbing Rough-In",
+            "MEP",
+            [
+                "Verify pipe sizing per fixture unit calculation",
+                'Check DWV slope (1/4" per foot minimum)',
+                "Inspect pressure test results (min 50 PSI 15 min)",
+                "Verify cleanout locations per code",
+                "Check water heater installation clearances",
+                "Inspect backflow prevention devices",
+            ],
+        ),
+        (
+            "HVAC Installation",
+            "MEP",
+            [
+                "Verify duct sizing per load calculation",
+                "Check duct sealing at all joints (mastic/tape)",
+                "Inspect refrigerant line brazing quality",
+                "Verify thermostat placement (5ft, interior wall)",
+                "Check condensate drain routing and trap",
+                "Inspect equipment clearances for service access",
+            ],
+        ),
+        (
+            "Roofing Inspection",
+            "envelope",
+            [
+                "Verify underlayment installation and overlap",
+                "Check flashing at all penetrations",
+                "Inspect valley and ridge details",
+                "Verify drip edge installation",
+                "Check gutter and downspout sizing",
+                "Inspect attic ventilation (1:150 ratio)",
+            ],
+        ),
+        (
+            "Fire Protection",
+            "life_safety",
+            [
+                "Verify sprinkler head spacing per NFPA 13",
+                "Check fire alarm device placement per NFPA 72",
+                "Inspect fire-rated assembly penetrations",
+                "Verify fire door ratings and hardware",
+                "Check fire extinguisher placement (75ft travel)",
+                "Inspect fire pump test results",
+                "Verify standpipe connection accessibility",
+            ],
+        ),
+        (
+            "Concrete Placement",
+            "structural",
+            [
+                "Verify mix design matches specifications",
+                'Check slump test results (4" +/- 1")',
+                "Inspect rebar coverage and chair placement",
+                "Verify control joint layout",
+                "Check curing compound application",
+                "Inspect cylinder test schedule compliance",
+            ],
+        ),
+        (
+            "Waterproofing Inspection",
+            "envelope",
+            [
+                "Verify surface preparation and priming",
+                "Check membrane thickness (wet mil gauge)",
+                "Inspect lap seams and termination details",
+                "Verify drainage board installation",
+                "Check protection board over membrane",
+                "Inspect flood test results (24-hour minimum)",
+            ],
+        ),
+        (
+            "Final / Punch Walk",
+            "closeout",
+            [
+                "Verify all finish surfaces free of damage",
+                "Check all hardware operation (doors, locks, closers)",
+                "Inspect paint touch-ups and wall finish quality",
+                "Verify all MEP systems operational",
+                "Check flooring transitions and thresholds",
+                "Inspect all signage and room numbering",
+                "Verify ADA compliance (grab bars, clearances)",
+                "Check life safety systems tested and tagged",
+            ],
+        ),
     ]
 
     tpl_count = 0
@@ -548,15 +939,38 @@ def seed():
     # --- Safety Inspections & Items ---
     insp_count = 0
     insp_item_count = 0
-    insp_statuses = ["scheduled", "in_progress", "passed", "passed", "passed", "failed", "conditional"]
-    inspectors = [
-        ("John Mitchell", "City Building Dept"), ("Sarah Chen", "AHJ Fire Marshal"),
-        ("Robert Alvarez", "MEP Engineering Inc"), ("Linda Park", "Structural Solutions"),
-        ("David Kowalski", "Third Party Testing"), ("Maria Santos", "OSHA Compliance Group"),
-        ("James O'Brien", "Quality Assurance LLC"), ("Angela Wu", "Safety First Consultants"),
+    insp_statuses = [
+        "scheduled",
+        "in_progress",
+        "passed",
+        "passed",
+        "passed",
+        "failed",
+        "conditional",
     ]
-    insp_types = ["foundation", "framing", "rough_electrical", "rough_plumbing", "rough_HVAC",
-                  "insulation", "drywall", "fire_protection", "final", "roofing", "concrete"]
+    inspectors = [
+        ("John Mitchell", "City Building Dept"),
+        ("Sarah Chen", "AHJ Fire Marshal"),
+        ("Robert Alvarez", "MEP Engineering Inc"),
+        ("Linda Park", "Structural Solutions"),
+        ("David Kowalski", "Third Party Testing"),
+        ("Maria Santos", "OSHA Compliance Group"),
+        ("James O'Brien", "Quality Assurance LLC"),
+        ("Angela Wu", "Safety First Consultants"),
+    ]
+    insp_types = [
+        "foundation",
+        "framing",
+        "rough_electrical",
+        "rough_plumbing",
+        "rough_HVAC",
+        "insulation",
+        "drywall",
+        "fire_protection",
+        "final",
+        "roofing",
+        "concrete",
+    ]
 
     for pid in PROJECT_IDS:
         num_insp = random.randint(5, 7)
@@ -566,10 +980,17 @@ def seed():
             tpl_id = random.choice(template_ids)
             status = random.choice(insp_statuses)
             sched = date(2025, 2, 1) + timedelta(days=random.randint(0, 150))
-            completed = sched + timedelta(days=random.randint(0, 5)) if status in ("passed", "failed", "conditional") else None
+            completed = (
+                sched + timedelta(days=random.randint(0, 5))
+                if status in ("passed", "failed", "conditional")
+                else None
+            )
             result_map = {
-                "passed": "pass", "failed": "fail", "conditional": "conditional",
-                "scheduled": None, "in_progress": None,
+                "passed": "pass",
+                "failed": "fail",
+                "conditional": "conditional",
+                "scheduled": None,
+                "in_progress": None,
             }
 
             insp = SafetyInspection(
@@ -594,13 +1015,19 @@ def seed():
             item_results = ["pass", "pass", "pass", "pass", "fail", "na"]
             for j in range(num_items):
                 insp_item_count += 1
-                res = random.choice(item_results) if status not in ("scheduled",) else None
+                res = (
+                    random.choice(item_results)
+                    if status not in ("scheduled",)
+                    else None
+                )
                 item = SafetyInspectionItem(
                     inspection_id=insp.id,
                     company_id=COMPANY_ID,
-                    description=f"Inspection item #{j+1} - check compliance",
+                    description=f"Inspection item #{j + 1} - check compliance",
                     result=res,
-                    notes=f"Noted: {random.choice(['OK', 'Minor issue', 'Needs follow-up', 'Acceptable'])}" if res else None,
+                    notes=f"Noted: {random.choice(['OK', 'Minor issue', 'Needs follow-up', 'Acceptable'])}"
+                    if res
+                    else None,
                     display_order=j,
                 )
                 db.add(item)
@@ -613,28 +1040,53 @@ def seed():
 
     # --- Punch List Items ---
     punch_count = 0
-    punch_statuses = ["open", "open", "in_progress", "in_progress", "completed", "verified"]
+    punch_statuses = [
+        "open",
+        "open",
+        "in_progress",
+        "in_progress",
+        "completed",
+        "verified",
+    ]
     punch_priorities = ["low", "medium", "medium", "medium", "high", "critical"]
 
     PUNCH_TITLES = [
-        "Paint touch-up lobby ceiling", "Drywall crack repair 2nd floor corridor",
-        "Cabinet door alignment kitchen unit 3", "Tile grout missing bathroom 204",
-        "Electrical cover plate missing room 301", "HVAC diffuser not balanced suite 102",
-        "Door closer adjustment main entrance", "Baseboard gap at corner office 405",
-        "Window sealant bead incomplete north wall", "Carpet seam visible hallway B",
-        "Light fixture flickering conference room A", "Ceiling grid sagging above reception",
-        "Fire caulk missing at pipe penetration", "Handrail loose at stairwell B landing",
-        "Floor transition strip missing elevator lobby", "Paint overspray on window frame 2F",
-        "Plumbing leak under sink breakroom", "Missing escutcheon plate sprinkler head",
-        "Damaged outlet cover plate room 208", "Scratched door hardware suite 301",
-        "Unfinished caulk at countertop backsplash", "Misaligned switch plate conference B",
-        "Stained ceiling tile mechanical room", "Cracked floor tile entry vestibule",
-        "Missing access panel above ceiling grid", "Improperly graded landscape at entry",
-        "Exterior light not operational south wall", "Parking lot striping incomplete",
-        "ADA sign missing at restroom", "Fire extinguisher cabinet dented level 1",
-        "Concrete spall at loading dock", "Expansion joint sealant missing level P2",
-        "Roof drain cap missing section 4", "Condensation on HVAC duct above ceiling",
-        "Acoustic panel loose in auditorium", "Elevator cab finish scratched",
+        "Paint touch-up lobby ceiling",
+        "Drywall crack repair 2nd floor corridor",
+        "Cabinet door alignment kitchen unit 3",
+        "Tile grout missing bathroom 204",
+        "Electrical cover plate missing room 301",
+        "HVAC diffuser not balanced suite 102",
+        "Door closer adjustment main entrance",
+        "Baseboard gap at corner office 405",
+        "Window sealant bead incomplete north wall",
+        "Carpet seam visible hallway B",
+        "Light fixture flickering conference room A",
+        "Ceiling grid sagging above reception",
+        "Fire caulk missing at pipe penetration",
+        "Handrail loose at stairwell B landing",
+        "Floor transition strip missing elevator lobby",
+        "Paint overspray on window frame 2F",
+        "Plumbing leak under sink breakroom",
+        "Missing escutcheon plate sprinkler head",
+        "Damaged outlet cover plate room 208",
+        "Scratched door hardware suite 301",
+        "Unfinished caulk at countertop backsplash",
+        "Misaligned switch plate conference B",
+        "Stained ceiling tile mechanical room",
+        "Cracked floor tile entry vestibule",
+        "Missing access panel above ceiling grid",
+        "Improperly graded landscape at entry",
+        "Exterior light not operational south wall",
+        "Parking lot striping incomplete",
+        "ADA sign missing at restroom",
+        "Fire extinguisher cabinet dented level 1",
+        "Concrete spall at loading dock",
+        "Expansion joint sealant missing level P2",
+        "Roof drain cap missing section 4",
+        "Condensation on HVAC duct above ceiling",
+        "Acoustic panel loose in auditorium",
+        "Elevator cab finish scratched",
     ]
 
     for pid in PROJECT_IDS:
@@ -644,8 +1096,16 @@ def seed():
             status = random.choice(punch_statuses)
             priority = random.choice(punch_priorities)
             due = date(2025, 4, 1) + timedelta(days=random.randint(0, 60))
-            completed = due - timedelta(days=random.randint(0, 5)) if status in ("completed", "verified") else None
-            verified = completed + timedelta(days=random.randint(1, 3)) if status == "verified" and completed else None
+            completed = (
+                due - timedelta(days=random.randint(0, 5))
+                if status in ("completed", "verified")
+                else None
+            )
+            verified = (
+                completed + timedelta(days=random.randint(1, 3))
+                if status == "verified" and completed
+                else None
+            )
 
             p = PunchListItem(
                 company_id=COMPANY_ID,
@@ -670,25 +1130,108 @@ def seed():
 
     # --- Incident Reports ---
     incident_count = 0
-    severities = ["near_miss", "near_miss", "near_miss", "first_aid", "first_aid", "medical", "lost_time"]
+    severities = [
+        "near_miss",
+        "near_miss",
+        "near_miss",
+        "first_aid",
+        "first_aid",
+        "medical",
+        "lost_time",
+    ]
     inc_statuses = ["reported", "investigating", "resolved", "resolved", "closed"]
 
     INCIDENT_DATA = [
-        ("Worker tripped over unsecured extension cord", "Trip hazard", "Extension cord across walkway not secured", "Implement cord covers on all walkways; add to daily inspection"),
-        ("Falling debris from overhead work struck hardhat", "Struck by", "Overhead demolition without barricade below", "Establish controlled access zones; install debris netting"),
-        ("Ladder slipped on wet surface", "Fall from elevation", "Wet floor from rain without barricade", "Deploy anti-slip mats; barricade wet areas immediately"),
-        ("Worker strained back lifting heavy pipe", "Overexertion", "Improper lifting technique; no mechanical aid", "Mandatory buddy lift over 50 lbs; provide mechanical hoist"),
-        ("Nail gun discharged into worker's hand", "Struck by", "Trigger lock not engaged; hand in line of fire", "Retrain on nail gun safety; enforce trigger lock policy"),
-        ("Worker exposed to concrete dust without mask", "Exposure", "RPE not worn during cutting operation", "Enforce PPE policy; provide N95 dust masks at cutting stations"),
-        ("Scaffolding plank broke under load", "Fall from elevation", "Plank not rated for load; no inspection tag", "Implement scaffold tagging system; daily competent person inspection"),
-        ("Excavation cave-in near worker", "Cave-in", "Trench box not installed above 5ft depth", "Mandatory trench protection over 4ft; retrain excavation competent person"),
-        ("Forklift struck pedestrian at blind corner", "Struck by", "No spotter used; poor visibility at corner", "Install convex mirrors; mandatory spotter for blind corners"),
-        ("Arc flash during panel energization", "Electrical", "Panel not properly de-energized; no LOTO", "Enforce LOTO procedures; require arc flash PPE for all panel work"),
-        ("Worker cut by unguarded circular saw", "Laceration", "Blade guard removed and not replaced", "Daily tool inspection; zero tolerance for guard removal"),
-        ("Heat exhaustion during summer concrete pour", "Heat illness", "Inadequate hydration breaks in high heat", "Mandatory 15-min breaks every hour above 90F; provide cooling stations"),
-        ("Chemical splash on arm during cleaning", "Exposure", "Improper PPE for chemical handling", "Provide chemical-resistant gloves and splash goggles; update SDS access"),
-        ("Boom lift contact with overhead power line", "Electrical", "No spotter; proximity to energized line", "Implement 10ft clearance rule; require spotter for all aerial work near lines"),
-        ("Material fell from crane during lift", "Struck by", "Rigging failure; overloaded sling", "Re-certify riggers; implement lift plan review for loads over 75%"),
+        (
+            "Worker tripped over unsecured extension cord",
+            "Trip hazard",
+            "Extension cord across walkway not secured",
+            "Implement cord covers on all walkways; add to daily inspection",
+        ),
+        (
+            "Falling debris from overhead work struck hardhat",
+            "Struck by",
+            "Overhead demolition without barricade below",
+            "Establish controlled access zones; install debris netting",
+        ),
+        (
+            "Ladder slipped on wet surface",
+            "Fall from elevation",
+            "Wet floor from rain without barricade",
+            "Deploy anti-slip mats; barricade wet areas immediately",
+        ),
+        (
+            "Worker strained back lifting heavy pipe",
+            "Overexertion",
+            "Improper lifting technique; no mechanical aid",
+            "Mandatory buddy lift over 50 lbs; provide mechanical hoist",
+        ),
+        (
+            "Nail gun discharged into worker's hand",
+            "Struck by",
+            "Trigger lock not engaged; hand in line of fire",
+            "Retrain on nail gun safety; enforce trigger lock policy",
+        ),
+        (
+            "Worker exposed to concrete dust without mask",
+            "Exposure",
+            "RPE not worn during cutting operation",
+            "Enforce PPE policy; provide N95 dust masks at cutting stations",
+        ),
+        (
+            "Scaffolding plank broke under load",
+            "Fall from elevation",
+            "Plank not rated for load; no inspection tag",
+            "Implement scaffold tagging system; daily competent person inspection",
+        ),
+        (
+            "Excavation cave-in near worker",
+            "Cave-in",
+            "Trench box not installed above 5ft depth",
+            "Mandatory trench protection over 4ft; retrain excavation competent person",
+        ),
+        (
+            "Forklift struck pedestrian at blind corner",
+            "Struck by",
+            "No spotter used; poor visibility at corner",
+            "Install convex mirrors; mandatory spotter for blind corners",
+        ),
+        (
+            "Arc flash during panel energization",
+            "Electrical",
+            "Panel not properly de-energized; no LOTO",
+            "Enforce LOTO procedures; require arc flash PPE for all panel work",
+        ),
+        (
+            "Worker cut by unguarded circular saw",
+            "Laceration",
+            "Blade guard removed and not replaced",
+            "Daily tool inspection; zero tolerance for guard removal",
+        ),
+        (
+            "Heat exhaustion during summer concrete pour",
+            "Heat illness",
+            "Inadequate hydration breaks in high heat",
+            "Mandatory 15-min breaks every hour above 90F; provide cooling stations",
+        ),
+        (
+            "Chemical splash on arm during cleaning",
+            "Exposure",
+            "Improper PPE for chemical handling",
+            "Provide chemical-resistant gloves and splash goggles; update SDS access",
+        ),
+        (
+            "Boom lift contact with overhead power line",
+            "Electrical",
+            "No spotter; proximity to energized line",
+            "Implement 10ft clearance rule; require spotter for all aerial work near lines",
+        ),
+        (
+            "Material fell from crane during lift",
+            "Struck by",
+            "Rigging failure; overloaded sling",
+            "Re-certify riggers; implement lift plan review for loads over 75%",
+        ),
     ]
 
     for pid in PROJECT_IDS:
@@ -711,15 +1254,21 @@ def seed():
                 severity=severity,
                 status=status,
                 incident_date=inc_date,
-                incident_time=f"{random.randint(6,16):02d}:{random.choice(['00','15','30','45'])}",
+                incident_time=f"{random.randint(6, 16):02d}:{random.choice(['00', '15', '30', '45'])}",
                 location=random.choice(LOCATIONS),
-                injured_party=f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}" if severity != "near_miss" else None,
+                injured_party=f"{random.choice(FIRST_NAMES)} {random.choice(LAST_NAMES)}"
+                if severity != "near_miss"
+                else None,
                 root_cause=root_cause,
                 corrective_action=corrective,
                 reported_by=USER_ID,
                 investigated_by=USER_ID if status in ("resolved", "closed") else None,
-                investigation_date=inc_date + timedelta(days=random.randint(1, 5)) if status in ("resolved", "closed") else None,
-                closed_date=inc_date + timedelta(days=random.randint(5, 20)) if status == "closed" else None,
+                investigation_date=inc_date + timedelta(days=random.randint(1, 5))
+                if status in ("resolved", "closed")
+                else None,
+                closed_date=inc_date + timedelta(days=random.randint(5, 20))
+                if status == "closed"
+                else None,
                 osha_recordable=osha,
                 days_lost=days,
             )
@@ -736,59 +1285,93 @@ def seed():
     # --- Selections & Options ---
     sel_count = 0
     opt_count = 0
-    sel_statuses = ["pending", "presented", "presented", "approved", "approved", "rejected"]
+    sel_statuses = [
+        "pending",
+        "presented",
+        "presented",
+        "approved",
+        "approved",
+        "rejected",
+    ]
 
     SELECTION_CATEGORIES = [
-        ("Flooring", [
-            ("Engineered Hardwood - Oak", 8.50, "sf"),
-            ("Luxury Vinyl Plank - Premium", 5.75, "sf"),
-            ("Porcelain Tile 24x24", 12.00, "sf"),
-            ("Polished Concrete", 6.00, "sf"),
-        ]),
-        ("Countertops", [
-            ("Quartz - Cambria", 85.00, "sf"),
-            ("Granite - Level 3", 65.00, "sf"),
-            ("Solid Surface - Corian", 55.00, "sf"),
-            ("Butcher Block - Walnut", 75.00, "sf"),
-        ]),
-        ("Fixtures - Lighting", [
-            ("Recessed LED 6\" Canless", 45.00, "ea"),
-            ("Pendant - Modern Brushed Nickel", 185.00, "ea"),
-            ("Track Lighting - 4ft LED", 220.00, "ea"),
-            ("Chandelier - Contemporary", 650.00, "ea"),
-        ]),
-        ("Paint Colors", [
-            ("Benjamin Moore - Simply White", 65.00, "gal"),
-            ("Sherwin Williams - Agreeable Gray", 65.00, "gal"),
-            ("PPG - Whiskers", 60.00, "gal"),
-        ]),
-        ("Cabinets", [
-            ("Custom Shaker - Painted White", 450.00, "lf"),
-            ("Semi-Custom - Thermofoil", 280.00, "lf"),
-            ("Stock - Raised Panel Oak", 180.00, "lf"),
-            ("Custom Modern - Flat Panel Walnut", 550.00, "lf"),
-        ]),
-        ("Plumbing Fixtures", [
-            ("Kohler Memoirs Toilet", 485.00, "ea"),
-            ("Delta Trinsic Faucet - Chrome", 320.00, "ea"),
-            ("Grohe Essence Faucet - Brushed Nickel", 410.00, "ea"),
-            ("Moen Align Kitchen Faucet", 280.00, "ea"),
-        ]),
-        ("Hardware", [
-            ("Emtek Knurled Knob - Satin Brass", 28.00, "ea"),
-            ("Top Knobs Nouveau Ring Pull", 18.00, "ea"),
-            ("Baldwin Hollywood Hills Lever", 95.00, "ea"),
-        ]),
+        (
+            "Flooring",
+            [
+                ("Engineered Hardwood - Oak", 8.50, "sf"),
+                ("Luxury Vinyl Plank - Premium", 5.75, "sf"),
+                ("Porcelain Tile 24x24", 12.00, "sf"),
+                ("Polished Concrete", 6.00, "sf"),
+            ],
+        ),
+        (
+            "Countertops",
+            [
+                ("Quartz - Cambria", 85.00, "sf"),
+                ("Granite - Level 3", 65.00, "sf"),
+                ("Solid Surface - Corian", 55.00, "sf"),
+                ("Butcher Block - Walnut", 75.00, "sf"),
+            ],
+        ),
+        (
+            "Fixtures - Lighting",
+            [
+                ('Recessed LED 6" Canless', 45.00, "ea"),
+                ("Pendant - Modern Brushed Nickel", 185.00, "ea"),
+                ("Track Lighting - 4ft LED", 220.00, "ea"),
+                ("Chandelier - Contemporary", 650.00, "ea"),
+            ],
+        ),
+        (
+            "Paint Colors",
+            [
+                ("Benjamin Moore - Simply White", 65.00, "gal"),
+                ("Sherwin Williams - Agreeable Gray", 65.00, "gal"),
+                ("PPG - Whiskers", 60.00, "gal"),
+            ],
+        ),
+        (
+            "Cabinets",
+            [
+                ("Custom Shaker - Painted White", 450.00, "lf"),
+                ("Semi-Custom - Thermofoil", 280.00, "lf"),
+                ("Stock - Raised Panel Oak", 180.00, "lf"),
+                ("Custom Modern - Flat Panel Walnut", 550.00, "lf"),
+            ],
+        ),
+        (
+            "Plumbing Fixtures",
+            [
+                ("Kohler Memoirs Toilet", 485.00, "ea"),
+                ("Delta Trinsic Faucet - Chrome", 320.00, "ea"),
+                ("Grohe Essence Faucet - Brushed Nickel", 410.00, "ea"),
+                ("Moen Align Kitchen Faucet", 280.00, "ea"),
+            ],
+        ),
+        (
+            "Hardware",
+            [
+                ("Emtek Knurled Knob - Satin Brass", 28.00, "ea"),
+                ("Top Knobs Nouveau Ring Pull", 18.00, "ea"),
+                ("Baldwin Hollywood Hills Lever", 95.00, "ea"),
+            ],
+        ),
     ]
 
     for pid in PROJECT_IDS:
         num_sel = random.randint(5, 7)
-        chosen_cats = random.sample(SELECTION_CATEGORIES, min(num_sel, len(SELECTION_CATEGORIES)))
+        chosen_cats = random.sample(
+            SELECTION_CATEGORIES, min(num_sel, len(SELECTION_CATEGORIES))
+        )
         for cat_name, options in chosen_cats:
             sel_count += 1
             status = random.choice(sel_statuses)
             budget = round(random.uniform(2000, 25000), 2)
-            selected_amt = round(budget * random.uniform(0.7, 1.4), 2) if status in ("approved",) else 0
+            selected_amt = (
+                round(budget * random.uniform(0.7, 1.4), 2)
+                if status in ("approved",)
+                else 0
+            )
             impact = round(selected_amt - budget, 2) if selected_amt else 0
 
             sel = Selection(
@@ -800,18 +1383,24 @@ def seed():
                 location=random.choice(LOCATIONS[:8]),
                 status=status,
                 due_date=date(2025, 3, 1) + timedelta(days=random.randint(0, 60)),
-                decided_date=date(2025, 4, 1) + timedelta(days=random.randint(0, 30)) if status in ("approved", "rejected") else None,
+                decided_date=date(2025, 4, 1) + timedelta(days=random.randint(0, 30))
+                if status in ("approved", "rejected")
+                else None,
                 budget_amount=budget,
                 selected_amount=selected_amt,
                 budget_impact=impact,
-                decided_by=f"Client #{pid}" if status in ("approved", "rejected") else None,
+                decided_by=f"Client #{pid}"
+                if status in ("approved", "rejected")
+                else None,
             )
             db.add(sel)
             db.flush()
 
             # Options
             recommended_idx = random.randint(0, len(options) - 1)
-            selected_idx = random.randint(0, len(options) - 1) if status == "approved" else -1
+            selected_idx = (
+                random.randint(0, len(options) - 1) if status == "approved" else -1
+            )
             for j, (opt_name, price, unit) in enumerate(options):
                 opt_count += 1
                 opt = SelectionOption(
@@ -835,11 +1424,32 @@ def seed():
     bs_count = 0
     bp_statuses = ["open", "open", "closed", "closed", "awarded"]
     bid_trades = [
-        "Electrical", "Plumbing", "HVAC", "Structural Steel", "Concrete",
-        "Roofing", "Fire Protection", "Painting", "Masonry", "Glazing",
-        "Drywall/Framing", "Flooring", "Elevator", "Site Work", "Landscaping",
+        "Electrical",
+        "Plumbing",
+        "HVAC",
+        "Structural Steel",
+        "Concrete",
+        "Roofing",
+        "Fire Protection",
+        "Painting",
+        "Masonry",
+        "Glazing",
+        "Drywall/Framing",
+        "Flooring",
+        "Elevator",
+        "Site Work",
+        "Landscaping",
     ]
-    bid_sub_statuses = ["invited", "draft", "submitted", "submitted", "under_review", "awarded", "rejected", "withdrawn"]
+    bid_sub_statuses = [
+        "invited",
+        "draft",
+        "submitted",
+        "submitted",
+        "under_review",
+        "awarded",
+        "rejected",
+        "withdrawn",
+    ]
 
     VENDORS_BID = [
         ("ABC Building Supply", "abc@building.example.com"),
@@ -888,7 +1498,11 @@ def seed():
                 bs_count += 1
                 sub_status = random.choice(bid_sub_statuses)
                 is_awarded = False
-                if bp_status == "awarded" and not awarded_one and sub_status in ("submitted", "under_review", "awarded"):
+                if (
+                    bp_status == "awarded"
+                    and not awarded_one
+                    and sub_status in ("submitted", "under_review", "awarded")
+                ):
                     sub_status = "awarded"
                     is_awarded = True
                     awarded_one = True
@@ -902,7 +1516,9 @@ def seed():
                     status=sub_status,
                     total_amount=amt,
                     scope_description=f"Complete {trade} scope per plans and specifications. Includes all labor, material, and equipment.",
-                    submitted_date=due - timedelta(days=random.randint(0, 10)) if sub_status not in ("invited", "draft") else None,
+                    submitted_date=due - timedelta(days=random.randint(0, 10))
+                    if sub_status not in ("invited", "draft")
+                    else None,
                     is_awarded=is_awarded,
                 )
                 db.add(bs)
@@ -944,51 +1560,111 @@ def seed():
     rs_count = 0
 
     REPORT_DEFS = [
-        ("Project Financial Summary", "financial", "agcm_projects",
-         '["project_name","budget","actual_cost","variance","pct_complete"]',
-         '{"status":"active"}'),
-        ("Monthly Cost Breakdown", "financial", "agcm_vendor_bills",
-         '["vendor_name","bill_number","total_amount","status","due_date"]',
-         '{"date_range":"monthly"}'),
-        ("Purchase Order Status", "financial", "agcm_purchase_orders",
-         '["po_number","vendor_name","total_amount","status","expected_delivery"]',
-         '{}'),
-        ("Subcontract Progress", "financial", "agcm_subcontracts",
-         '["contract_number","vendor_name","revised_amount","billed_to_date","balance_remaining"]',
-         '{}'),
-        ("Budget vs Actual", "financial", "agcm_estimates",
-         '["project_name","estimated_total","actual_total","variance_pct"]',
-         '{}'),
-        ("Project Schedule Overview", "schedule", "agcm_projects",
-         '["project_name","start_date","end_date","pct_complete","status"]',
-         '{"status":"active"}'),
-        ("Daily Activity Summary", "schedule", "agcm_daily_activity_logs",
-         '["project_name","date","weather","manpower_count","notes"]',
-         '{"date_range":"weekly"}'),
-        ("Safety Inspection Report", "safety", "agcm_safety_inspections",
-         '["project_name","inspector_name","inspection_type","status","overall_result","completed_date"]',
-         '{}'),
-        ("Incident Summary", "safety", "agcm_incident_reports",
-         '["project_name","title","severity","status","incident_date","days_lost"]',
-         '{}'),
-        ("Punch List Status", "safety", "agcm_punch_list_items",
-         '["project_name","title","priority","status","trade","due_date"]',
-         '{"status":"open,in_progress"}'),
-        ("Workforce Utilization", "resource", "agcm_timesheets",
-         '["worker_name","project_name","total_hours","total_cost","date_range"]',
-         '{"date_range":"weekly"}'),
-        ("Equipment Utilization", "resource", "agcm_equipment_assignments",
-         '["equipment_name","project_name","total_days","total_cost","assigned_date"]',
-         '{}'),
-        ("Worker Timesheet Detail", "resource", "agcm_timesheets",
-         '["worker_name","date","regular_hours","overtime_hours","total_cost","status"]',
-         '{}'),
-        ("Bid Comparison Report", "custom", "agcm_bid_submissions",
-         '["bid_package","vendor_name","total_amount","status","submitted_date"]',
-         '{}'),
-        ("Selection Decision Log", "custom", "agcm_selections",
-         '["project_name","category","name","status","budget_amount","selected_amount","budget_impact"]',
-         '{}'),
+        (
+            "Project Financial Summary",
+            "financial",
+            "agcm_projects",
+            '["project_name","budget","actual_cost","variance","pct_complete"]',
+            '{"status":"active"}',
+        ),
+        (
+            "Monthly Cost Breakdown",
+            "financial",
+            "agcm_vendor_bills",
+            '["vendor_name","bill_number","total_amount","status","due_date"]',
+            '{"date_range":"monthly"}',
+        ),
+        (
+            "Purchase Order Status",
+            "financial",
+            "agcm_purchase_orders",
+            '["po_number","vendor_name","total_amount","status","expected_delivery"]',
+            "{}",
+        ),
+        (
+            "Subcontract Progress",
+            "financial",
+            "agcm_subcontracts",
+            '["contract_number","vendor_name","revised_amount","billed_to_date","balance_remaining"]',
+            "{}",
+        ),
+        (
+            "Budget vs Actual",
+            "financial",
+            "agcm_estimates",
+            '["project_name","estimated_total","actual_total","variance_pct"]',
+            "{}",
+        ),
+        (
+            "Project Schedule Overview",
+            "schedule",
+            "agcm_projects",
+            '["project_name","start_date","end_date","pct_complete","status"]',
+            '{"status":"active"}',
+        ),
+        (
+            "Daily Activity Summary",
+            "schedule",
+            "agcm_daily_activity_logs",
+            '["project_name","date","weather","manpower_count","notes"]',
+            '{"date_range":"weekly"}',
+        ),
+        (
+            "Safety Inspection Report",
+            "safety",
+            "agcm_safety_inspections",
+            '["project_name","inspector_name","inspection_type","status","overall_result","completed_date"]',
+            "{}",
+        ),
+        (
+            "Incident Summary",
+            "safety",
+            "agcm_incident_reports",
+            '["project_name","title","severity","status","incident_date","days_lost"]',
+            "{}",
+        ),
+        (
+            "Punch List Status",
+            "safety",
+            "agcm_punch_list_items",
+            '["project_name","title","priority","status","trade","due_date"]',
+            '{"status":"open,in_progress"}',
+        ),
+        (
+            "Workforce Utilization",
+            "resource",
+            "agcm_timesheets",
+            '["worker_name","project_name","total_hours","total_cost","date_range"]',
+            '{"date_range":"weekly"}',
+        ),
+        (
+            "Equipment Utilization",
+            "resource",
+            "agcm_equipment_assignments",
+            '["equipment_name","project_name","total_days","total_cost","assigned_date"]',
+            "{}",
+        ),
+        (
+            "Worker Timesheet Detail",
+            "resource",
+            "agcm_timesheets",
+            '["worker_name","date","regular_hours","overtime_hours","total_cost","status"]',
+            "{}",
+        ),
+        (
+            "Bid Comparison Report",
+            "custom",
+            "agcm_bid_submissions",
+            '["bid_package","vendor_name","total_amount","status","submitted_date"]',
+            "{}",
+        ),
+        (
+            "Selection Decision Log",
+            "custom",
+            "agcm_selections",
+            '["project_name","category","name","status","budget_amount","selected_amount","budget_impact"]',
+            "{}",
+        ),
     ]
 
     report_ids = []
@@ -1003,6 +1679,63 @@ def seed():
             columns=columns,
             filters=filters,
             is_system=True,
+            is_shared=True,
+            created_by=USER_ID,
+        )
+        db.add(rd)
+        db.flush()
+        report_ids.append(rd.id)
+
+    # Add non-system custom reports that users can edit
+    custom_reports = [
+        (
+            "My Project Summary",
+            "custom",
+            "projects",
+            '["name","ref_number","status","city","start_date","end_date"]',
+            "{}",
+        ),
+        (
+            "Open RFIs",
+            "custom",
+            "agcm_rfis",
+            '["sequence_name","subject","status","priority","due_date","assigned_to"]',
+            '{"status":"open,draft"}',
+        ),
+        (
+            "Pending Change Orders",
+            "custom",
+            "agcm_change_orders",
+            '["sequence_name","title","status","cost_impact","requested_date"]',
+            '{"status":"pending,review"}',
+        ),
+        (
+            "Budget vs Actual",
+            "custom",
+            "agcm_budgets",
+            '["cost_code","description","budget_amount","committed_amount","actual_amount","variance"]',
+            "{}",
+        ),
+        (
+            "Overdue Tasks",
+            "custom",
+            "agcm_tasks",
+            '["name","project_name","status","start_date","end_date","assigned_to"]',
+            '{"status":"in_progress,not_started","overdue":true}',
+        ),
+    ]
+
+    for rname, rtype, dsource, columns, filters in custom_reports:
+        rd_count += 1
+        rd = ReportDefinition(
+            company_id=COMPANY_ID,
+            name=rname,
+            description=f"Custom report: {rname}",
+            report_type=rtype,
+            data_source=dsource,
+            columns=columns,
+            filters=filters,
+            is_system=False,
             is_shared=True,
             created_by=USER_ID,
         )
@@ -1047,54 +1780,175 @@ def seed():
     dw_count = 0
 
     LAYOUTS = [
-        ("Executive Overview", "executive", True, [
-            ("KPI_CARD", "Active Projects", "agcm_projects", 0, 0, 3, 2),
-            ("KPI_CARD", "Total Budget", "agcm_estimates", 3, 0, 3, 2),
-            ("KPI_CARD", "Open POs", "agcm_purchase_orders", 6, 0, 3, 2),
-            ("KPI_CARD", "Safety Score", "agcm_safety_inspections", 9, 0, 3, 2),
-            ("BAR_CHART", "Budget vs Actual by Project", "agcm_estimates", 0, 2, 6, 4),
-            ("PIE_CHART", "Project Status Distribution", "agcm_projects", 6, 2, 6, 4),
-            ("LINE_CHART", "Monthly Spend Trend", "agcm_vendor_bills", 0, 6, 8, 4),
-            ("TABLE", "Recent Incidents", "agcm_incident_reports", 8, 6, 4, 4),
-        ]),
-        ("Project Manager Dashboard", "project", False, [
-            ("KPI_CARD", "My Projects", "agcm_projects", 0, 0, 4, 2),
-            ("KPI_CARD", "Open Punch Items", "agcm_punch_list_items", 4, 0, 4, 2),
-            ("KPI_CARD", "Pending Inspections", "agcm_safety_inspections", 8, 0, 4, 2),
-            ("PROGRESS_CARD", "Project Completion Progress", "agcm_projects", 0, 2, 6, 3),
-            ("BAR_CHART", "Manpower by Trade", "agcm_timesheets", 6, 2, 6, 3),
-            ("TABLE", "Upcoming Inspections", "agcm_safety_inspections", 0, 5, 6, 4),
-            ("STAT_GROUP", "Weekly Resource Summary", "agcm_timesheets", 6, 5, 6, 4),
-        ]),
-        ("Financial Dashboard", "financial", False, [
-            ("KPI_CARD", "Total Committed", "agcm_subcontracts", 0, 0, 3, 2),
-            ("KPI_CARD", "Paid to Date", "agcm_vendor_bills", 3, 0, 3, 2),
-            ("KPI_CARD", "Outstanding Balance", "agcm_vendor_bills", 6, 0, 3, 2),
-            ("KPI_CARD", "Change Orders", "agcm_subcontracts", 9, 0, 3, 2),
-            ("LINE_CHART", "Cash Flow Projection", "agcm_vendor_bills", 0, 2, 8, 4),
-            ("PIE_CHART", "Cost by Category", "agcm_purchase_orders", 8, 2, 4, 4),
-            ("TABLE", "Overdue Bills", "agcm_vendor_bills", 0, 6, 12, 4),
-        ]),
-        ("Safety Dashboard", "executive", False, [
-            ("KPI_CARD", "Total Inspections", "agcm_safety_inspections", 0, 0, 3, 2),
-            ("KPI_CARD", "Pass Rate", "agcm_safety_inspections", 3, 0, 3, 2),
-            ("KPI_CARD", "Open Incidents", "agcm_incident_reports", 6, 0, 3, 2),
-            ("KPI_CARD", "Days Without Incident", "agcm_incident_reports", 9, 0, 3, 2),
-            ("BAR_CHART", "Incidents by Severity", "agcm_incident_reports", 0, 2, 6, 4),
-            ("LINE_CHART", "Inspection Trend", "agcm_safety_inspections", 6, 2, 6, 4),
-            ("TABLE", "Critical Punch Items", "agcm_punch_list_items", 0, 6, 6, 4),
-            ("PIE_CHART", "Punch Items by Status", "agcm_punch_list_items", 6, 6, 6, 4),
-        ]),
-        ("Resource Dashboard", "executive", False, [
-            ("KPI_CARD", "Total Workers", "agcm_workers", 0, 0, 3, 2),
-            ("KPI_CARD", "Equipment In Use", "agcm_equipment", 3, 0, 3, 2),
-            ("KPI_CARD", "Weekly Labor Cost", "agcm_timesheets", 6, 0, 3, 2),
-            ("KPI_CARD", "Equipment Cost MTD", "agcm_equipment_assignments", 9, 0, 3, 2),
-            ("BAR_CHART", "Workers by Trade", "agcm_workers", 0, 2, 6, 4),
-            ("PIE_CHART", "Equipment by Status", "agcm_equipment", 6, 2, 6, 4),
-            ("LINE_CHART", "Labor Hours Trend", "agcm_timesheets", 0, 6, 8, 4),
-            ("TABLE", "Top Timesheets This Week", "agcm_timesheets", 8, 6, 4, 4),
-        ]),
+        (
+            "Executive Overview",
+            "executive",
+            True,
+            [
+                ("KPI_CARD", "Active Projects", "agcm_projects", 0, 0, 3, 2),
+                ("KPI_CARD", "Total Budget", "agcm_estimates", 3, 0, 3, 2),
+                ("KPI_CARD", "Open POs", "agcm_purchase_orders", 6, 0, 3, 2),
+                ("KPI_CARD", "Safety Score", "agcm_safety_inspections", 9, 0, 3, 2),
+                (
+                    "BAR_CHART",
+                    "Budget vs Actual by Project",
+                    "agcm_estimates",
+                    0,
+                    2,
+                    6,
+                    4,
+                ),
+                (
+                    "PIE_CHART",
+                    "Project Status Distribution",
+                    "agcm_projects",
+                    6,
+                    2,
+                    6,
+                    4,
+                ),
+                ("LINE_CHART", "Monthly Spend Trend", "agcm_vendor_bills", 0, 6, 8, 4),
+                ("TABLE", "Recent Incidents", "agcm_incident_reports", 8, 6, 4, 4),
+            ],
+        ),
+        (
+            "Project Manager Dashboard",
+            "project",
+            False,
+            [
+                ("KPI_CARD", "My Projects", "agcm_projects", 0, 0, 4, 2),
+                ("KPI_CARD", "Open Punch Items", "agcm_punch_list_items", 4, 0, 4, 2),
+                (
+                    "KPI_CARD",
+                    "Pending Inspections",
+                    "agcm_safety_inspections",
+                    8,
+                    0,
+                    4,
+                    2,
+                ),
+                (
+                    "PROGRESS_CARD",
+                    "Project Completion Progress",
+                    "agcm_projects",
+                    0,
+                    2,
+                    6,
+                    3,
+                ),
+                ("BAR_CHART", "Manpower by Trade", "agcm_timesheets", 6, 2, 6, 3),
+                (
+                    "TABLE",
+                    "Upcoming Inspections",
+                    "agcm_safety_inspections",
+                    0,
+                    5,
+                    6,
+                    4,
+                ),
+                (
+                    "STAT_GROUP",
+                    "Weekly Resource Summary",
+                    "agcm_timesheets",
+                    6,
+                    5,
+                    6,
+                    4,
+                ),
+            ],
+        ),
+        (
+            "Financial Dashboard",
+            "financial",
+            False,
+            [
+                ("KPI_CARD", "Total Committed", "agcm_subcontracts", 0, 0, 3, 2),
+                ("KPI_CARD", "Paid to Date", "agcm_vendor_bills", 3, 0, 3, 2),
+                ("KPI_CARD", "Outstanding Balance", "agcm_vendor_bills", 6, 0, 3, 2),
+                ("KPI_CARD", "Change Orders", "agcm_subcontracts", 9, 0, 3, 2),
+                ("LINE_CHART", "Cash Flow Projection", "agcm_vendor_bills", 0, 2, 8, 4),
+                ("PIE_CHART", "Cost by Category", "agcm_purchase_orders", 8, 2, 4, 4),
+                ("TABLE", "Overdue Bills", "agcm_vendor_bills", 0, 6, 12, 4),
+            ],
+        ),
+        (
+            "Safety Dashboard",
+            "executive",
+            False,
+            [
+                (
+                    "KPI_CARD",
+                    "Total Inspections",
+                    "agcm_safety_inspections",
+                    0,
+                    0,
+                    3,
+                    2,
+                ),
+                ("KPI_CARD", "Pass Rate", "agcm_safety_inspections", 3, 0, 3, 2),
+                ("KPI_CARD", "Open Incidents", "agcm_incident_reports", 6, 0, 3, 2),
+                (
+                    "KPI_CARD",
+                    "Days Without Incident",
+                    "agcm_incident_reports",
+                    9,
+                    0,
+                    3,
+                    2,
+                ),
+                (
+                    "BAR_CHART",
+                    "Incidents by Severity",
+                    "agcm_incident_reports",
+                    0,
+                    2,
+                    6,
+                    4,
+                ),
+                (
+                    "LINE_CHART",
+                    "Inspection Trend",
+                    "agcm_safety_inspections",
+                    6,
+                    2,
+                    6,
+                    4,
+                ),
+                ("TABLE", "Critical Punch Items", "agcm_punch_list_items", 0, 6, 6, 4),
+                (
+                    "PIE_CHART",
+                    "Punch Items by Status",
+                    "agcm_punch_list_items",
+                    6,
+                    6,
+                    6,
+                    4,
+                ),
+            ],
+        ),
+        (
+            "Resource Dashboard",
+            "executive",
+            False,
+            [
+                ("KPI_CARD", "Total Workers", "agcm_workers", 0, 0, 3, 2),
+                ("KPI_CARD", "Equipment In Use", "agcm_equipment", 3, 0, 3, 2),
+                ("KPI_CARD", "Weekly Labor Cost", "agcm_timesheets", 6, 0, 3, 2),
+                (
+                    "KPI_CARD",
+                    "Equipment Cost MTD",
+                    "agcm_equipment_assignments",
+                    9,
+                    0,
+                    3,
+                    2,
+                ),
+                ("BAR_CHART", "Workers by Trade", "agcm_workers", 0, 2, 6, 4),
+                ("PIE_CHART", "Equipment by Status", "agcm_equipment", 6, 2, 6, 4),
+                ("LINE_CHART", "Labor Hours Trend", "agcm_timesheets", 0, 6, 8, 4),
+                ("TABLE", "Top Timesheets This Week", "agcm_timesheets", 8, 6, 4, 4),
+            ],
+        ),
     ]
 
     for layout_name, layout_type, is_default, widgets in LAYOUTS:
@@ -1114,15 +1968,26 @@ def seed():
         for j, (wtype, title, dsource, px, py, w, h) in enumerate(widgets):
             dw_count += 1
             # Insert via raw SQL to bypass Python enum vs DB enum casing mismatch
-            db.execute(_text(
-                "INSERT INTO agcm_dashboard_widgets "
-                "(layout_id, company_id, widget_type, title, data_source, "
-                "position_x, position_y, width, height, display_order) "
-                "VALUES (:lid, :cid, :wt, :title, :ds, :px, :py, :w, :h, :do)"
-            ), {
-                "lid": dl.id, "cid": COMPANY_ID, "wt": wtype, "title": title,
-                "ds": dsource, "px": px, "py": py, "w": w, "h": h, "do": j,
-            })
+            db.execute(
+                _text(
+                    "INSERT INTO agcm_dashboard_widgets "
+                    "(layout_id, company_id, widget_type, title, data_source, "
+                    "position_x, position_y, width, height, display_order) "
+                    "VALUES (:lid, :cid, :wt, :title, :ds, :px, :py, :w, :h, :do)"
+                ),
+                {
+                    "lid": dl.id,
+                    "cid": COMPANY_ID,
+                    "wt": wtype,
+                    "title": title,
+                    "ds": dsource,
+                    "px": px,
+                    "py": py,
+                    "w": w,
+                    "h": h,
+                    "do": j,
+                },
+            )
 
     db.commit()
     print(f"  Dashboard Layouts: {dl_count}, Dashboard Widgets: {dw_count}")
@@ -1131,20 +1996,31 @@ def seed():
     # Summary
     # ===================================================================
     from sqlalchemy import text
+
     tables = [
         # Resource
-        "agcm_workers", "agcm_equipment", "agcm_timesheets", "agcm_equipment_assignments",
+        "agcm_workers",
+        "agcm_equipment",
+        "agcm_timesheets",
+        "agcm_equipment_assignments",
         # Safety
-        "agcm_checklist_templates", "agcm_checklist_template_items",
-        "agcm_safety_inspections", "agcm_safety_inspection_items",
-        "agcm_punch_list_items", "agcm_incident_reports",
+        "agcm_checklist_templates",
+        "agcm_checklist_template_items",
+        "agcm_safety_inspections",
+        "agcm_safety_inspection_items",
+        "agcm_punch_list_items",
+        "agcm_incident_reports",
         # Portal
-        "agcm_selections", "agcm_selection_options",
-        "agcm_bid_packages", "agcm_bid_submissions",
+        "agcm_selections",
+        "agcm_selection_options",
+        "agcm_bid_packages",
+        "agcm_bid_submissions",
         "agcm_portal_configs",
         # Reporting
-        "agcm_report_definitions", "agcm_report_schedules",
-        "agcm_dashboard_layouts", "agcm_dashboard_widgets",
+        "agcm_report_definitions",
+        "agcm_report_schedules",
+        "agcm_dashboard_layouts",
+        "agcm_dashboard_widgets",
     ]
     total = 0
     print(f"\n{'=' * 60}")

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 # --- ReportSchedule ---
 
+
 class ReportScheduleBase(BaseModel):
     schedule_type: str = Field(..., max_length=20)  # daily, weekly, monthly
     recipients: Optional[str] = Field(None, max_length=5000)  # JSON array of emails
@@ -46,6 +47,7 @@ class ReportScheduleResponse(BaseModel):
 
 
 # --- ReportDefinition ---
+
 
 class ReportDefinitionBase(BaseModel):
     name: str = Field(..., max_length=255)
@@ -91,7 +93,7 @@ class ReportDefinitionResponse(BaseModel):
     columns: Optional[str] = None
     filters: Optional[str] = None
     sort_by: Optional[str] = None
-    sort_order: str = "desc"
+    sort_order: Optional[str] = "desc"
     group_by: Optional[str] = None
     is_system: bool = False
     is_shared: bool = True
