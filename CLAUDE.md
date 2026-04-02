@@ -23,8 +23,8 @@ BuildForge is a comprehensive construction management platform built as 15 addon
 | `agcm_resource` | Workers, equipment, timesheets | 4 | Worker, Equipment, Timesheet, EquipmentAssignment |
 | `agcm_safety` | Checklists, inspections, punch lists, incidents | 8 | SafetyInspection, PunchListItem, IncidentReport, ChecklistTemplate |
 | `agcm_portal` | Client selections, bid packages, portal config | 5 | Selection, BidPackage, BidSubmission, PortalConfig |
-| `agcm_reporting` | Report definitions, dashboards, widgets | 4 | AGCMReportDefinition, AGCMDashboardLayout, AGCMDashboardWidget |
-| `agcm_bim` | 3D models, xeokit viewer, clash detection, annotations | 6 | BIMModel, BIMViewpoint, ClashTest, ClashResult, BIMAnnotation3D |
+| `agcm_reporting` | Report definitions, dashboards, widgets | 4 | AGCMReportDefinition, AGCMReportSchedule, AGCMDashboardLayout, AGCMDashboardWidget |
+| `agcm_bim` | 3D models, xeokit viewer, clash detection, annotations | 6 | BIMModel, BIMViewpoint, BIMElement, BIMAnnotation3D, ClashTest, ClashResult |
 
 ## Critical Rules
 
@@ -50,7 +50,9 @@ BuildForge is a comprehensive construction management platform built as 15 addon
 
 ### Class Name Conflicts
 - AGCM models that share Python class names with core modules MUST be renamed
-- Pattern: `AGCMDashboardLayout`, `AGCMReportDefinition`, `SafetyInspection`
+- `AGCMDashboardLayout`, `AGCMDashboardWidget` — avoid conflict with `modules.base.models.dashboard`
+- `AGCMReportDefinition`, `AGCMReportSchedule` — avoid conflict with core report models
+- `SafetyInspection`, `SafetyInspectionItem` — avoid conflict with `agcm.models.inspection`
 - Use tablename-based relationships: `relationship("agcm_report_schedules", ...)`
 - Services use aliases: `from ... import AGCMReportDefinition as ReportDefinition`
 
@@ -92,11 +94,17 @@ BuildForge is a comprehensive construction management platform built as 15 addon
 - Overview Canvas: SVG charts (donut, bars) in daily log reports
 - Project Dashboard: aggregated KPIs in periodic reports
 - PDF via WeasyPrint with HTML fallback
+- Export formats: CSV, PDF (WeasyPrint via core `pdf_service`), Excel (openpyxl)
+- Export endpoint: `GET /reports/{id}/export?format=csv|pdf|excel&token=JWT`
+- Token-based auth for browser-initiated downloads (`window.open` with `?token=JWT` pattern, same as BIM)
 
 ### BIM Viewer (xeokit SDK)
 - 3D viewer: `bim-viewer.vue` (3,044 lines, 10 xeokit plugins)
+- 6 tables: `agcm_bim_models`, `agcm_bim_viewpoints`, `agcm_bim_elements`, `agcm_bim_annotations`, `agcm_clash_tests`, `agcm_clash_results`
+- Key entities: BIMModel, BIMViewpoint, BIMElement, BIMAnnotation3D, ClashTest, ClashResult
 - IFC→XKT conversion via `convert2xkt` CLI through job queue
 - XKT streaming: `GET /agcm_bim/models/{id}/xkt`
+- Token-based auth for XKT downloads (`?token=JWT` pattern)
 - 25 toolbar tools, 12 keyboard shortcuts
 - BCF 2.1 viewpoint save/restore with screenshots
 - 3D annotations with entity linking (RFI, Issue, Punch List)
@@ -109,3 +117,39 @@ BuildForge is a comprehensive construction management platform built as 15 addon
 - Inspection fail → Punch List: auto-creates PunchListItem
 - Bid awarded → Subcontract: auto-creates draft Subcontract
 - BIM Viewpoints ↔ RFIs/Issues: cross-entity linking
+
+### Audit Trail & Activity
+- **ActivityMixin**: 30+ models include `ActivityMixin` for automatic audit logging
+- All mutations (create/update/delete) automatically logged with user, timestamp, field changes
+- Frontend: `ActivityThread` Vue component for activity display in detail views
+- Component location: `frontend/packages/effects/common-ui/src/components/activity-thread/activity-thread.vue`
+- Props: `modelName`, `recordId`, `accessToken`, `apiBase`, `showMessages`, `showActivities`
+
+### Caching
+- Two-tier caching: L1 (in-process LRU 512) + L2 (Redis)
+- Pattern: `cache.get_or_set(key, factory, ttl)` with stampede protection
+- Compressed storage for values > 1KB: `cache.set_compressed/get_compressed`
+- Cache invalidation: `_invalidate_<module>_cache(project_id=None)` pattern
+- All 13 services use TTL=300s caching with distributed invalidation
+- See `docs/SERVICE_STANDARDIZATION.md` for complete pattern documentation
+
+### Soft Delete
+- Models with soft delete: RFI, Task, ChangeOrder
+- Mixin: `SoftDeleteMixin` adds `deleted_at` timestamp column
+- Service methods: `delete_item()` (soft), `hard_delete_item()`, `restore_item()`
+- API endpoints: `DELETE /{id}` (soft), `POST /{id}/restore`
+- Deleted records excluded from queries unless `include_deleted=True`
+
+### Field Indexes
+- Frequently queried columns have indexes for performance
+- Indexed: status, dates, foreign keys, company_id, project_id
+- See individual model files for index definitions
+
+### Service Standardization
+All services follow `docs/SERVICE_STANDARDIZATION.md` pattern:
+- List methods return `dict` with `items`, `total`, `page`, `page_size`
+- Get methods return `Optional[Model]`
+- Create/Update methods return `Model` or `Optional[Model]`
+- Delete methods return `bool`
+- Restore methods return `Optional[Model]`
+- Services commit internally (no external transaction management)
