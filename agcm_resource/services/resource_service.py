@@ -393,6 +393,19 @@ class ResourceService:
 
         self.db.commit()
         self.db.refresh(timesheet)
+
+        # Notify worker of approval
+        try:
+            from addons.agcm.services.notify import notify_event
+            notify_event(
+                self.db, "approved", "timesheet", timesheet.id, self.user_id,
+                context={"date": str(timesheet.date)},
+                recipient_ids=[timesheet.created_by] if timesheet.created_by else [],
+                company_id=self.company_id,
+            )
+        except ImportError:
+            pass
+
         return timesheet
 
     def reject_timesheet(self, timesheet_id: int) -> Optional[Timesheet]:

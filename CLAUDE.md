@@ -103,6 +103,20 @@ When writing or modifying code, verify every endpoint against this checklist:
 - Child modules use `"parent": "agcm"` — NEVER re-declare Construction parent
 - Settings items use `"parent": "agcm.settings"`
 
+### Centralized Notification Engine
+- **Entry point**: `addons.agcm.services.notify.notify_event(db, event_type, entity_type, entity_id, ...)`
+- **Event registry**: `AGCM_EVENT_REGISTRY` — 16+ event types with title template, level, channels
+- **Channels**: in_app (WebSocket), email (via core notification_service), with fallback
+- **Safety**: all failures logged, never propagate — notifications never abort business logic
+- **Actor exclusion**: actor_id automatically excluded from recipient_ids
+- **Events covered**: RFI (created/response/closed), Submittal, CO, Task, PO, Safety, Timesheet, Budget, Daily Log
+- **Integration pattern**:
+  ```python
+  from addons.agcm.services.notify import notify_event
+  notify_event(db, "created", "rfi", rfi.id, user_id,
+               context={"subject": rfi.subject}, recipient_ids=[pm_id], company_id=cid)
+  ```
+
 ### Real-time Events
 - Service: `from addons.agcm.services.realtime_events import agcm_realtime`
 - Fire-and-forget: `try: await agcm_realtime.xxx(db, entity) except: pass`

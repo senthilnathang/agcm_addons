@@ -140,10 +140,25 @@ def _handle_change_order_approval(db: Session, entity_id: int, user_id: int, out
             post_to_budget(db, co.project_id, co.company_id,
                            "committed_amount", co.cost_impact,
                            description="Approved Change Orders")
+        event = "approved"
     else:
         co.status = ChangeOrderStatus.REJECTED.value
+        event = "rejected"
 
     co.updated_by = user_id
+
+    # Notify requester of approval outcome
+    try:
+        from addons.agcm.services.notify import notify_event
+        notify_event(
+            db, event, "change_order", co.id, user_id,
+            context={"title": co.title, "sequence_name": co.sequence_name,
+                     "cost_impact": str(co.cost_impact or 0)},
+            recipient_ids=[co.created_by] if co.created_by else [],
+            company_id=co.company_id,
+        )
+    except ImportError:
+        pass
 
 
 def _handle_estimate_approval(db: Session, entity_id: int, user_id: int, outcome: str):

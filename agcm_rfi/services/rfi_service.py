@@ -213,6 +213,19 @@ class RFIService:
         self.db.refresh(rfi)
 
         self._invalidate_rfi_cache(project_id=data.project_id)
+
+        # Notify assignees
+        try:
+            from addons.agcm.services.notify import notify_event
+            notify_event(
+                self.db, "created", "rfi", rfi.id, self.user_id,
+                context={"subject": rfi.subject, "sequence_name": rfi.sequence_name},
+                recipient_ids=data.assignee_ids or [],
+                company_id=self.company_id,
+            )
+        except ImportError:
+            pass
+
         return rfi
 
     def update_rfi(self, rfi_id: int, data: RFIUpdate) -> Optional[RFI]:
