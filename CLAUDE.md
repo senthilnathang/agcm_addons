@@ -4,19 +4,19 @@
 
 BuildForge is a comprehensive construction management platform built as 15 addon modules on the FastVue framework. Inspired by Procore (enterprise) and Buildern (SMB), it covers the full construction lifecycle: estimating → scheduling → financial → quality → collaboration → reporting → BIM.
 
-**Total: 15 modules, 104 database tables, 270+ API endpoints, 64+ frontend views, 38,000+ demo records**
+**Total: 16 modules, 115+ database tables, 310+ API endpoints, 67+ frontend views, 38,000+ demo records**
 
 ## Module Map
 
 | Module | Purpose | Tables | Key Entities |
 |--------|---------|--------|-------------|
-| `agcm` | Base: projects, daily logs, weather, photos | 17 | Project, DailyActivityLog, ManPower, Weather |
+| `agcm` | Base: projects, daily logs, weather, photos, approvals, settings | 20 | Project, ProjectMember, AGCMSettings, DailyActivityLog |
 | `agcm_document` | Documents + drawings with revision control | 4 | ProjectFolder, ProjectDocument, Drawing, DrawingRevision |
 | `agcm_rfi` | Request for Information workflow | 5 | RFI, RFIResponse, RFILabel |
 | `agcm_submittal` | Submittals with multi-step approval | 6 | Submittal, SubmittalApprover, SubmittalPackage |
 | `agcm_change_order` | Change orders with line items | 2 | ChangeOrder, ChangeOrderLine |
 | `agcm_schedule` | Tasks, WBS, Gantt, dependencies | 4 | Task, WBS, Schedule, TaskDependency |
-| `agcm_finance` | Budget, expenses, invoices, bills, prime contracts | 7 | Budget, CostCode, Invoice, Bill, PrimeContract |
+| `agcm_finance` | Budget, expenses, invoices, bills, prime contracts, tax rates | 11 | Budget, CostCode, Invoice, InvoiceLine, Bill, BillLine, TaxRate, PrimeContract |
 | `agcm_progress` | Issues, milestones, estimation, S-curve | 5 | Issue, Milestone, EstimationItem, SCurveData |
 | `agcm_estimate` | Cost catalogs, assemblies, estimates, proposals, takeoff | 11 | Estimate, CostItem, Assembly, Proposal, TakeoffSheet |
 | `agcm_procurement` | POs, subcontracts, vendor bills, payment apps, T&M | 12 | PurchaseOrder, Subcontract, VendorBill, PaymentApplication, TMTicket |
@@ -278,3 +278,24 @@ All services follow `docs/SERVICE_STANDARDIZATION.md` pattern:
 - Delete methods return `bool`
 - Restore methods return `Optional[Model]`
 - Services commit internally (no external transaction management)
+
+## Architecture Enhancements (10 Items)
+
+Summary of major architecture improvements:
+
+| # | Item | Key Files | Tests |
+|---|------|-----------|-------|
+| 1 | Approval chain wiring | `agcm/services/approval_handlers.py`, `agcm/api/approvals.py` | 10 |
+| 2 | Cost posting lifecycle | `agcm/services/budget_posting.py` | 9 |
+| 3 | Invoice/Bill lines + tax | `agcm_finance/models/invoice_line.py`, `bill_line.py`, `tax_rate.py` | 7 |
+| 4 | RFI → Change Order | `agcm_rfi/services/rfi_service.py:create_change_order_from_rfi()` | 3 |
+| 5 | Project access control | `agcm/models/project_member.py`, `agcm/services/project_access.py` | 8 |
+| 6 | Vendor directory | `agcm_contact/` (new module — model, service, API, frontend) | 6 |
+| 7 | EVM forecasting | `agcm_finance/services/finance_service.py:get_budget_forecast()` | 6 |
+| 8 | AIA G702/G703 | `agcm_procurement/api/payment_applications.py:g702-summary` | 5 |
+| 9 | Notification engine | `agcm/services/notify.py` + `AGCM_EVENT_REGISTRY` | 15 |
+| 10 | Module settings | `agcm/models/settings.py`, `agcm/services/settings_service.py` | 8 |
+
+**Total: 77 new tests, 16 modules, 115+ tables**
+
+Demo data seeder: `agcm/scripts/seed_all_features.py`

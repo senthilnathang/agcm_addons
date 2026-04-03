@@ -36,6 +36,7 @@ class ClashSeverity(str, enum.Enum):
 class ClashStatus(str, enum.Enum):
     NEW = "new"
     ACTIVE = "active"
+    REVIEWED = "reviewed"
     RESOLVED = "resolved"
     IGNORED = "ignored"
 

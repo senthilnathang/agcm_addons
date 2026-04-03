@@ -26,6 +26,8 @@ from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, Activit
 
 class BillRecordType(str, enum.Enum):
     BILL = "bill"
+    EXPENSE = "expense"
+    VENDOR_CREDIT = "vendor_credit"
     CREDIT_MEMO = "credit_memo"
     DEBIT_MEMO = "debit_memo"
 

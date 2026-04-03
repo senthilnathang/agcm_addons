@@ -20,6 +20,7 @@ from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, Activit
 
 class BillStatus(str, enum.Enum):
     DRAFT = "draft"
+    RECEIVED = "received"
     PENDING = "pending"
     APPROVED = "approved"
     PAID = "paid"

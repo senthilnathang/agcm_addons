@@ -16,6 +16,26 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
+def _get_notify_event():
+    """Get the notify_event function, handling both runtime and test environments."""
+    mod = sys.modules.get("agcm_notify")
+    if mod:
+        return mod.notify_event
+    try:
+        import importlib
+        mod = importlib.import_module("addons.agcm.services.notify")
+        return mod.notify_event
+    except ImportError:
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(__file__), "notify.py")
+        spec = importlib.util.spec_from_file_location("agcm_notify", path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["agcm_notify"] = mod
+        spec.loader.exec_module(mod)
+        return mod.notify_event
+
+
 def _get_post_to_budget():
     """Get the post_to_budget function, handling both runtime and test environments."""
     mod = sys.modules.get("agcm_budget_posting")
@@ -149,7 +169,7 @@ def _handle_change_order_approval(db: Session, entity_id: int, user_id: int, out
 
     # Notify requester of approval outcome
     try:
-        from addons.agcm.services.notify import notify_event
+        notify_event = _get_notify_event()
         notify_event(
             db, event, "change_order", co.id, user_id,
             context={"title": co.title, "sequence_name": co.sequence_name,
@@ -157,7 +177,7 @@ def _handle_change_order_approval(db: Session, entity_id: int, user_id: int, out
             recipient_ids=[co.created_by] if co.created_by else [],
             company_id=co.company_id,
         )
-    except ImportError:
+    except Exception:
         pass
 
 

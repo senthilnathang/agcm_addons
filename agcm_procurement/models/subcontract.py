@@ -36,6 +36,9 @@ class SOVSourceType(str, enum.Enum):
 
 class ComplianceDocType(str, enum.Enum):
     INSURANCE = "insurance"
+    INSURANCE_COI = "insurance_coi"
+    WORKERS_COMP = "workers_comp"
+    PERFORMANCE_BOND = "performance_bond"
     LICENSE = "license"
     BOND = "bond"
     W9 = "w9"
@@ -45,6 +48,7 @@ class ComplianceDocType(str, enum.Enum):
 
 class ComplianceDocStatus(str, enum.Enum):
     REQUIRED = "required"
+    SUBMITTED = "submitted"
     RECEIVED = "received"
     APPROVED = "approved"
     EXPIRED = "expired"
