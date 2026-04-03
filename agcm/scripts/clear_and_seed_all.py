@@ -623,6 +623,39 @@ def seed_daily_log_data(db, project_ids):
         db.commit()
     print(f"  Accidents: {acc_count}")
 
+    # Photos (2 per log → ~42 per project, with actual image files)
+    print("  Generating photos (with images)...")
+    try:
+        from agcm_addons.agcm.scripts._generate_photos import generate_photos
+        photo_count = generate_photos(db, log_ids, COMPANY_ID, USER_ID, LOCATIONS)
+    except ImportError:
+        # Fallback: insert photo records without image files
+        photo_count = 0
+        PHOTO_SUBJECTS = [
+            "Foundation work", "Steel erection", "Concrete pour", "Framing progress",
+            "Exterior wall", "Roof installation", "Plumbing rough-in", "HVAC ductwork",
+            "Drywall installation", "Painting in progress", "Flooring layout",
+            "Window installation", "Equipment on site", "Material delivery",
+            "Scaffolding setup", "Excavation work", "Masonry wall", "Crane operation",
+        ]
+        for log_id, pid, log_date in log_ids:
+            for _ in range(random.randint(1, 2)):
+                photo_count += 1
+                db.execute(text(
+                    "INSERT INTO agcm_photos (company_id, sequence_name, name, file_name, "
+                    "location, album, dailylog_id, project_id, created_by) "
+                    "VALUES (:cid, :seq, :name, :fname, :loc, :album, :log, :pid, :uid)"
+                ), {"cid": COMPANY_ID, "seq": f"PH{photo_count:05d}",
+                    "name": random.choice(PHOTO_SUBJECTS),
+                    "fname": f"photo_{photo_count:05d}.jpg",
+                    "loc": random.choice(LOCATIONS),
+                    "album": random.choice(["Exterior", "Interior", "Foundation", "MEP", "Progress"]),
+                    "log": log_id, "pid": pid, "uid": USER_ID})
+        db.commit()
+        print(f"  Photos (no images): {photo_count}")
+    except Exception as e:
+        print(f"  Photos skipped: {e}")
+
 
 def seed_approval_chains(db):
     """Seed approval chains (requires base_automation module with correct enum)."""
@@ -682,6 +715,7 @@ def main():
             ("agcm_delays", "Delays"),
             ("agcm_deficiencies", "Deficiencies"),
             ("agcm_accidents", "Accidents"),
+            ("agcm_photos", "Photos"),
             ("agcm_rfis", "RFIs"),
             ("agcm_change_orders", "Change Orders"),
             ("agcm_submittals", "Submittals"),
