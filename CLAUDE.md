@@ -24,6 +24,7 @@ BuildForge is a comprehensive construction management platform built as 15 addon
 | `agcm_safety` | Checklists, inspections, punch lists, incidents | 8 | SafetyInspection, PunchListItem, IncidentReport, ChecklistTemplate |
 | `agcm_portal` | Client selections, bid packages, portal config | 5 | Selection, BidPackage, BidSubmission, PortalConfig |
 | `agcm_reporting` | Report definitions, dashboards, widgets | 4 | AGCMReportDefinition, AGCMReportSchedule, AGCMDashboardLayout, AGCMDashboardWidget |
+| `agcm_contact` | Centralized vendor/client/subcontractor directory | 1 | Vendor |
 | `agcm_bim` | 3D models, xeokit viewer, clash detection, annotations | 6 | BIMModel, BIMViewpoint, BIMElement, BIMAnnotation3D, ClashTest, ClashResult |
 
 ## Critical Rules

@@ -172,6 +172,8 @@ _addon_models = [
     ("agcm_bim_bim_element", _model_path("agcm_bim", "bim_element.py")),
     ("agcm_bim_annotation", _model_path("agcm_bim", "annotation.py")),
     ("agcm_bim_clash_detection", _model_path("agcm_bim", "clash_detection.py")),
+    # agcm_contact
+    ("agcm_contact_vendor", _model_path("agcm_contact", "vendor.py")),
 ]
 
 for mod_name, mod_path in _core_models + _base_models + _addon_models:
