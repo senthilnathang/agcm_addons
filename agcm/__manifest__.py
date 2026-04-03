@@ -58,6 +58,7 @@ Daily activity logging system for construction projects.
         "views/settings-inspection-types.vue",
         "views/settings-accident-types.vue",
         "views/settings-violation-types.vue",
+        "views/settings-modules.vue",
     ],
 
     "assets": {

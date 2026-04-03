@@ -238,6 +238,18 @@ When writing or modifying code, verify every endpoint against this checklist:
 - Component location: `frontend/packages/effects/common-ui/src/components/activity-thread/activity-thread.vue`
 - Props: `modelName`, `recordId`, `accessToken`, `apiBase`, `showMessages`, `showActivities`
 
+### Module Settings (`agcm_settings`)
+- **Model**: `AGCMSettings` — per-module, company-scoped configuration
+- Fields: retention_pct, markup_pct, tax_rate_pct, payment_terms, PO/INV prefix, currency, working hours, OT multiplier
+- `settings_json` (JSONB) — extensible per-module custom settings
+- **Service**: `addons.agcm.services.settings_service.SettingsService`
+  - `get_settings(module_name)` — returns configured or module defaults
+  - `update_settings(module_name, data)` — upsert (creates if none exists)
+  - `list_all_modules()` — all 11 modules with configured + defaults
+- **API**: `GET /agcm/settings/modules`, `GET /agcm/settings/modules/{name}`, `PUT /agcm/settings/modules/{name}`
+- **Frontend**: `settings-modules.vue` — table of all modules with edit modal
+- **Module defaults**: finance (10% retention, Net 30), estimate (15% markup, 8.25% tax), schedule (8h/day)
+
 ### Caching
 - Two-tier caching: L1 (in-process LRU 512) + L2 (Redis)
 - Pattern: `cache.get_or_set(key, factory, ttl)` with stampede protection
