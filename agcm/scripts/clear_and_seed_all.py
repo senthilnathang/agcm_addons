@@ -406,6 +406,226 @@ def seed_module_settings(db):
     print(f"  Created {len(settings_data)} module settings")
 
 
+def seed_daily_log_data(db, project_ids):
+    """Seed daily logs, weather, manpower, notes, inspections, visitors,
+    safety violations, delays, deficiencies, accidents — from original seed_demo_data."""
+    print("\n--- Seeding daily log data (daily logs, weather, manpower, etc.) ---")
+
+    MANPOWER_COMMENTS = [
+        "Concrete pouring crew", "Electrical rough-in", "Plumbing installation",
+        "HVAC ductwork", "Structural steel erection", "Drywall hanging",
+        "Exterior painting", "Landscaping crew", "Fire sprinkler installation",
+    ]
+    NOTES_COMMENTS = [
+        "Site and Landscaping", "Electrical and Low Voltage", "Plumbing and Restrooms",
+        "Mechanical", "Roofing", "Concrete Work", "Steel Erection", "Flooring",
+    ]
+    NOTES_DESCRIPTIONS = [
+        "Trenching for landscaping irrigation lines", "Final wiring for power",
+        "Restroom trim out beginning today", "No work observed",
+        "Concrete pour scheduled for tomorrow", "Steel delivery arrived on site",
+        "Tile installation in lobby area", "Interior painting continues",
+    ]
+    LOCATIONS = [
+        "Floor 1", "Floor 2", "Floor 3", "Basement", "Lobby",
+        "Exterior North", "Exterior South", "Parking Garage", "Roof",
+        "Mechanical Room", "Loading Dock",
+    ]
+    VISITOR_NAMES = [
+        "John Smith", "Maria Garcia", "David Johnson", "Sarah Williams",
+        "Michael Brown", "Jennifer Davis", "Robert Miller",
+    ]
+    VISITOR_REASONS = [
+        "Site inspection", "Material delivery", "Client walkthrough",
+        "Engineering review", "Safety audit", "City inspector visit",
+    ]
+    DELAY_REASONS = [
+        "Weather delay - heavy rain", "Material delivery delayed",
+        "Equipment breakdown", "Permit not yet approved",
+        "Design change requested", "Subcontractor no-show",
+    ]
+    DEFICIENCY_NAMES = [
+        "Concrete crack in foundation", "Misaligned door frame",
+        "Paint finish defect", "Plumbing leak at joint",
+        "Electrical outlet not grounded", "Window seal incomplete",
+    ]
+    SAFETY_DESCRIPTIONS = [
+        "Worker without hard hat", "Missing guardrail on scaffold",
+        "Electrical cord in walkway", "Unsecured ladder",
+        "No safety glasses worn", "Blocked emergency exit",
+    ]
+
+    log_counter = 0
+    log_ids = []
+    for pid in project_ids:
+        base_date = date(2025, 6, 1)
+        for d in range(30):  # 30 days per project
+            log_date = base_date + timedelta(days=d)
+            if log_date.weekday() >= 5:
+                continue
+            log_counter += 1
+            result = db.execute(text(
+                "INSERT INTO agcm_daily_activity_logs (company_id, sequence_name, date, "
+                "project_id, created_by) "
+                "VALUES (:cid, :seq, :date, :pid, :uid) RETURNING id"
+            ), {"cid": COMPANY_ID, "seq": f"DL{log_counter:05d}",
+                "date": log_date, "pid": pid, "uid": USER_ID})
+            log_id = result.fetchone()[0]
+            log_ids.append((log_id, pid, log_date))
+    db.commit()
+    print(f"  Daily Logs: {len(log_ids)}")
+
+    # Manpower (2 per log)
+    mp_count = 0
+    for log_id, pid, log_date in log_ids:
+        for _ in range(2):
+            mp_count += 1
+            workers = random.randint(2, 12)
+            hours = random.choice([6.0, 8.0, 10.0])
+            db.execute(text(
+                "INSERT INTO agcm_manpower (company_id, sequence_name, name, location, "
+                "number_of_workers, number_of_hours, total_hours, dailylog_id, project_id, created_by) "
+                "VALUES (:cid, :seq, :name, :loc, :workers, :hours, :total, :log, :pid, :uid)"
+            ), {"cid": COMPANY_ID, "seq": f"MP{mp_count:05d}",
+                "name": random.choice(MANPOWER_COMMENTS), "loc": random.choice(LOCATIONS),
+                "workers": workers, "hours": hours, "total": workers * hours,
+                "log": log_id, "pid": pid, "uid": USER_ID})
+    db.commit()
+    print(f"  Manpower: {mp_count}")
+
+    # Notes (1 per log)
+    note_count = 0
+    for log_id, pid, log_date in log_ids:
+        note_count += 1
+        db.execute(text(
+            "INSERT INTO agcm_notes (company_id, sequence_name, name, description, "
+            "location, dailylog_id, project_id, created_by) "
+            "VALUES (:cid, :seq, :name, :desc, :loc, :log, :pid, :uid)"
+        ), {"cid": COMPANY_ID, "seq": f"N{note_count:05d}",
+            "name": random.choice(NOTES_COMMENTS), "desc": random.choice(NOTES_DESCRIPTIONS),
+            "loc": random.choice(LOCATIONS), "log": log_id, "pid": pid, "uid": USER_ID})
+    db.commit()
+    print(f"  Notes: {note_count}")
+
+    # Visitors (70% of logs)
+    vis_count = 0
+    for log_id, pid, log_date in log_ids:
+        if random.random() < 0.7:
+            vis_count += 1
+            entry_hour = random.randint(7, 14)
+            db.execute(text(
+                "INSERT INTO agcm_visitors (company_id, sequence_name, name, reason, "
+                "visit_entry_time, visit_exit_time, "
+                "dailylog_id, project_id, created_by) "
+                "VALUES (:cid, :seq, :name, :reason, :entry, :exit, :log, :pid, :uid)"
+            ), {"cid": COMPANY_ID, "seq": f"V{vis_count:05d}",
+                "name": random.choice(VISITOR_NAMES), "reason": random.choice(VISITOR_REASONS),
+                "entry": datetime.combine(log_date, datetime.min.time()).replace(hour=entry_hour),
+                "exit": datetime.combine(log_date, datetime.min.time()).replace(hour=entry_hour + 2),
+                "log": log_id, "pid": pid, "uid": USER_ID})
+    db.commit()
+    print(f"  Visitors: {vis_count}")
+
+    # Inspections (50% of logs)
+    insp_count = 0
+    insp_type_ids = [r[0] for r in db.execute(text(
+        "SELECT id FROM agcm_inspection_types WHERE company_id = :cid"
+    ), {"cid": COMPANY_ID}).fetchall()]
+    if insp_type_ids:
+        for log_id, pid, log_date in log_ids:
+            if random.random() < 0.5:
+                insp_count += 1
+                db.execute(text(
+                    "INSERT INTO agcm_inspections (company_id, sequence_name, name, "
+                    "inspection_type_id, result, dailylog_id, project_id, created_by) "
+                    "VALUES (:cid, :seq, :name, :tid, :result, :log, :pid, :uid)"
+                ), {"cid": COMPANY_ID, "seq": f"I{insp_count:05d}",
+                    "name": f"Inspection #{insp_count}",
+                    "tid": random.choice(insp_type_ids),
+                    "result": random.choice(["Pass", "Pass", "Fail", "Conditional Pass"]),
+                    "log": log_id, "pid": pid, "uid": USER_ID})
+        db.commit()
+    print(f"  Inspections: {insp_count}")
+
+    # Safety Violations (20% of logs)
+    sv_count = 0
+    viol_type_ids = [r[0] for r in db.execute(text(
+        "SELECT id FROM agcm_violation_types WHERE company_id = :cid"
+    ), {"cid": COMPANY_ID}).fetchall()]
+    if viol_type_ids:
+        for log_id, pid, log_date in log_ids:
+            if random.random() < 0.2:
+                sv_count += 1
+                db.execute(text(
+                    "INSERT INTO agcm_safety_violations (company_id, sequence_name, name, "
+                    "violation_notice, violation_type_id, dailylog_id, project_id, created_by) "
+                    "VALUES (:cid, :seq, :name, :notice, :tid, :log, :pid, :uid)"
+                ), {"cid": COMPANY_ID, "seq": f"SV{sv_count:05d}",
+                    "name": random.choice(SAFETY_DESCRIPTIONS),
+                    "notice": random.choice(["Verbal warning", "Written notice", "Work stopped"]),
+                    "tid": random.choice(viol_type_ids),
+                    "log": log_id, "pid": pid, "uid": USER_ID})
+        db.commit()
+    print(f"  Safety Violations: {sv_count}")
+
+    # Delays (15% of logs)
+    delay_count = 0
+    for log_id, pid, log_date in log_ids:
+        if random.random() < 0.15:
+            delay_count += 1
+            db.execute(text(
+                "INSERT INTO agcm_delays (company_id, sequence_name, name, reason, "
+                "delay, reported_by, partner_id, dailylog_id, project_id, created_by) "
+                "VALUES (:cid, :seq, :name, :reason, :delay, :reported, :partner, :log, :pid, :uid)"
+            ), {"cid": COMPANY_ID, "seq": f"D{delay_count:05d}",
+                "name": f"Delay #{delay_count}",
+                "reason": random.choice(DELAY_REASONS),
+                "delay": f"{random.randint(1, 8)} hours",
+                "reported": random.choice(VISITOR_NAMES),
+                "partner": USER_ID,
+                "log": log_id, "pid": pid, "uid": USER_ID})
+    db.commit()
+    print(f"  Delays: {delay_count}")
+
+    # Deficiencies (15% of logs)
+    def_count = 0
+    for log_id, pid, log_date in log_ids:
+        if random.random() < 0.15:
+            def_count += 1
+            db.execute(text(
+                "INSERT INTO agcm_deficiencies (company_id, sequence_name, name, "
+                "description, dailylog_id, project_id, created_by) "
+                "VALUES (:cid, :seq, :name, :desc, :log, :pid, :uid)"
+            ), {"cid": COMPANY_ID, "seq": f"DEF{def_count:05d}",
+                "name": random.choice(DEFICIENCY_NAMES),
+                "desc": f"Found at {random.choice(LOCATIONS)}. Requires attention.",
+                "log": log_id, "pid": pid, "uid": USER_ID})
+    db.commit()
+    print(f"  Deficiencies: {def_count}")
+
+    # Accidents (5% of logs)
+    acc_count = 0
+    acc_type_ids = [r[0] for r in db.execute(text(
+        "SELECT id FROM agcm_accident_types WHERE company_id = :cid"
+    ), {"cid": COMPANY_ID}).fetchall()]
+    if acc_type_ids:
+        for log_id, pid, log_date in log_ids:
+            if random.random() < 0.05:
+                acc_count += 1
+                db.execute(text(
+                    "INSERT INTO agcm_accidents (company_id, sequence_name, name, "
+                    "accident_type_id, resolution, location, dailylog_id, project_id, created_by) "
+                    "VALUES (:cid, :seq, :name, :tid, :res, :loc, :log, :pid, :uid)"
+                ), {"cid": COMPANY_ID, "seq": f"ACC{acc_count:05d}",
+                    "name": f"Incident #{acc_count}",
+                    "tid": random.choice(acc_type_ids),
+                    "res": random.choice(["First aid", "Sent to clinic", "Near miss documented"]),
+                    "loc": random.choice(LOCATIONS),
+                    "log": log_id, "pid": pid, "uid": USER_ID})
+        db.commit()
+    print(f"  Accidents: {acc_count}")
+
+
 def seed_approval_chains(db):
     """Seed approval chains (requires base_automation module with correct enum)."""
     print("\n--- Seeding approval chains ---")
@@ -437,6 +657,11 @@ def main():
         seed_vendors(db)
         seed_project_members(db, project_ids)
         seed_module_settings(db)
+
+        # Seed original AGCM daily log data (daily logs, weather, manpower,
+        # notes, inspections, visitors, safety violations, delays, deficiencies, accidents)
+        seed_daily_log_data(db, project_ids)
+
         # Approval chains use a separate session to avoid rollback on error
         try:
             seed_approval_chains(Session())
@@ -449,6 +674,16 @@ def main():
         print("=" * 60)
         for table, label in [
             ("agcm_projects", "Projects"),
+            ("agcm_daily_activity_logs", "Daily Logs"),
+            ("agcm_manpower", "Manpower"),
+            ("agcm_weather", "Weather"),
+            ("agcm_notes", "Notes"),
+            ("agcm_inspections", "Inspections"),
+            ("agcm_visitors", "Visitors"),
+            ("agcm_safety_violations", "Safety Violations"),
+            ("agcm_delays", "Delays"),
+            ("agcm_deficiencies", "Deficiencies"),
+            ("agcm_accidents", "Accidents"),
             ("agcm_rfis", "RFIs"),
             ("agcm_change_orders", "Change Orders"),
             ("agcm_submittals", "Submittals"),
