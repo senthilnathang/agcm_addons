@@ -38,10 +38,18 @@ USER_ID = 1
 
 
 def clear_all_agcm_data(db):
-    """Truncate all agcm_* tables."""
+    """Truncate all agcm_* tables and clean up photo files."""
     print("=" * 60)
     print("CLEARING ALL AGCM DATA")
     print("=" * 60)
+
+    # Clean up old photo files
+    import shutil
+    photo_dir = os.path.join(ADDONS_DIR, "..", "backend", "uploads", "agcm", "photos")
+    photo_dir = os.path.abspath(photo_dir)
+    if os.path.exists(photo_dir):
+        shutil.rmtree(photo_dir)
+        print(f"Cleaned up photo files at {photo_dir}")
 
     # Get all agcm tables
     result = db.execute(text(
@@ -458,7 +466,7 @@ def seed_daily_log_data(db, project_ids):
     log_counter = 0
     log_ids = []
     for pid in project_ids:
-        base_date = date(2025, 6, 1)
+        base_date = date(2026, 1, 1)
         for d in range(30):  # 30 days per project
             log_date = base_date + timedelta(days=d)
             if log_date.weekday() >= 5:

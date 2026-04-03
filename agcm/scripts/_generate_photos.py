@@ -121,7 +121,11 @@ def generate_photos(db, log_ids, company_id, user_id, locations):
     """
     from sqlalchemy import text
 
-    uploads_base = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'backend', 'uploads')
+    # Resolve uploads dir — handle both direct and symlink paths
+    # Follow symlinks to get real path, then navigate to backend/uploads
+    real_script = os.path.realpath(__file__)
+    real_addons = os.path.abspath(os.path.join(os.path.dirname(real_script), '..', '..'))
+    uploads_base = os.path.join(real_addons, '..', 'backend', 'uploads')
     uploads_base = os.path.abspath(uploads_base)
 
     photo_count = 0
