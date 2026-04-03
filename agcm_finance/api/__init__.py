@@ -8,6 +8,7 @@ from addons.agcm_finance.api.expenses import router as expenses_router
 from addons.agcm_finance.api.invoices import router as invoices_router
 from addons.agcm_finance.api.bills import router as bills_router
 from addons.agcm_finance.api.prime_contracts import router as prime_contracts_router
+from addons.agcm_finance.api.tax_rates import router as tax_rates_router
 
 router = APIRouter()
 router.include_router(cost_codes_router)
@@ -16,3 +17,4 @@ router.include_router(expenses_router)
 router.include_router(invoices_router)
 router.include_router(bills_router)
 router.include_router(prime_contracts_router)
+router.include_router(tax_rates_router)

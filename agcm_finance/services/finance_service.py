@@ -12,7 +12,10 @@ from addons.agcm_finance.models.cost_code import CostCode
 from addons.agcm_finance.models.budget import Budget
 from addons.agcm_finance.models.expense import Expense, ExpenseLine
 from addons.agcm_finance.models.invoice import Invoice
+from addons.agcm_finance.models.invoice_line import InvoiceLine
 from addons.agcm_finance.models.bill import Bill
+from addons.agcm_finance.models.bill_line import BillLine
+from addons.agcm_finance.models.tax_rate import TaxRate
 from addons.agcm_finance.schemas.finance import (
     CostCodeCreate,
     CostCodeUpdate,
@@ -24,8 +27,16 @@ from addons.agcm_finance.schemas.finance import (
     ExpenseLineUpdate,
     InvoiceCreate,
     InvoiceUpdate,
+    InvoiceLineCreate,
+    InvoiceLineUpdate,
+    InvoiceLineResponse,
     BillCreate,
     BillUpdate,
+    BillLineCreate,
+    BillLineUpdate,
+    BillLineResponse,
+    TaxRateCreate,
+    TaxRateUpdate,
     RecordPayment,
 )
 
@@ -881,6 +892,204 @@ class FinanceService:
             )
 
         return bill
+
+    # =========================================================================
+    # TAX RATES
+    # =========================================================================
+
+    def list_tax_rates(self, active_only: bool = True) -> List[TaxRate]:
+        q = self.db.query(TaxRate).filter(TaxRate.company_id == self.company_id)
+        if active_only:
+            q = q.filter(TaxRate.is_active == True)
+        return q.order_by(TaxRate.name).all()
+
+    def create_tax_rate(self, data: TaxRateCreate) -> TaxRate:
+        tr = TaxRate(company_id=self.company_id, **data.model_dump())
+        self.db.add(tr)
+        self.db.commit()
+        self.db.refresh(tr)
+        return tr
+
+    def update_tax_rate(self, rate_id: int, data: TaxRateUpdate) -> Optional[TaxRate]:
+        tr = self.db.query(TaxRate).filter(
+            TaxRate.id == rate_id, TaxRate.company_id == self.company_id
+        ).first()
+        if not tr:
+            return None
+        for k, v in data.model_dump(exclude_unset=True).items():
+            setattr(tr, k, v)
+        self.db.commit()
+        self.db.refresh(tr)
+        return tr
+
+    def delete_tax_rate(self, rate_id: int) -> bool:
+        tr = self.db.query(TaxRate).filter(
+            TaxRate.id == rate_id, TaxRate.company_id == self.company_id
+        ).first()
+        if not tr:
+            return False
+        self.db.delete(tr)
+        self.db.commit()
+        return True
+
+    # =========================================================================
+    # INVOICE LINE ITEMS
+    # =========================================================================
+
+    def _calculate_line_tax(self, line, tax_rate_id: int = None) -> None:
+        """Calculate tax and totals for a line item."""
+        subtotal = (line.quantity or 0) * (getattr(line, "unit_price", 0) or getattr(line, "unit_cost", 0) or 0)
+        line.subtotal = round(subtotal, 2)
+
+        if line.taxable and tax_rate_id:
+            tr = self.db.query(TaxRate).filter(TaxRate.id == tax_rate_id).first()
+            if tr:
+                line.tax_amount = round(line.subtotal * tr.rate / 100, 2)
+            else:
+                line.tax_amount = 0
+        else:
+            line.tax_amount = 0
+
+        line.total = round(line.subtotal + line.tax_amount, 2)
+
+        if hasattr(line, "retention_pct"):
+            line.retention_amount = round(line.subtotal * (line.retention_pct or 0) / 100, 2)
+
+    def _recalculate_invoice(self, invoice: Invoice) -> None:
+        """Recalculate invoice totals from lines."""
+        lines = invoice.lines or []
+        if not lines:
+            return
+        invoice.amount = round(sum(l.subtotal or 0 for l in lines), 2)
+        invoice.tax_amount = round(sum(l.tax_amount or 0 for l in lines), 2)
+        invoice.total_amount = round(invoice.amount + invoice.tax_amount, 2)
+        invoice.balance_due = round(invoice.total_amount - (invoice.paid_amount or 0), 2)
+
+    def _recalculate_bill(self, bill: Bill) -> None:
+        """Recalculate bill totals from lines."""
+        lines = bill.lines or []
+        if not lines:
+            return
+        bill.amount = round(sum(l.subtotal or 0 for l in lines), 2)
+        bill.tax_amount = round(sum(l.tax_amount or 0 for l in lines), 2)
+        bill.total_amount = round(bill.amount + bill.tax_amount, 2)
+        bill.balance_due = round(bill.total_amount - (bill.paid_amount or 0), 2)
+
+    def get_invoice_detail(self, invoice_id: int) -> Optional[dict]:
+        inv = self.get_invoice(invoice_id)
+        if not inv:
+            return None
+        from addons.agcm_finance.schemas.finance import InvoiceDetail
+        return InvoiceDetail.model_validate(inv).model_dump()
+
+    def get_bill_detail(self, bill_id: int) -> Optional[dict]:
+        bill = self.get_bill(bill_id)
+        if not bill:
+            return None
+        from addons.agcm_finance.schemas.finance import BillDetail
+        return BillDetail.model_validate(bill).model_dump()
+
+    def add_invoice_line(self, invoice_id: int, data: InvoiceLineCreate) -> Optional[InvoiceLine]:
+        inv = self.get_invoice(invoice_id)
+        if not inv:
+            return None
+        line = InvoiceLine(
+            invoice_id=invoice_id,
+            company_id=self.company_id,
+            **data.model_dump(exclude={"tax_rate_id"}),
+        )
+        line.tax_rate_id = data.tax_rate_id
+        self._calculate_line_tax(line, data.tax_rate_id)
+        self.db.add(line)
+        self.db.flush()
+        self._recalculate_invoice(inv)
+        self.db.commit()
+        self.db.refresh(line)
+        self._invalidate_finance_cache(inv.project_id)
+        return line
+
+    def update_invoice_line(self, line_id: int, data: InvoiceLineUpdate) -> Optional[InvoiceLine]:
+        line = self.db.query(InvoiceLine).filter(
+            InvoiceLine.id == line_id, InvoiceLine.company_id == self.company_id
+        ).first()
+        if not line:
+            return None
+        for k, v in data.model_dump(exclude_unset=True).items():
+            setattr(line, k, v)
+        self._calculate_line_tax(line, line.tax_rate_id)
+        self.db.flush()
+        inv = self.get_invoice(line.invoice_id)
+        if inv:
+            self._recalculate_invoice(inv)
+        self.db.commit()
+        self.db.refresh(line)
+        return line
+
+    def delete_invoice_line(self, line_id: int) -> bool:
+        line = self.db.query(InvoiceLine).filter(
+            InvoiceLine.id == line_id, InvoiceLine.company_id == self.company_id
+        ).first()
+        if not line:
+            return False
+        invoice_id = line.invoice_id
+        self.db.delete(line)
+        self.db.flush()
+        inv = self.get_invoice(invoice_id)
+        if inv:
+            self._recalculate_invoice(inv)
+        self.db.commit()
+        return True
+
+    def add_bill_line(self, bill_id: int, data: BillLineCreate) -> Optional[BillLine]:
+        bill = self.get_bill(bill_id)
+        if not bill:
+            return None
+        line = BillLine(
+            bill_id=bill_id,
+            company_id=self.company_id,
+            **data.model_dump(exclude={"tax_rate_id"}),
+        )
+        line.tax_rate_id = data.tax_rate_id
+        self._calculate_line_tax(line, data.tax_rate_id)
+        self.db.add(line)
+        self.db.flush()
+        self._recalculate_bill(bill)
+        self.db.commit()
+        self.db.refresh(line)
+        self._invalidate_finance_cache(bill.project_id)
+        return line
+
+    def update_bill_line(self, line_id: int, data: BillLineUpdate) -> Optional[BillLine]:
+        line = self.db.query(BillLine).filter(
+            BillLine.id == line_id, BillLine.company_id == self.company_id
+        ).first()
+        if not line:
+            return None
+        for k, v in data.model_dump(exclude_unset=True).items():
+            setattr(line, k, v)
+        self._calculate_line_tax(line, line.tax_rate_id)
+        self.db.flush()
+        bill = self.get_bill(line.bill_id)
+        if bill:
+            self._recalculate_bill(bill)
+        self.db.commit()
+        self.db.refresh(line)
+        return line
+
+    def delete_bill_line(self, line_id: int) -> bool:
+        line = self.db.query(BillLine).filter(
+            BillLine.id == line_id, BillLine.company_id == self.company_id
+        ).first()
+        if not line:
+            return False
+        bill_id = line.bill_id
+        self.db.delete(line)
+        self.db.flush()
+        bill = self.get_bill(bill_id)
+        if bill:
+            self._recalculate_bill(bill)
+        self.db.commit()
+        return True
 
     # =========================================================================
     # BUDGET FORECASTING (EAC/ETC)

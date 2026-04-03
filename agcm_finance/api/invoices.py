@@ -11,6 +11,10 @@ from addons.agcm_finance.schemas.finance import (
     InvoiceCreate,
     InvoiceUpdate,
     InvoiceResponse,
+    InvoiceDetail,
+    InvoiceLineCreate,
+    InvoiceLineUpdate,
+    InvoiceLineResponse,
     RecordPayment,
 )
 from addons.agcm_finance.services.finance_service import FinanceService
@@ -89,6 +93,59 @@ async def delete_invoice(
     svc = _get_service(db, current_user)
     if not svc.delete_invoice(invoice_id):
         raise HTTPException(status_code=404, detail="Invoice not found")
+
+
+@router.get("/invoices/{invoice_id}/detail", response_model=InvoiceDetail)
+async def get_invoice_detail(
+    invoice_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get invoice with line items."""
+    svc = _get_service(db, current_user)
+    result = svc.get_invoice_detail(invoice_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return result
+
+
+@router.post("/invoice-lines", response_model=InvoiceLineResponse, status_code=201)
+async def add_invoice_line(
+    data: InvoiceLineCreate,
+    invoice_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    svc = _get_service(db, current_user)
+    result = svc.add_invoice_line(invoice_id, data)
+    if not result:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    return result
+
+
+@router.put("/invoice-lines/{line_id}", response_model=InvoiceLineResponse)
+async def update_invoice_line(
+    line_id: int,
+    data: InvoiceLineUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    svc = _get_service(db, current_user)
+    result = svc.update_invoice_line(line_id, data)
+    if not result:
+        raise HTTPException(status_code=404, detail="Line not found")
+    return result
+
+
+@router.delete("/invoice-lines/{line_id}", status_code=204)
+async def delete_invoice_line(
+    line_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    svc = _get_service(db, current_user)
+    if not svc.delete_invoice_line(line_id):
+        raise HTTPException(status_code=404, detail="Line not found")
 
 
 @router.post("/invoices/{invoice_id}/record-payment", response_model=InvoiceResponse)

@@ -279,3 +279,142 @@ class BillResponse(BaseModel):
 
 class RecordPayment(BaseModel):
     amount: float = Field(..., gt=0)
+
+
+# =============================================================================
+# TAX RATES
+# =============================================================================
+
+class TaxRateCreate(BaseModel):
+    name: str = Field(..., max_length=100)
+    rate: float = Field(0, ge=0, le=100)
+    is_compound: bool = False
+    is_default: bool = False
+    is_active: bool = True
+
+
+class TaxRateUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    name: Optional[str] = None
+    rate: Optional[float] = Field(None, ge=0, le=100)
+    is_compound: Optional[bool] = None
+    is_default: Optional[bool] = None
+    is_active: Optional[bool] = None
+
+
+class TaxRateResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    company_id: int
+    name: str
+    rate: float
+    is_compound: bool
+    is_default: bool
+    is_active: bool
+    created_at: Optional[datetime] = None
+
+
+# =============================================================================
+# INVOICE LINES
+# =============================================================================
+
+class InvoiceLineCreate(BaseModel):
+    description: str = Field(..., max_length=500)
+    quantity: float = Field(1.0, ge=0)
+    unit: Optional[str] = "ea"
+    unit_price: float = Field(0, ge=0)
+    taxable: bool = True
+    tax_rate_id: Optional[int] = None
+    cost_code_id: Optional[int] = None
+    retention_pct: float = Field(0, ge=0, le=100)
+    display_order: int = 0
+
+
+class InvoiceLineUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    description: Optional[str] = None
+    quantity: Optional[float] = Field(None, ge=0)
+    unit: Optional[str] = None
+    unit_price: Optional[float] = Field(None, ge=0)
+    taxable: Optional[bool] = None
+    tax_rate_id: Optional[int] = None
+    cost_code_id: Optional[int] = None
+    retention_pct: Optional[float] = Field(None, ge=0, le=100)
+    display_order: Optional[int] = None
+
+
+class InvoiceLineResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    invoice_id: int
+    description: str
+    quantity: float = 1.0
+    unit: Optional[str] = "ea"
+    unit_price: float = 0
+    subtotal: float = 0
+    taxable: bool = True
+    tax_rate_id: Optional[int] = None
+    tax_amount: float = 0
+    total: float = 0
+    cost_code_id: Optional[int] = None
+    retention_pct: float = 0
+    retention_amount: float = 0
+    display_order: int = 0
+    company_id: int
+    created_at: Optional[datetime] = None
+
+
+class InvoiceDetail(InvoiceResponse):
+    """Invoice with line items."""
+    lines: List[InvoiceLineResponse] = []
+
+
+# =============================================================================
+# BILL LINES
+# =============================================================================
+
+class BillLineCreate(BaseModel):
+    description: str = Field(..., max_length=500)
+    quantity: float = Field(1.0, ge=0)
+    unit: Optional[str] = "ea"
+    unit_cost: float = Field(0, ge=0)
+    taxable: bool = True
+    tax_rate_id: Optional[int] = None
+    cost_code_id: Optional[int] = None
+    display_order: int = 0
+
+
+class BillLineUpdate(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    description: Optional[str] = None
+    quantity: Optional[float] = Field(None, ge=0)
+    unit: Optional[str] = None
+    unit_cost: Optional[float] = Field(None, ge=0)
+    taxable: Optional[bool] = None
+    tax_rate_id: Optional[int] = None
+    cost_code_id: Optional[int] = None
+    display_order: Optional[int] = None
+
+
+class BillLineResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    bill_id: int
+    description: str
+    quantity: float = 1.0
+    unit: Optional[str] = "ea"
+    unit_cost: float = 0
+    subtotal: float = 0
+    taxable: bool = True
+    tax_rate_id: Optional[int] = None
+    tax_amount: float = 0
+    total: float = 0
+    cost_code_id: Optional[int] = None
+    display_order: int = 0
+    company_id: int
+    created_at: Optional[datetime] = None
+
+
+class BillDetail(BillResponse):
+    """Bill with line items."""
+    lines: List[BillLineResponse] = []

@@ -73,6 +73,14 @@ class Invoice(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     # Relationships
     company = relationship("Company", foreign_keys=[company_id], lazy="select")
 
+    lines = relationship(
+        "InvoiceLine",
+        back_populates="invoice",
+        cascade="all, delete-orphan",
+        order_by="InvoiceLine.display_order",
+        lazy="select",
+    )
+
     __table_args__ = (
         Index("ix_agcm_inv_project_status", "project_id", "status"),
         Index("ix_agcm_inv_company", "company_id"),

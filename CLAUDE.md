@@ -137,6 +137,16 @@ When writing or modifying code, verify every endpoint against this checklist:
         entity.status = "approved"  # no chain — auto-approve
     ```
 
+### Invoice & Bill Line Items with Tax
+- **TaxRate** (`agcm_tax_rates`): company-level tax rates (name, rate %, is_compound, is_default)
+- **InvoiceLine** (`agcm_invoice_lines`): qty, unit_price, subtotal, taxable, tax_rate_id, tax_amount, total, retention_pct/amount, cost_code_id
+- **BillLine** (`agcm_bill_lines`): qty, unit_cost, subtotal, taxable, tax_rate_id, tax_amount, total, cost_code_id
+- Calculation: subtotal = qty × price/cost; tax = subtotal × rate%; total = subtotal + tax
+- Document recalculation: amount = sum(subtotals), tax_amount = sum(taxes), total_amount = amount + tax
+- API: `/agcm_finance/tax-rates` (CRUD), `/invoice-lines` (CRUD), `/bill-lines` (CRUD)
+- Detail endpoints: `GET /invoices/{id}/detail`, `GET /bills/{id}/detail` (include lines)
+- Backward compatible: flat amount fields still work when no lines exist
+
 ### Reports
 - Overview Canvas: SVG charts (donut, bars) in daily log reports
 - Project Dashboard: aggregated KPIs in periodic reports

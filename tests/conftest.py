@@ -128,6 +128,9 @@ _addon_models = [
     ("agcm_finance_expense", _model_path("agcm_finance", "expense.py")),
     ("agcm_finance_invoice", _model_path("agcm_finance", "invoice.py")),
     ("agcm_finance_bill", _model_path("agcm_finance", "bill.py")),
+    ("agcm_finance_tax_rate", _model_path("agcm_finance", "tax_rate.py")),
+    ("agcm_finance_invoice_line", _model_path("agcm_finance", "invoice_line.py")),
+    ("agcm_finance_bill_line", _model_path("agcm_finance", "bill_line.py")),
     # agcm_progress
     ("agcm_progress_milestone", _model_path("agcm_progress", "milestone.py")),
     ("agcm_progress_issue", _model_path("agcm_progress", "issue.py")),

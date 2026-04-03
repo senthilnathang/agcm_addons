@@ -11,6 +11,10 @@ from addons.agcm_finance.schemas.finance import (
     BillCreate,
     BillUpdate,
     BillResponse,
+    BillDetail,
+    BillLineCreate,
+    BillLineUpdate,
+    BillLineResponse,
     RecordPayment,
 )
 from addons.agcm_finance.services.finance_service import FinanceService
@@ -89,6 +93,59 @@ async def delete_bill(
     svc = _get_service(db, current_user)
     if not svc.delete_bill(bill_id):
         raise HTTPException(status_code=404, detail="Bill not found")
+
+
+@router.get("/bills/{bill_id}/detail", response_model=BillDetail)
+async def get_bill_detail(
+    bill_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Get bill with line items."""
+    svc = _get_service(db, current_user)
+    result = svc.get_bill_detail(bill_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Bill not found")
+    return result
+
+
+@router.post("/bill-lines", response_model=BillLineResponse, status_code=201)
+async def add_bill_line(
+    data: BillLineCreate,
+    bill_id: int = Query(...),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    svc = _get_service(db, current_user)
+    result = svc.add_bill_line(bill_id, data)
+    if not result:
+        raise HTTPException(status_code=404, detail="Bill not found")
+    return result
+
+
+@router.put("/bill-lines/{line_id}", response_model=BillLineResponse)
+async def update_bill_line(
+    line_id: int,
+    data: BillLineUpdate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    svc = _get_service(db, current_user)
+    result = svc.update_bill_line(line_id, data)
+    if not result:
+        raise HTTPException(status_code=404, detail="Line not found")
+    return result
+
+
+@router.delete("/bill-lines/{line_id}", status_code=204)
+async def delete_bill_line(
+    line_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    svc = _get_service(db, current_user)
+    if not svc.delete_bill_line(line_id):
+        raise HTTPException(status_code=404, detail="Line not found")
 
 
 @router.post("/bills/{bill_id}/record-payment", response_model=BillResponse)

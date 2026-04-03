@@ -56,6 +56,7 @@ class Bill(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     tax_amount = Column(Float, default=0, nullable=False)
     total_amount = Column(Float, default=0, nullable=False)
     paid_amount = Column(Float, default=0, nullable=False)
+    balance_due = Column(Float, default=0, nullable=False)
 
     issue_date = Column(Date, nullable=True)
     due_date = Column(Date, nullable=True)
@@ -70,6 +71,14 @@ class Bill(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
 
     # Relationships
     company = relationship("Company", foreign_keys=[company_id], lazy="select")
+
+    lines = relationship(
+        "BillLine",
+        back_populates="bill",
+        cascade="all, delete-orphan",
+        order_by="BillLine.display_order",
+        lazy="select",
+    )
 
     __table_args__ = (
         Index("ix_agcm_bill_project_status", "project_id", "status"),
