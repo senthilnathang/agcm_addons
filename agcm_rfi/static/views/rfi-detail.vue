@@ -92,6 +92,14 @@ async function handleReopen() {
   } catch { message.error('Failed to reopen RFI'); }
 }
 
+async function handleCreateChangeOrder() {
+  try {
+    const result = await requestClient.post(`${BASE}/rfis/${rfiId.value}/create-change-order`);
+    message.success(`Change Order ${result.sequence_name} created`);
+    router.push({ path: '/agcm/change-orders/detail', query: { id: result.change_order_id } });
+  } catch { message.error('Failed to create Change Order'); }
+}
+
 async function handleSendResponse() {
   if (!newResponseContent.value.trim()) { message.warning('Response content required'); return; }
   sendingResponse.value = true;
@@ -134,6 +142,11 @@ onMounted(fetchRFI);
           <Space>
             <Button @click="router.push('/agcm/rfi')"><ArrowLeftOutlined /> Back</Button>
             <Button @click="router.push({ path: '/agcm/rfi/form', query: { id: rfi.id } })"><EditOutlined /> Edit</Button>
+            <Button
+              v-if="(rfi.cost_impact > 0 || rfi.schedule_impact_days > 0) && rfi.status !== 'closed'"
+              type="primary"
+              @click="handleCreateChangeOrder"
+            >Create Change Order</Button>
             <Button v-if="rfi.status !== 'closed'" type="primary" danger @click="handleClose"><LockOutlined /> Close</Button>
             <Button v-else type="primary" @click="handleReopen"><UnlockOutlined /> Reopen</Button>
           </Space>

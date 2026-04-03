@@ -171,6 +171,9 @@ When writing or modifying code, verify every endpoint against this checklist:
 ### Workflow Connections
 - Estimate → Budget: `send_to_budget()` creates agcm_finance.Budget records
 - Change Order → Budget: auto-updates `committed_amount` on approval
+- PO/Subcontract → Budget: auto-updates `committed_amount` on approval
+- VendorBill/Timesheet/Expense → Budget: auto-updates `actual_amount` on approval
+- **RFI → Change Order**: `POST /agcm_rfi/rfis/{id}/create-change-order` — creates draft CO pre-populated with RFI subject, question, cost_impact, schedule_impact_days, project_id
 - Inspection fail → Punch List: auto-creates PunchListItem
 - Bid awarded → Subcontract: auto-creates draft Subcontract
 - BIM Viewpoints ↔ RFIs/Issues: cross-entity linking

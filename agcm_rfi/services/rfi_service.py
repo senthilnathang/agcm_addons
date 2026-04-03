@@ -283,6 +283,44 @@ class RFIService:
         self._invalidate_rfi_cache(rfi_id=rfi_id, project_id=rfi.project_id)
         return rfi
 
+    # --- RFI → Change Order ---
+
+    def create_change_order_from_rfi(self, rfi_id: int) -> Optional[dict]:
+        """Create a draft Change Order pre-populated from an RFI's cost/schedule impact."""
+        rfi = self.get_rfi(rfi_id)
+        if not rfi:
+            return None
+
+        try:
+            from addons.agcm_change_order.services.change_order_service import ChangeOrderService
+            from addons.agcm_change_order.schemas.change_order import ChangeOrderCreate
+
+            co_data = ChangeOrderCreate(
+                title=rfi.subject or f"Change Order from {rfi.sequence_name}",
+                description=rfi.question or "",
+                reason=f"Change Order from RFI {rfi.sequence_name}",
+                cost_impact=rfi.cost_impact or 0.0,
+                schedule_impact_days=rfi.schedule_impact_days or 0,
+                project_id=rfi.project_id,
+                lines=[],
+            )
+
+            co_svc = ChangeOrderService(self.db, self.company_id, self.user_id)
+            co = co_svc.create_change_order(co_data)
+
+            return {
+                "change_order_id": co.id,
+                "sequence_name": co.sequence_name,
+                "title": co.title,
+                "cost_impact": co.cost_impact,
+                "schedule_impact_days": co.schedule_impact_days,
+                "status": co.status,
+            }
+
+        except ImportError:
+            logger.warning("agcm_change_order not installed — cannot create CO from RFI")
+            return None
+
     # --- Responses ---
 
     def create_response(

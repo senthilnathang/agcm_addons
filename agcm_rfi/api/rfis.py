@@ -148,6 +148,20 @@ async def reopen_rfi(
     return result
 
 
+@router.post("/rfis/{rfi_id}/create-change-order")
+async def create_change_order_from_rfi(
+    rfi_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Create a draft Change Order pre-populated from an RFI's cost/schedule impact."""
+    svc = _get_service(db, current_user)
+    result = svc.create_change_order_from_rfi(rfi_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="RFI not found or change order module unavailable")
+    return result
+
+
 # --- Responses ---
 
 
