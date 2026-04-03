@@ -32,6 +32,8 @@ from addons.agcm.models.deficiency import Deficiency
 from addons.agcm.models.photo import Photo
 from addons.agcm.models.entity_attachment import agcm_entity_attachments
 from addons.agcm.models.comment import EntityComment
+from addons.agcm.models.project_member import ProjectMember, ProjectRole
+from addons.agcm.models.settings import AGCMSettings
 
 __all__ = [
     # Lookups
@@ -66,4 +68,8 @@ __all__ = [
     # Generic cross-module
     "agcm_entity_attachments",
     "EntityComment",
+    # Project access & settings
+    "ProjectMember",
+    "ProjectRole",
+    "AGCMSettings",
 ]
