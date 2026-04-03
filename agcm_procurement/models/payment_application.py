@@ -70,6 +70,11 @@ class PaymentApplication(Base, TimestampMixin, AuditMixin):
     net_payment_due = Column(Float, default=0, nullable=False)
     pct_complete = Column(Float, default=0, nullable=False)
 
+    # AIA G702 additional fields
+    retainage_pct = Column(Float, default=10.0, nullable=False)
+    contract_date = Column(Date, nullable=True)
+    change_order_total = Column(Float, default=0, nullable=False)
+
     certified_by = Column(String(255), nullable=True)
     certified_date = Column(Date, nullable=True)
     notes = Column(Text, nullable=True)
@@ -115,9 +120,17 @@ class PaymentApplicationLine(Base, TimestampMixin):
         nullable=True,
     )
 
+    item_number = Column(String(20), nullable=True)  # G703 explicit item number
+    change_order_id = Column(
+        Integer,
+        ForeignKey("agcm_change_orders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     description = Column(String(500), nullable=False)
     scheduled_value = Column(Float, default=0, nullable=False)
     previous_billed = Column(Float, default=0, nullable=False)
+    previous_stored_materials = Column(Float, default=0, nullable=False)
     current_billed = Column(Float, default=0, nullable=False)
     stored_materials = Column(Float, default=0, nullable=False)
     total_completed = Column(Float, default=0, nullable=False)

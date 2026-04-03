@@ -148,6 +148,18 @@ When writing or modifying code, verify every endpoint against this checklist:
 - Detail endpoints: `GET /invoices/{id}/detail`, `GET /bills/{id}/detail` (include lines)
 - Backward compatible: flat amount fields still work when no lines exist
 
+### AIA G702/G703 Payment Applications
+- PaymentApplication enhanced with: `retainage_pct`, `contract_date`, `change_order_total`
+- PaymentApplicationLine enhanced with: `item_number`, `change_order_id`, `previous_stored_materials`
+- **G702 Summary**: `GET /agcm_procurement/payment-applications/{id}/g702-summary`
+  - Returns: original_contract_sum, net_change_by_COs, current_contract_sum
+  - Retainage: computed from total_completed × retainage_pct
+  - Payment due: total_earned_less_retainage - previous_certificates
+  - Project/contractor header info from Project and Subcontract
+- **G703 Continuation Sheet**: line-by-line SOV with AIA columns
+  - item_number, scheduled_value, from_previous (work + materials)
+  - this_period (work + materials), total_completed, pct_complete, balance_to_finish, retainage
+
 ### Earned Value Management (EVM) Forecasting
 - Endpoint: `GET /agcm_finance/budget/forecast?project_id=X`
 - Schema: `BudgetForecastResponse` with full EVM metrics

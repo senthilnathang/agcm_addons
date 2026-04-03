@@ -149,6 +149,8 @@ _addon_models = [
     ("agcm_procurement_purchase_order", _model_path("agcm_procurement", "purchase_order.py")),
     ("agcm_procurement_subcontract", _model_path("agcm_procurement", "subcontract.py")),
     ("agcm_procurement_vendor_bill", _model_path("agcm_procurement", "vendor_bill.py")),
+    ("agcm_procurement_payment_application", _model_path("agcm_procurement", "payment_application.py")),
+    ("agcm_procurement_tm_ticket", _model_path("agcm_procurement", "tm_ticket.py")),
     # agcm_resource
     ("agcm_resource_worker", _model_path("agcm_resource", "worker.py")),
     ("agcm_resource_equipment", _model_path("agcm_resource", "equipment.py")),
