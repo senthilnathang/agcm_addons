@@ -1095,8 +1095,47 @@ class FinanceService:
     # BUDGET FORECASTING (EAC/ETC)
     # =========================================================================
 
+    def _get_project_completion_pct(self, project_id: int) -> float:
+        """Get weighted % complete from scheduled tasks if available."""
+        try:
+            from addons.agcm_schedule.models.task import Task
+            tasks = (
+                self.db.query(Task)
+                .filter(
+                    Task.project_id == project_id,
+                    Task.company_id == self.company_id,
+                )
+                .all()
+            )
+            if not tasks:
+                return 0.0
+            total_weight = sum(getattr(t, "planned_hours", 1) or 1 for t in tasks)
+            weighted_pct = sum(
+                (getattr(t, "progress", 0) or 0) * (getattr(t, "planned_hours", 1) or 1)
+                for t in tasks
+            )
+            return (weighted_pct / total_weight) if total_weight else 0.0
+        except (ImportError, Exception):
+            return 0.0
+
     def get_budget_forecast(self, project_id: int) -> dict:
-        """Compute Estimate at Completion / Estimate to Complete forecast."""
+        """
+        Compute Earned Value Management (EVM) forecast for a project.
+
+        Standard EVM metrics:
+        - BAC: Budget at Completion (revised budget)
+        - BCWS: Budgeted Cost of Work Scheduled (planned value)
+        - BCWP: Budgeted Cost of Work Performed (earned value)
+        - ACWP: Actual Cost of Work Performed
+        - CV: Cost Variance (BCWP - ACWP)
+        - SV: Schedule Variance (BCWP - BCWS)
+        - CPI: Cost Performance Index (BCWP / ACWP)
+        - SPI: Schedule Performance Index (BCWP / BCWS)
+        - EAC: Estimate at Completion (multiple methods)
+        - ETC: Estimate to Complete
+        - VAC: Variance at Completion (BAC - EAC)
+        - TCPI: To-Complete Performance Index
+        """
         budgets = self.list_budgets(project_id)
 
         original_budget = sum(b.planned_amount or 0 for b in budgets)
@@ -1120,55 +1159,102 @@ class FinanceService:
         except Exception:
             pass
 
-        revised_budget = original_budget + approved_changes
+        # === EVM Core Metrics ===
+        bac = original_budget + approved_changes  # Budget at Completion
+        bcws = bac  # Planned Value (full budget = what should have been spent)
+        acwp = actual_spent  # Actual Cost of Work Performed
 
-        # Trend factor: ratio of committed-but-unspent work
-        if committed > 0 and actual_spent > 0:
-            trend_factor = actual_spent / committed if committed else 1.0
+        # Earned Value: use task % complete if available, else cost-based proxy
+        task_pct = self._get_project_completion_pct(project_id)
+        if task_pct > 0:
+            bcwp = bac * (task_pct / 100.0)
+        elif bac > 0 and committed > 0:
+            # Proxy: use actual/committed ratio as earned value indicator
+            bcwp = min(bac * (actual_spent / committed), bac) if committed else 0
         else:
-            trend_factor = 1.0
+            bcwp = actual_spent  # Fallback: earned = spent
 
+        # Variances
+        cv = bcwp - acwp          # Cost Variance (positive = under budget)
+        sv = bcwp - bcws          # Schedule Variance (positive = ahead)
+
+        # Performance Indices
+        cpi = (bcwp / acwp) if acwp > 0 else (1.0 if bcwp == 0 else 0)
+        spi = (bcwp / bcws) if bcws > 0 else (1.0 if bcwp == 0 else 0)
+
+        # EAC Methods
+        # Method 1: EAC based on CPI (assumes current cost performance continues)
+        eac_cpi = (bac / cpi) if cpi > 0 else bac
+        # Method 2: EAC based on trend (existing method)
+        trend_factor = (actual_spent / committed) if committed > 0 and actual_spent > 0 else 1.0
         remaining_committed = max(committed - actual_spent, 0)
-        estimated_at_completion = actual_spent + remaining_committed * trend_factor
-        # Ensure EAC is at least the revised budget when there is no variance signal
-        if estimated_at_completion < revised_budget and actual_spent == 0:
-            estimated_at_completion = revised_budget
+        eac_trend = actual_spent + remaining_committed * trend_factor
+        # Method 3: Composite (CPI × SPI weighted)
+        cpi_spi = cpi * spi if (cpi > 0 and spi > 0) else cpi
+        eac_composite = (bac / cpi_spi) if cpi_spi > 0 else bac
 
-        estimate_to_complete = max(estimated_at_completion - actual_spent, 0)
-        variance = revised_budget - estimated_at_completion
-        pct_complete = (actual_spent / revised_budget * 100) if revised_budget else 0
-        cpi = (
-            (revised_budget / estimated_at_completion) if estimated_at_completion else 0
-        )
+        # Use CPI-based EAC as primary (industry standard)
+        eac = eac_cpi
+        if eac < bac and actual_spent == 0:
+            eac = bac  # No variance signal yet
+
+        etc = max(eac - actual_spent, 0)
+        vac = bac - eac  # Variance at Completion
+        pct_complete = (actual_spent / bac * 100) if bac > 0 else 0
+
+        # TCPI: required performance to finish on budget
+        remaining_budget = bac - acwp
+        remaining_work = bac - bcwp
+        tcpi = (remaining_work / remaining_budget) if remaining_budget > 0 else 0
 
         # Build per-cost-code breakdown
         by_cost_code = []
         for b in budgets:
-            cc_forecast = (b.actual_amount or 0) + max(
-                (b.committed_amount or 0) - (b.actual_amount or 0), 0
-            ) * trend_factor
-            by_cost_code.append(
-                {
-                    "budget_id": b.id,
-                    "cost_code_id": b.cost_code_id,
-                    "description": b.description,
-                    "planned": b.planned_amount or 0,
-                    "committed": b.committed_amount or 0,
-                    "actual": b.actual_amount or 0,
-                    "forecast": round(cc_forecast, 2),
-                }
-            )
+            b_planned = b.planned_amount or 0
+            b_committed = b.committed_amount or 0
+            b_actual = b.actual_amount or 0
+            cc_forecast = b_actual + max(b_committed - b_actual, 0) * trend_factor
+            cc_earned = b_planned * (task_pct / 100.0) if task_pct > 0 else b_actual
+            by_cost_code.append({
+                "budget_id": b.id,
+                "cost_code_id": b.cost_code_id,
+                "description": b.description,
+                "planned": round(b_planned, 2),
+                "committed": round(b_committed, 2),
+                "actual": round(b_actual, 2),
+                "earned": round(cc_earned, 2),
+                "forecast": round(cc_forecast, 2),
+            })
 
         return {
+            # Budget totals
             "original_budget": round(original_budget, 2),
             "approved_changes": round(approved_changes, 2),
-            "revised_budget": round(revised_budget, 2),
+            "revised_budget": round(bac, 2),
             "committed": round(committed, 2),
             "actual_spent": round(actual_spent, 2),
-            "estimated_at_completion": round(estimated_at_completion, 2),
-            "estimate_to_complete": round(estimate_to_complete, 2),
-            "variance": round(variance, 2),
-            "pct_complete": round(pct_complete, 2),
+            # EVM core metrics
+            "bac": round(bac, 2),
+            "bcws": round(bcws, 2),
+            "bcwp": round(bcwp, 2),
+            "acwp": round(acwp, 2),
+            # Variances
+            "cost_variance": round(cv, 2),
+            "schedule_variance": round(sv, 2),
+            # Performance indices
             "cost_performance_index": round(cpi, 4),
+            "schedule_performance_index": round(spi, 4),
+            # Forecasts
+            "estimated_at_completion": round(eac, 2),
+            "eac_cpi": round(eac_cpi, 2),
+            "eac_trend": round(eac_trend, 2),
+            "eac_composite": round(eac_composite, 2),
+            "estimate_to_complete": round(etc, 2),
+            "variance_at_completion": round(vac, 2),
+            "tcpi": round(tcpi, 4),
+            # Summary
+            "pct_complete": round(pct_complete, 2),
+            "pct_schedule_complete": round(task_pct, 2),
+            # Detail
             "by_cost_code": by_cost_code,
         }

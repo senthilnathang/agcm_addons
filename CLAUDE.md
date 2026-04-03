@@ -148,6 +148,16 @@ When writing or modifying code, verify every endpoint against this checklist:
 - Detail endpoints: `GET /invoices/{id}/detail`, `GET /bills/{id}/detail` (include lines)
 - Backward compatible: flat amount fields still work when no lines exist
 
+### Earned Value Management (EVM) Forecasting
+- Endpoint: `GET /agcm_finance/budget/forecast?project_id=X`
+- Schema: `BudgetForecastResponse` with full EVM metrics
+- **Core Metrics:** BAC, BCWS (Planned Value), BCWP (Earned Value), ACWP (Actual Cost)
+- **Variances:** CV (Cost Variance), SV (Schedule Variance)
+- **Indices:** CPI (Cost Performance), SPI (Schedule Performance), TCPI (To-Complete PI)
+- **Forecasts:** EAC (3 methods: CPI-based, trend, composite), ETC, VAC
+- BCWP source: task % complete from agcm_schedule (fallback: actual/committed proxy)
+- Per-cost-code breakdown with planned, committed, actual, earned, forecast
+
 ### Reports
 - Overview Canvas: SVG charts (donut, bars) in daily log reports
 - Project Dashboard: aggregated KPIs in periodic reports

@@ -84,6 +84,51 @@ class BudgetResponse(BaseModel):
     updated_at: Optional[datetime] = None
 
 
+class BudgetForecastCostCode(BaseModel):
+    budget_id: int
+    cost_code_id: Optional[int] = None
+    description: str = ""
+    planned: float = 0
+    committed: float = 0
+    actual: float = 0
+    earned: float = 0
+    forecast: float = 0
+
+
+class BudgetForecastResponse(BaseModel):
+    """Full Earned Value Management forecast response."""
+    # Budget totals
+    original_budget: float = 0
+    approved_changes: float = 0
+    revised_budget: float = 0
+    committed: float = 0
+    actual_spent: float = 0
+    # EVM core metrics
+    bac: float = 0            # Budget at Completion
+    bcws: float = 0           # Budgeted Cost of Work Scheduled (Planned Value)
+    bcwp: float = 0           # Budgeted Cost of Work Performed (Earned Value)
+    acwp: float = 0           # Actual Cost of Work Performed
+    # Variances
+    cost_variance: float = 0   # CV = BCWP - ACWP (positive = under budget)
+    schedule_variance: float = 0  # SV = BCWP - BCWS (positive = ahead)
+    # Performance indices
+    cost_performance_index: float = 0    # CPI = BCWP / ACWP
+    schedule_performance_index: float = 0  # SPI = BCWP / BCWS
+    # Forecasts
+    estimated_at_completion: float = 0   # EAC (primary, CPI-based)
+    eac_cpi: float = 0                   # EAC = BAC / CPI
+    eac_trend: float = 0                 # EAC based on cost trend
+    eac_composite: float = 0             # EAC = BAC / (CPI × SPI)
+    estimate_to_complete: float = 0      # ETC = EAC - ACWP
+    variance_at_completion: float = 0    # VAC = BAC - EAC
+    tcpi: float = 0                      # To-Complete Performance Index
+    # Summary
+    pct_complete: float = 0
+    pct_schedule_complete: float = 0
+    # Detail
+    by_cost_code: List[BudgetForecastCostCode] = []
+
+
 class BudgetSummary(BaseModel):
     total_planned: float = 0
     total_actual: float = 0
