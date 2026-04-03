@@ -378,6 +378,19 @@ class ResourceService:
         timesheet.approved_by = self.user_id
         timesheet.approved_date = date.today()
         timesheet.updated_by = self.user_id
+
+        # Post labor cost to budget
+        if timesheet.project_id and timesheet.total_cost:
+            try:
+                from addons.agcm.services.budget_posting import post_to_budget
+                post_to_budget(
+                    self.db, timesheet.project_id, self.company_id,
+                    "actual_amount", timesheet.total_cost,
+                    description="Labor (Timesheets)",
+                )
+            except ImportError:
+                pass
+
         self.db.commit()
         self.db.refresh(timesheet)
         return timesheet

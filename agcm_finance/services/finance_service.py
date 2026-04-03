@@ -504,6 +504,33 @@ class FinanceService:
 
         return True
 
+    def approve_expense(self, expense_id: int) -> Optional[Expense]:
+        exp = self.get_expense(expense_id)
+        if not exp:
+            return None
+        exp.status = ExpenseStatus.APPROVED.value
+        exp.updated_by = self.user_id
+
+        # Post actual cost to budget from expense lines
+        try:
+            from addons.agcm.services.budget_posting import post_to_budget
+            total = sum(
+                (line.total_cost or 0) for line in (exp.lines or [])
+            )
+            if exp.project_id and total:
+                post_to_budget(
+                    self.db, exp.project_id, self.company_id,
+                    "actual_amount", total,
+                    description="Expenses",
+                )
+        except ImportError:
+            pass
+
+        self.db.commit()
+        self.db.refresh(exp)
+        self._invalidate_finance_cache(exp.project_id)
+        return exp
+
     # --- Expense Line standalone CRUD ---
 
     def add_expense_line(

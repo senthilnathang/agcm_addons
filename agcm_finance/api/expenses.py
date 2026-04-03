@@ -94,6 +94,20 @@ async def delete_expense(
         raise HTTPException(status_code=404, detail="Expense not found")
 
 
+@router.post("/expenses/{expense_id}/approve", response_model=ExpenseResponse)
+async def approve_expense(
+    expense_id: int,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Approve an expense and post cost to budget."""
+    svc = _get_service(db, current_user)
+    result = svc.approve_expense(expense_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    return ExpenseResponse.model_validate(result).model_dump()
+
+
 # --- Expense Line Endpoints ---
 
 @router.post("/expense-lines", response_model=ExpenseLineResponse, status_code=201)

@@ -118,7 +118,15 @@ When writing or modifying code, verify every endpoint against this checklist:
   - **Backward compatible**: if no chain configured, entities auto-approve instantly
   - **With chain**: entity status → `pending_approval`, tasks created, chain runs
   - **On completion**: handler in `approval_handlers.py` updates entity status + side effects
-  - CO budget update preserved: committed_amount updated when CO chain approves
+  - **Budget Posting**: `addons.agcm.services.budget_posting` — shared cost posting helper
+    - `post_to_budget(db, project_id, company_id, column, amount, description=)` — upsert budget line
+    - `reverse_budget_posting(...)` — undo a posting (e.g., void after approval)
+    - PO approved → `committed_amount` += total_amount (description: "Purchase Orders")
+    - Subcontract approved → `committed_amount` += revised_amount (description: "Subcontracts")
+    - VendorBill approved → `actual_amount` += total_amount (description: "Vendor Bills")
+    - CO approved → `committed_amount` += cost_impact (description: "Approved Change Orders")
+    - Timesheet approved → `actual_amount` += total_cost (description: "Labor (Timesheets)")
+    - Expense approved → `actual_amount` += line totals (description: "Expenses")
   - Demo chains: `agcm/scripts/seed_approval_chains.py` (PO, CO, Subcontract — 2-step each)
   - Pattern for new approve methods:
     ```python

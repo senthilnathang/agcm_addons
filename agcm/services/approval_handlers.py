@@ -16,6 +16,27 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 
+def _get_post_to_budget():
+    """Get the post_to_budget function, handling both runtime and test environments."""
+    mod = sys.modules.get("agcm_budget_posting")
+    if mod:
+        return mod.post_to_budget
+    try:
+        import importlib
+        mod = importlib.import_module("addons.agcm.services.budget_posting")
+        return mod.post_to_budget
+    except ImportError:
+        # Direct file import fallback
+        import importlib.util
+        import os
+        path = os.path.join(os.path.dirname(__file__), "budget_posting.py")
+        spec = importlib.util.spec_from_file_location("agcm_budget_posting", path)
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["agcm_budget_posting"] = mod
+        spec.loader.exec_module(mod)
+        return mod.post_to_budget
+
+
 def _import_model(addon_module: str, file_name: str, *class_names: str):
     """Import model classes, handling both runtime (addons.*) and test environments."""
     # Check if already loaded by test conftest (importlib pre-loading)
@@ -35,6 +56,8 @@ def _import_model(addon_module: str, file_name: str, *class_names: str):
 # ---------------------------------------------------------------------------
 
 def _handle_po_approval(db: Session, entity_id: int, user_id: int, outcome: str):
+    post_to_budget = _get_post_to_budget()
+
     PurchaseOrder, PurchaseOrderStatus = _import_model(
         "agcm_procurement", "purchase_order", "PurchaseOrder", "PurchaseOrderStatus")
     po = db.query(PurchaseOrder).filter(PurchaseOrder.id == entity_id).first()
@@ -44,12 +67,19 @@ def _handle_po_approval(db: Session, entity_id: int, user_id: int, outcome: str)
         po.status = PurchaseOrderStatus.APPROVED.value
         po.approved_by = user_id
         po.approved_date = date.today()
+        # Post committed cost to budget
+        if po.project_id and po.total_amount:
+            post_to_budget(db, po.project_id, po.company_id,
+                           "committed_amount", po.total_amount,
+                           description="Purchase Orders")
     else:
         po.status = PurchaseOrderStatus.REJECTED.value
     po.updated_by = user_id
 
 
 def _handle_subcontract_approval(db: Session, entity_id: int, user_id: int, outcome: str):
+    post_to_budget = _get_post_to_budget()
+
     Subcontract, SubcontractStatus = _import_model(
         "agcm_procurement", "subcontract", "Subcontract", "SubcontractStatus")
     sc = db.query(Subcontract).filter(Subcontract.id == entity_id).first()
@@ -59,12 +89,20 @@ def _handle_subcontract_approval(db: Session, entity_id: int, user_id: int, outc
         sc.status = SubcontractStatus.APPROVED.value
         sc.approved_by = user_id
         sc.approved_date = date.today()
+        # Post committed cost to budget
+        amount = getattr(sc, "revised_amount", None) or getattr(sc, "original_amount", 0)
+        if sc.project_id and amount:
+            post_to_budget(db, sc.project_id, sc.company_id,
+                           "committed_amount", amount,
+                           description="Subcontracts")
     else:
         sc.status = SubcontractStatus.CANCELLED.value
     sc.updated_by = user_id
 
 
 def _handle_vendor_bill_approval(db: Session, entity_id: int, user_id: int, outcome: str):
+    post_to_budget = _get_post_to_budget()
+
     VendorBill, VendorBillStatus = _import_model(
         "agcm_procurement", "vendor_bill", "VendorBill", "VendorBillStatus")
     bill = db.query(VendorBill).filter(VendorBill.id == entity_id).first()
@@ -74,12 +112,19 @@ def _handle_vendor_bill_approval(db: Session, entity_id: int, user_id: int, outc
         bill.status = VendorBillStatus.APPROVED.value
         bill.approved_by = user_id
         bill.approved_date = date.today()
+        # Post actual cost to budget
+        if bill.project_id and bill.total_amount:
+            post_to_budget(db, bill.project_id, bill.company_id,
+                           "actual_amount", bill.total_amount,
+                           description="Vendor Bills")
     else:
         bill.status = VendorBillStatus.VOID.value
     bill.updated_by = user_id
 
 
 def _handle_change_order_approval(db: Session, entity_id: int, user_id: int, outcome: str):
+    post_to_budget = _get_post_to_budget()
+
     ChangeOrder, ChangeOrderStatus = _import_model(
         "agcm_change_order", "change_order", "ChangeOrder", "ChangeOrderStatus")
     co = db.query(ChangeOrder).filter(ChangeOrder.id == entity_id).first()
@@ -90,39 +135,11 @@ def _handle_change_order_approval(db: Session, entity_id: int, user_id: int, out
         co.status = ChangeOrderStatus.APPROVED.value
         co.approved_by = user_id
         co.approved_date = date.today()
-
-        # Side effect: update budget committed_amount (same logic as original)
-        try:
-            Budget = _import_model("agcm_finance", "budget", "Budget")
-            if co.project_id and co.cost_impact:
-                budget_line = (
-                    db.query(Budget)
-                    .filter(
-                        Budget.project_id == co.project_id,
-                        Budget.company_id == co.company_id,
-                        Budget.description.ilike("%Approved Change Orders%"),
-                    )
-                    .first()
-                )
-                if budget_line:
-                    budget_line.committed_amount = (
-                        budget_line.committed_amount or 0
-                    ) + co.cost_impact
-                else:
-                    budget_line = Budget(
-                        project_id=co.project_id,
-                        cost_code_id=None,
-                        description="Approved Change Orders",
-                        planned_amount=0,
-                        actual_amount=0,
-                        committed_amount=co.cost_impact,
-                        company_id=co.company_id,
-                    )
-                    db.add(budget_line)
-        except ImportError:
-            logger.debug("agcm_finance not installed — skipping budget update")
-        except Exception as e:
-            logger.warning("Failed to update budget for CO #%d: %s", entity_id, e)
+        # Post committed cost to budget
+        if co.project_id and co.cost_impact:
+            post_to_budget(db, co.project_id, co.company_id,
+                           "committed_amount", co.cost_impact,
+                           description="Approved Change Orders")
     else:
         co.status = ChangeOrderStatus.REJECTED.value
 
