@@ -507,10 +507,10 @@ def seed_daily_log_data(db, project_ids):
     db.commit()
     print(f"  Notes: {note_count}")
 
-    # Visitors (70% of logs)
+    # Visitors (every log, 1-2 per log → ~25-40 per project)
     vis_count = 0
     for log_id, pid, log_date in log_ids:
-        if random.random() < 0.7:
+        for _ in range(random.randint(1, 2)):
             vis_count += 1
             entry_hour = random.randint(7, 14)
             db.execute(text(
@@ -526,14 +526,14 @@ def seed_daily_log_data(db, project_ids):
     db.commit()
     print(f"  Visitors: {vis_count}")
 
-    # Inspections (50% of logs)
+    # Inspections (every log, 1-2 per log → ~25-40 per project)
     insp_count = 0
     insp_type_ids = [r[0] for r in db.execute(text(
         "SELECT id FROM agcm_inspection_types WHERE company_id = :cid"
     ), {"cid": COMPANY_ID}).fetchall()]
     if insp_type_ids:
         for log_id, pid, log_date in log_ids:
-            if random.random() < 0.5:
+            for _ in range(random.randint(1, 2)):
                 insp_count += 1
                 db.execute(text(
                     "INSERT INTO agcm_inspections (company_id, sequence_name, name, "
@@ -547,14 +547,14 @@ def seed_daily_log_data(db, project_ids):
         db.commit()
     print(f"  Inspections: {insp_count}")
 
-    # Safety Violations (20% of logs)
+    # Safety Violations (every log → ~21 per project)
     sv_count = 0
     viol_type_ids = [r[0] for r in db.execute(text(
         "SELECT id FROM agcm_violation_types WHERE company_id = :cid"
     ), {"cid": COMPANY_ID}).fetchall()]
     if viol_type_ids:
         for log_id, pid, log_date in log_ids:
-            if random.random() < 0.2:
+            for _ in range(random.randint(1, 2)):
                 sv_count += 1
                 db.execute(text(
                     "INSERT INTO agcm_safety_violations (company_id, sequence_name, name, "
@@ -568,10 +568,10 @@ def seed_daily_log_data(db, project_ids):
         db.commit()
     print(f"  Safety Violations: {sv_count}")
 
-    # Delays (15% of logs)
+    # Delays (every log, 1-2 per log → ~25-40 per project)
     delay_count = 0
     for log_id, pid, log_date in log_ids:
-        if random.random() < 0.15:
+        for _ in range(random.randint(1, 2)):
             delay_count += 1
             db.execute(text(
                 "INSERT INTO agcm_delays (company_id, sequence_name, name, reason, "
@@ -587,10 +587,9 @@ def seed_daily_log_data(db, project_ids):
     db.commit()
     print(f"  Delays: {delay_count}")
 
-    # Deficiencies (15% of logs)
+    # Deficiencies (every log → ~21 per project)
     def_count = 0
     for log_id, pid, log_date in log_ids:
-        if random.random() < 0.15:
             def_count += 1
             db.execute(text(
                 "INSERT INTO agcm_deficiencies (company_id, sequence_name, name, "
@@ -603,14 +602,13 @@ def seed_daily_log_data(db, project_ids):
     db.commit()
     print(f"  Deficiencies: {def_count}")
 
-    # Accidents (5% of logs)
+    # Accidents (every log → ~21 per project)
     acc_count = 0
     acc_type_ids = [r[0] for r in db.execute(text(
         "SELECT id FROM agcm_accident_types WHERE company_id = :cid"
     ), {"cid": COMPANY_ID}).fetchall()]
     if acc_type_ids:
         for log_id, pid, log_date in log_ids:
-            if random.random() < 0.05:
                 acc_count += 1
                 db.execute(text(
                     "INSERT INTO agcm_accidents (company_id, sequence_name, name, "
