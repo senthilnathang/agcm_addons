@@ -261,6 +261,28 @@ class ProcurementService:
         po = self.get_purchase_order(po_id)
         if not po:
             return None
+
+        # Try approval chain
+        from addons.agcm.services.approval_integration import submit_for_approval
+        tasks = submit_for_approval(
+            db=self.db,
+            entity_type="purchase_order",
+            entity_id=po.id,
+            requester_id=self.user_id,
+            company_id=self.company_id,
+            amount=getattr(po, "total_amount", None),
+        )
+        if tasks:
+            po.status = PurchaseOrderStatus.PENDING_APPROVAL.value
+            po.updated_by = self.user_id
+            self.db.commit()
+            self.db.refresh(po)
+            return po
+
+        # No chain configured — auto-approve
+        return self._finalize_po_approval(po)
+
+    def _finalize_po_approval(self, po: PurchaseOrder) -> PurchaseOrder:
         po.status = PurchaseOrderStatus.APPROVED.value
         po.approved_by = self.user_id
         po.approved_date = date.today()
@@ -616,6 +638,26 @@ class ProcurementService:
         sc = self.get_subcontract(sc_id)
         if not sc:
             return None
+
+        from addons.agcm.services.approval_integration import submit_for_approval
+        tasks = submit_for_approval(
+            db=self.db,
+            entity_type="subcontract",
+            entity_id=sc.id,
+            requester_id=self.user_id,
+            company_id=self.company_id,
+            amount=getattr(sc, "contract_amount", None),
+        )
+        if tasks:
+            sc.status = SubcontractStatus.PENDING_APPROVAL.value
+            sc.updated_by = self.user_id
+            self.db.commit()
+            self.db.refresh(sc)
+            return sc
+
+        return self._finalize_subcontract_approval(sc)
+
+    def _finalize_subcontract_approval(self, sc: Subcontract) -> Subcontract:
         sc.status = SubcontractStatus.APPROVED.value
         sc.approved_by = self.user_id
         sc.approved_date = date.today()
@@ -976,7 +1018,29 @@ class ProcurementService:
         bill = self.get_vendor_bill(bill_id)
         if not bill:
             return None
+
+        from addons.agcm.services.approval_integration import submit_for_approval
+        tasks = submit_for_approval(
+            db=self.db,
+            entity_type="vendor_bill",
+            entity_id=bill.id,
+            requester_id=self.user_id,
+            company_id=self.company_id,
+            amount=getattr(bill, "total_amount", None),
+        )
+        if tasks:
+            bill.status = VendorBillStatus.PENDING_APPROVAL.value
+            bill.updated_by = self.user_id
+            self.db.commit()
+            self.db.refresh(bill)
+            return bill
+
+        return self._finalize_vendor_bill_approval(bill)
+
+    def _finalize_vendor_bill_approval(self, bill: VendorBill) -> VendorBill:
         bill.status = VendorBillStatus.APPROVED.value
+        bill.approved_by = self.user_id
+        bill.approved_date = date.today()
         bill.updated_by = self.user_id
         self.db.commit()
         self.db.refresh(bill)

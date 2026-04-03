@@ -51,7 +51,7 @@ Manage construction submittals with approval workflows.
     "menus": [
         {
             "name": "Submittals",
-            "parent": "agcm_rfi",
+            "parent": "agcm_rfi.agcm.rfi",
             "path": "/agcm/submittals/list",
             "icon": "lucide:file-check-2",
             "sequence": 3,
@@ -59,7 +59,7 @@ Manage construction submittals with approval workflows.
         },
         {
             "name": "Submittal Types",
-            "parent": "agcm_rfi",
+            "parent": "agcm_rfi.agcm.rfi",
             "path": "/agcm/submittals/types",
             "icon": "lucide:file-type",
             "sequence": 4,
@@ -68,7 +68,7 @@ Manage construction submittals with approval workflows.
         {
             "name": "Submittal Form",
             "path": "/agcm/submittals/form",
-            "parent": "/agcm/rfi",
+            "parent": "agcm_rfi.agcm.rfi",
             "hideInMenu": True,
             "viewName": "submittal-form",
             "sequence": 110,
@@ -76,7 +76,7 @@ Manage construction submittals with approval workflows.
         {
             "name": "Submittal Detail",
             "path": "/agcm/submittals/detail",
-            "parent": "/agcm/rfi",
+            "parent": "agcm_rfi.agcm.rfi",
             "hideInMenu": True,
             "viewName": "submittal-detail",
             "sequence": 111,

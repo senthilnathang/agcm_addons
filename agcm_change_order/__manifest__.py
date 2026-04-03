@@ -49,16 +49,16 @@ Change order management for construction projects.
     "menus": [
         {
             "name": "Change Orders",
-            "parent": "agcm_rfi",
+            "parent": "agcm_rfi.agcm.rfi",
             "path": "/agcm/change-orders/list",
             "icon": "lucide:file-diff",
-            "sequence": 2,
+            "sequence": 5,
             "viewName": "change-orders",
         },
         {
             "name": "Change Order Form",
             "path": "/agcm/change-orders/form",
-            "parent": "/agcm/rfi",
+            "parent": "agcm_rfi.agcm.rfi",
             "hideInMenu": True,
             "viewName": "change-order-form",
             "sequence": 107,
@@ -66,7 +66,7 @@ Change order management for construction projects.
         {
             "name": "Change Order Detail",
             "path": "/agcm/change-orders/detail",
-            "parent": "/agcm/rfi",
+            "parent": "agcm_rfi.agcm.rfi",
             "hideInMenu": True,
             "viewName": "change-order-detail",
             "sequence": 108,

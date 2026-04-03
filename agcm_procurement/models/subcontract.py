@@ -19,6 +19,37 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
+class SubcontractStatus(str, enum.Enum):
+    DRAFT = "draft"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    ACTIVE = "active"
+    COMPLETED = "completed"
+    CANCELLED = "cancelled"
+
+
+class SOVSourceType(str, enum.Enum):
+    ORIGINAL = "original"
+    CHANGE_ORDER = "change_order"
+    AMENDMENT = "amendment"
+
+
+class ComplianceDocType(str, enum.Enum):
+    INSURANCE = "insurance"
+    LICENSE = "license"
+    BOND = "bond"
+    W9 = "w9"
+    SAFETY_PLAN = "safety_plan"
+    OTHER = "other"
+
+
+class ComplianceDocStatus(str, enum.Enum):
+    REQUIRED = "required"
+    RECEIVED = "received"
+    APPROVED = "approved"
+    EXPIRED = "expired"
+
+
 class Subcontract(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Subcontract for a construction project."""
 

@@ -20,6 +20,13 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
+class SelectionStatus(str, enum.Enum):
+    PENDING = "pending"
+    PRESENTED = "presented"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class Selection(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Material/finish selection for client approval."""
 

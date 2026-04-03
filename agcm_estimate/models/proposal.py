@@ -21,6 +21,16 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
+class ProposalStatus(str, enum.Enum):
+    DRAFT = "draft"
+    SENT = "sent"
+    VIEWED = "viewed"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    EXPIRED = "expired"
+
+
 class Proposal(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Client-facing proposal document generated from an estimate."""
 
@@ -63,6 +73,7 @@ class Proposal(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin)
     valid_until = Column(Date, nullable=True)
     sent_date = Column(Date, nullable=True)
     viewed_date = Column(DateTime, nullable=True)
+    approved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     approved_date = Column(Date, nullable=True)
     show_line_items = Column(Boolean, default=True)
     show_unit_prices = Column(Boolean, default=False)

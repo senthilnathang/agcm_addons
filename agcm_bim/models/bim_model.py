@@ -20,6 +20,14 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
+class BIMModelStatus(str, enum.Enum):
+    UPLOADING = "uploading"
+    PROCESSING = "processing"
+    READY = "ready"
+    FAILED = "failed"
+    ARCHIVED = "archived"
+
+
 class BIMModel(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """
     Uploaded 3D model file.

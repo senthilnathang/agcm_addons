@@ -18,6 +18,19 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
+class CostType(str, enum.Enum):
+    MATERIAL = "material"
+    LABOR = "labor"
+    EQUIPMENT = "equipment"
+    SUBCONTRACTOR = "subcontractor"
+    GROUP = "group"
+
+
+class EstimationStatus(str, enum.Enum):
+    INCOMPLETE = "incomplete"
+    COMPLETE = "complete"
+
+
 class EstimationItem(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Hierarchical cost estimation item."""
 

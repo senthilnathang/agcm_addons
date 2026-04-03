@@ -17,6 +17,13 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
+class ExpenseStatus(str, enum.Enum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    APPROVED = "approved"
+    PAID = "paid"
+
+
 class Expense(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Project expense with line items."""
 

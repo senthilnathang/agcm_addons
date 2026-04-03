@@ -20,6 +20,26 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
+class ClashTestStatus(str, enum.Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class ClashSeverity(str, enum.Enum):
+    CRITICAL = "critical"
+    MAJOR = "major"
+    MINOR = "minor"
+
+
+class ClashStatus(str, enum.Enum):
+    NEW = "new"
+    ACTIVE = "active"
+    RESOLVED = "resolved"
+    IGNORED = "ignored"
+
+
 class ClashTest(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """
     Clash detection run configuration.

@@ -805,6 +805,26 @@ class EstimateService:
         estimate = self.get_estimate(estimate_id)
         if not estimate:
             return None
+
+        from addons.agcm.services.approval_integration import submit_for_approval
+        tasks = submit_for_approval(
+            db=self.db,
+            entity_type="estimate",
+            entity_id=estimate.id,
+            requester_id=self.user_id,
+            company_id=self.company_id,
+            amount=getattr(estimate, "total_cost", None),
+        )
+        if tasks:
+            estimate.status = EstimateStatus.PENDING_APPROVAL.value
+            estimate.updated_by = self.user_id
+            self.db.commit()
+            self.db.refresh(estimate)
+            return estimate
+
+        return self._finalize_estimate_approval(estimate)
+
+    def _finalize_estimate_approval(self, estimate: Estimate) -> Estimate:
         estimate.status = EstimateStatus.APPROVED.value
         estimate.approved_by = self.user_id
         estimate.approved_date = date.today()
@@ -1243,7 +1263,28 @@ class EstimateService:
         proposal = self.get_proposal(proposal_id)
         if not proposal:
             return None
+
+        from addons.agcm.services.approval_integration import submit_for_approval
+        tasks = submit_for_approval(
+            db=self.db,
+            entity_type="proposal",
+            entity_id=proposal.id,
+            requester_id=self.user_id,
+            company_id=self.company_id,
+            amount=getattr(proposal, "total_amount", None),
+        )
+        if tasks:
+            proposal.status = ProposalStatus.PENDING_APPROVAL.value
+            proposal.updated_by = self.user_id
+            self.db.commit()
+            self.db.refresh(proposal)
+            return proposal
+
+        return self._finalize_proposal_approval(proposal)
+
+    def _finalize_proposal_approval(self, proposal: Proposal) -> Proposal:
         proposal.status = ProposalStatus.APPROVED.value
+        proposal.approved_by = self.user_id
         proposal.approved_date = date.today()
         proposal.updated_by = self.user_id
         self.db.commit()

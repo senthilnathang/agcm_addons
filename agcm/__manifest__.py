@@ -116,7 +116,7 @@ Daily activity logging system for construction projects.
                     "name": "Daily Logs",
                     "path": "/agcm/daily-logs",
                     "icon": "lucide:clipboard-list",
-                    "sequence": 20,
+                    "sequence": 15,
                     "viewName": "daily-logs",
                 },
                

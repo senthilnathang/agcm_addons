@@ -11,25 +11,36 @@ import {
   Descriptions,
   DescriptionsItem,
   Divider,
-  Input,
+  Empty,
   message,
   Modal,
   Row,
   Space,
+  Spin,
   Steps,
   Tag,
+  Tabs,
   Timeline,
   TimelineItem,
   Textarea,
+  Tooltip,
 } from 'ant-design-vue';
 import {
   ArrowLeftOutlined,
+  CalendarOutlined,
+  CheckCircleFilled,
   CheckCircleOutlined,
+  ClockCircleFilled,
   ClockCircleOutlined,
+  CloseCircleFilled,
   CloseCircleOutlined,
   EditOutlined,
+  ExclamationCircleFilled,
   ExclamationCircleOutlined,
+  FileTextOutlined,
   ReloadOutlined,
+  SendOutlined,
+  UserOutlined,
 } from '@ant-design/icons-vue';
 
 import { requestClient } from '#/api/request';
@@ -53,55 +64,29 @@ function getAccessToken() {
   }
 }
 
-const statusColors = {
-  draft: 'default',
-  pending_review: 'processing',
-  in_review: 'processing',
-  approved: 'success',
-  approved_with_comments: 'warning',
-  rejected: 'error',
-  resubmitted: 'cyan',
+const statusConfig = {
+  draft: { color: 'default', label: 'Draft' },
+  pending_review: { color: 'processing', label: 'Pending Review' },
+  in_review: { color: 'processing', label: 'In Review' },
+  approved: { color: 'success', label: 'Approved' },
+  approved_with_comments: { color: 'warning', label: 'Approved w/ Comments' },
+  rejected: { color: 'error', label: 'Rejected' },
+  resubmitted: { color: 'cyan', label: 'Resubmitted' },
 };
 
-const statusLabels = {
-  draft: 'Draft',
-  pending_review: 'Pending Review',
-  in_review: 'In Review',
-  approved: 'Approved',
-  approved_with_comments: 'Approved w/ Comments',
-  rejected: 'Rejected',
-  resubmitted: 'Resubmitted',
+const priorityConfig = {
+  low: { color: '#52c41a', bg: '#f6ffed', border: '#b7eb8f', label: 'Low' },
+  medium: { color: '#1890ff', bg: '#e6f7ff', border: '#91d5ff', label: 'Medium' },
+  high: { color: '#fa8c16', bg: '#fff7e6', border: '#ffd591', label: 'High' },
+  urgent: { color: '#f5222d', bg: '#fff1f0', border: '#ffa39e', label: 'Urgent' },
 };
 
-const priorityColors = {
-  low: 'green',
-  medium: 'blue',
-  high: 'orange',
-  urgent: 'red',
-};
-
-const approverStatusIcons = {
-  pending: ClockCircleOutlined,
-  approved: CheckCircleOutlined,
-  approved_as_noted: ExclamationCircleOutlined,
-  rejected: CloseCircleOutlined,
-  revise_and_submit: ReloadOutlined,
-};
-
-const approverStatusColors = {
-  pending: '#999',
-  approved: '#52c41a',
-  approved_as_noted: '#faad14',
-  rejected: '#f5222d',
-  revise_and_submit: '#722ed1',
-};
-
-const approverStatusLabels = {
-  pending: 'Pending',
-  approved: 'Approved',
-  approved_as_noted: 'Approved as Noted',
-  rejected: 'Rejected',
-  revise_and_submit: 'Revise & Submit',
+const approverStatusConfig = {
+  pending: { icon: ClockCircleFilled, color: '#8c8c8c', bg: '#fafafa', label: 'Pending' },
+  approved: { icon: CheckCircleFilled, color: '#52c41a', bg: '#f6ffed', label: 'Approved' },
+  approved_as_noted: { icon: ExclamationCircleFilled, color: '#faad14', bg: '#fffbe6', label: 'Approved as Noted' },
+  rejected: { icon: CloseCircleFilled, color: '#f5222d', bg: '#fff1f0', label: 'Rejected' },
+  revise_and_submit: { icon: ReloadOutlined, color: '#722ed1', bg: '#f9f0ff', label: 'Revise & Submit' },
 };
 
 // Approve modal
@@ -127,7 +112,7 @@ function handleEdit() {
 }
 
 function handleBack() {
-  router.push('/agcm/submittals');
+  router.push('/agcm/submittals/list');
 }
 
 function openApproveModal(action) {
@@ -174,158 +159,290 @@ const actionLabel = computed(() => {
   return map[approveAction.value] || approveAction.value;
 });
 
+function formatDate(d) {
+  if (!d) return '-';
+  return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function formatDateTime(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleString('en-US', {
+    year: 'numeric', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
+}
+
+const approvalProgress = computed(() => {
+  if (!submittal.value?.approvers?.length) return { done: 0, total: 0, pct: 0 };
+  const total = submittal.value.approvers.length;
+  const done = submittal.value.approvers.filter(
+    a => a.status === 'approved' || a.status === 'approved_as_noted'
+  ).length;
+  return { done, total, pct: Math.round((done / total) * 100) };
+});
+
 onMounted(fetchSubmittal);
 </script>
 
 <template>
-  <div class="p-6">
+  <Page title="Submittal Detail">
     <ASpin :spinning="loading">
-      <!-- Header -->
-      <div class="mb-4 flex items-center gap-3">
-        <AButton @click="handleBack">
-          <template #icon><ArrowLeftOutlined /></template>
-          Back
-        </AButton>
-        <template v-if="submittal">
-          <AButton @click="handleEdit">
-            <template #icon><EditOutlined /></template>
-            Edit
-          </AButton>
-          <AButton
-            v-if="submittal.status === 'rejected' || submittal.status === 'draft'"
-            type="primary"
-            @click="handleResubmit"
-          >
-            <template #icon><ReloadOutlined /></template>
-            Resubmit
-          </AButton>
-        </template>
-      </div>
-
       <template v-if="submittal">
-        <!-- Title Card -->
+        <!-- Header Card -->
         <ACard class="mb-4">
           <div class="flex items-start justify-between">
-            <div>
-              <h1 class="text-2xl font-bold mb-1">{{ submittal.title }}</h1>
-              <p class="text-gray-500 mb-2">
-                {{ submittal.sequence_name }}
-                <span v-if="submittal.spec_section"> | Spec: {{ submittal.spec_section }}</span>
-              </p>
-              <ASpace wrap>
-                <ATag :color="statusColors[submittal.status] || 'default'">
-                  {{ statusLabels[submittal.status] || submittal.status }}
+            <div style="flex: 1;">
+              <div class="flex items-center gap-2 mb-2">
+                <ATag color="blue" style="font-size: 13px; font-weight: 600; margin: 0;">
+                  {{ submittal.sequence_name }}
                 </ATag>
-                <ATag :color="priorityColors[submittal.priority] || 'default'">
-                  {{ (submittal.priority || '').replace(/^\w/, c => c.toUpperCase()) }} Priority
+                <ATag
+                  :color="statusConfig[submittal.status]?.color || 'default'"
+                  style="margin: 0;"
+                >
+                  {{ statusConfig[submittal.status]?.label || submittal.status }}
                 </ATag>
-                <ATag color="blue">Rev {{ submittal.revision }}</ATag>
+              </div>
+              <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 8px 0; line-height: 1.3;">
+                {{ submittal.title }}
+              </h2>
+              <ASpace :size="8" wrap>
+                <span
+                  v-if="submittal.spec_section"
+                  style="color: #595959; font-size: 13px;"
+                >
+                  <FileTextOutlined /> Spec: {{ submittal.spec_section }}
+                </span>
+                <ATag
+                  v-if="submittal.priority"
+                  :style="{
+                    color: priorityConfig[submittal.priority]?.color || '#595959',
+                    background: priorityConfig[submittal.priority]?.bg || '#fafafa',
+                    borderColor: priorityConfig[submittal.priority]?.border || '#d9d9d9',
+                    margin: 0,
+                  }"
+                >
+                  {{ priorityConfig[submittal.priority]?.label || submittal.priority }} Priority
+                </ATag>
+                <ATag color="geekblue" style="margin: 0;">Rev {{ submittal.revision }}</ATag>
                 <ATag
                   v-for="label in (submittal.labels || [])"
                   :key="label.id"
                   :color="label.color"
+                  style="margin: 0;"
                 >
                   {{ label.name }}
                 </ATag>
               </ASpace>
             </div>
+            <ASpace>
+              <AButton @click="handleBack">
+                <template #icon><ArrowLeftOutlined /></template>
+                Back
+              </AButton>
+              <AButton @click="handleEdit">
+                <template #icon><EditOutlined /></template>
+                Edit
+              </AButton>
+              <AButton
+                v-if="submittal.status === 'rejected' || submittal.status === 'draft'"
+                type="primary"
+                @click="handleResubmit"
+              >
+                <template #icon><ReloadOutlined /></template>
+                Resubmit
+              </AButton>
+            </ASpace>
           </div>
         </ACard>
 
-        <!-- Tabs -->
-        <ACard>
-          <ATabs v-model:activeKey="activeTab">
-            <ATabs.TabPane key="details" tab="Details">
-              <!-- Details Section -->
-              <ADescriptions :column="3" bordered size="small" class="mb-4">
-                <ADescriptionsItem label="Package">{{ submittal.package_name || '-' }}</ADescriptionsItem>
-                <ADescriptionsItem label="Type">{{ submittal.type_name || '-' }}</ADescriptionsItem>
-                <ADescriptionsItem label="Due Date">{{ submittal.due_date || '-' }}</ADescriptionsItem>
-                <ADescriptionsItem label="Submitted Date">{{ submittal.submitted_date || '-' }}</ADescriptionsItem>
-                <ADescriptionsItem label="Received Date">{{ submittal.received_date || '-' }}</ADescriptionsItem>
-                <ADescriptionsItem label="Revision">{{ submittal.revision }}</ADescriptionsItem>
-              </ADescriptions>
-              <div v-if="submittal.description" class="mt-4">
-                <h4 class="font-semibold mb-2">Description</h4>
-                <p style="white-space: pre-wrap;">{{ submittal.description }}</p>
-              </div>
-            </ATabs.TabPane>
-
-            <!-- Approval Chain Tab -->
-            <ATabs.TabPane key="approvers" tab="Approval Chain">
-              <div v-if="(submittal.approvers || []).length === 0" class="text-gray-400">
-                No approvers assigned.
-              </div>
-              <ATimeline v-else>
-                <ATimelineItem
-                  v-for="approver in submittal.approvers"
-                  :key="approver.id"
-                  :color="approverStatusColors[approver.status] || '#999'"
-                >
-                  <div class="flex items-center gap-3">
-                    <div>
-                      <component
-                        :is="approverStatusIcons[approver.status] || ClockCircleOutlined"
-                        :style="{ color: approverStatusColors[approver.status] || '#999', fontSize: '18px' }"
-                      />
+        <!-- Tabs Card -->
+        <Card class="mt-4">
+          <Tabs v-model:activeKey="activeTab">
+            <!-- ==================== DETAILS TAB ==================== -->
+            <Tabs.TabPane key="details" tab="Details">
+              <div style="padding: 16px 0 24px;">
+                <!-- Key Info Grid -->
+                <ARow :gutter="16" class="mb-4">
+                  <ACol :span="4">
+                    <div class="detail-info-card">
+                      <div class="detail-info-label">Package</div>
+                      <div class="detail-info-value">{{ submittal.package_name || '-' }}</div>
                     </div>
-                    <div style="flex: 1;">
-                      <div class="font-semibold">
-                        Step {{ approver.sequence }}: {{ approver.user_name || `User #${approver.user_id}` }}
+                  </ACol>
+                  <ACol :span="4">
+                    <div class="detail-info-card">
+                      <div class="detail-info-label">Type</div>
+                      <div class="detail-info-value">{{ submittal.type_name || '-' }}</div>
+                    </div>
+                  </ACol>
+                  <ACol :span="4">
+                    <div class="detail-info-card">
+                      <div class="detail-info-label">Due Date</div>
+                      <div class="detail-info-value">
+                        <CalendarOutlined style="margin-right: 4px; color: #8c8c8c;" />
+                        {{ formatDate(submittal.due_date) }}
                       </div>
-                      <ATag
-                        :color="approverStatusColors[approver.status]"
-                        size="small"
-                        style="margin-top: 4px;"
-                      >
-                        {{ approverStatusLabels[approver.status] || approver.status }}
-                      </ATag>
-                      <div v-if="approver.comments" class="text-gray-500 mt-1" style="font-size: 13px;">
+                    </div>
+                  </ACol>
+                  <ACol :span="4">
+                    <div class="detail-info-card">
+                      <div class="detail-info-label">Submitted</div>
+                      <div class="detail-info-value">{{ formatDate(submittal.submitted_date) }}</div>
+                    </div>
+                  </ACol>
+                  <ACol :span="4">
+                    <div class="detail-info-card">
+                      <div class="detail-info-label">Received</div>
+                      <div class="detail-info-value">{{ formatDate(submittal.received_date) }}</div>
+                    </div>
+                  </ACol>
+                  <ACol :span="4">
+                    <div class="detail-info-card">
+                      <div class="detail-info-label">Revision</div>
+                      <div class="detail-info-value">#{{ submittal.revision }}</div>
+                    </div>
+                  </ACol>
+                </ARow>
+
+                <!-- Description -->
+                <div v-if="submittal.description" class="detail-section">
+                  <h4 class="detail-section-title">Description</h4>
+                  <div class="detail-section-body">
+                    <p style="white-space: pre-wrap; margin: 0; color: #434343; line-height: 1.7;">
+                      {{ submittal.description }}
+                    </p>
+                  </div>
+                </div>
+
+                <!-- Approval Summary (compact) -->
+                <div v-if="(submittal.approvers || []).length > 0" class="detail-section" style="margin-top: 16px;">
+                  <h4 class="detail-section-title">Approval Summary</h4>
+                  <div style="display: flex; align-items: center; gap: 16px; padding: 12px 16px; background: #fafafa; border-radius: 8px;">
+                    <div style="flex: 1;">
+                      <div style="background: #f0f0f0; border-radius: 4px; height: 8px; overflow: hidden;">
+                        <div
+                          :style="{
+                            width: approvalProgress.pct + '%',
+                            height: '100%',
+                            background: approvalProgress.pct === 100 ? '#52c41a' : '#1890ff',
+                            borderRadius: '4px',
+                            transition: 'width 0.3s ease',
+                          }"
+                        ></div>
+                      </div>
+                    </div>
+                    <span style="font-size: 13px; color: #595959; white-space: nowrap;">
+                      {{ approvalProgress.done }} / {{ approvalProgress.total }} approved
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Tabs.TabPane>
+
+            <!-- ==================== APPROVAL CHAIN TAB ==================== -->
+            <Tabs.TabPane key="approvers" tab="Approval Chain">
+              <div style="padding: 16px 0 24px;">
+                <div v-if="(submittal.approvers || []).length === 0">
+                  <AEmpty description="No approvers assigned" :image="Empty.PRESENTED_IMAGE_SIMPLE" />
+                </div>
+                <template v-else>
+                  <!-- Approval Steps -->
+                  <div class="approval-chain">
+                    <div
+                      v-for="(approver, idx) in submittal.approvers"
+                      :key="approver.id"
+                      class="approval-step"
+                      :style="{
+                        background: approverStatusConfig[approver.status]?.bg || '#fafafa',
+                        borderLeft: `3px solid ${approverStatusConfig[approver.status]?.color || '#d9d9d9'}`,
+                      }"
+                    >
+                      <div class="approval-step-header">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                          <component
+                            :is="approverStatusConfig[approver.status]?.icon || ClockCircleFilled"
+                            :style="{
+                              color: approverStatusConfig[approver.status]?.color || '#8c8c8c',
+                              fontSize: '22px',
+                            }"
+                          />
+                          <div>
+                            <div style="font-weight: 600; font-size: 14px; color: #262626;">
+                              Step {{ approver.sequence }}
+                            </div>
+                            <div style="font-size: 13px; color: #595959;">
+                              <UserOutlined style="margin-right: 4px;" />
+                              {{ approver.user_name || `User #${approver.user_id}` }}
+                            </div>
+                          </div>
+                        </div>
+                        <ATag
+                          :style="{
+                            color: approverStatusConfig[approver.status]?.color || '#8c8c8c',
+                            background: 'white',
+                            borderColor: approverStatusConfig[approver.status]?.color || '#d9d9d9',
+                            fontWeight: 500,
+                            margin: 0,
+                          }"
+                        >
+                          {{ approverStatusConfig[approver.status]?.label || approver.status }}
+                        </ATag>
+                      </div>
+                      <div v-if="approver.comments" style="margin-top: 8px; padding-left: 32px; font-size: 13px; color: #595959; line-height: 1.5;">
                         {{ approver.comments }}
                       </div>
-                      <div v-if="approver.signed_at" class="text-gray-400 mt-1" style="font-size: 12px;">
-                        Signed: {{ new Date(approver.signed_at).toLocaleString() }}
+                      <div v-if="approver.signed_at" style="margin-top: 4px; padding-left: 32px; font-size: 12px; color: #8c8c8c;">
+                        Signed {{ formatDateTime(approver.signed_at) }}
                       </div>
+
+                      <!-- Connector line -->
+                      <div
+                        v-if="idx < submittal.approvers.length - 1"
+                        class="approval-connector"
+                      ></div>
                     </div>
                   </div>
-                </ATimelineItem>
-              </ATimeline>
 
-              <!-- Action buttons for approvers -->
-              <ADivider v-if="(submittal.approvers || []).length > 0" />
-              <ASpace v-if="(submittal.approvers || []).length > 0">
-                <AButton type="primary" @click="openApproveModal('approve')">
-                  <template #icon><CheckCircleOutlined /></template>
-                  Approve
-                </AButton>
-                <AButton @click="openApproveModal('approved_as_noted')">
-                  <template #icon><ExclamationCircleOutlined /></template>
-                  Approve as Noted
-                </AButton>
-                <AButton danger @click="openApproveModal('reject')">
-                  <template #icon><CloseCircleOutlined /></template>
-                  Reject
-                </AButton>
-                <AButton @click="openApproveModal('revise_and_submit')">
-                  <template #icon><ReloadOutlined /></template>
-                  Revise & Submit
-                </AButton>
-              </ASpace>
-            </ATabs.TabPane>
+                  <!-- Action Buttons -->
+                  <ADivider style="margin: 16px 0;" />
+                  <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                    <AButton type="primary" @click="openApproveModal('approve')">
+                      <template #icon><CheckCircleOutlined /></template>
+                      Approve
+                    </AButton>
+                    <AButton @click="openApproveModal('approved_as_noted')">
+                      <template #icon><ExclamationCircleOutlined /></template>
+                      Approve as Noted
+                    </AButton>
+                    <AButton danger @click="openApproveModal('reject')">
+                      <template #icon><CloseCircleOutlined /></template>
+                      Reject
+                    </AButton>
+                    <AButton @click="openApproveModal('revise_and_submit')">
+                      <template #icon><ReloadOutlined /></template>
+                      Revise & Submit
+                    </AButton>
+                  </div>
+                </template>
+              </div>
+            </Tabs.TabPane>
 
-            <!-- Activity Tab -->
-            <ATabs.TabPane key="activity" tab="Activity">
-              <ActivityThread
-                :model-name="'agcm_submittals'"
-                :record-id="submittalId"
-                :access-token="getAccessToken()"
-                :api-base="'/api/v1'"
-                :show-messages="true"
-                :show-activities="true"
-              />
-            </ATabs.TabPane>
-          </ATabs>
-        </ACard>
+            <!-- ==================== ACTIVITY TAB ==================== -->
+            <Tabs.TabPane key="activity" tab="Activity">
+              <div style="padding: 16px 0 24px;">
+                <ActivityThread
+                  :model-name="'agcm_submittals'"
+                  :record-id="submittalId"
+                  :access-token="getAccessToken()"
+                  :api-base="'/api/v1'"
+                  :show-messages="true"
+                  :show-activities="true"
+                />
+              </div>
+            </Tabs.TabPane>
+          </Tabs>
+        </Card>
       </template>
 
       <AEmpty v-else-if="!loading" description="Submittal not found" />
@@ -337,6 +454,7 @@ onMounted(fetchSubmittal);
       :title="actionLabel"
       :confirm-loading="approving"
       @ok="handleApprove"
+      :width="480"
     >
       <AForm layout="vertical" style="margin-top: 16px;">
         <AFormItem label="Comments (optional)">
@@ -348,5 +466,5 @@ onMounted(fetchSubmittal);
         </AFormItem>
       </AForm>
     </AModal>
-  </div>
+  </Page>
 </template>

@@ -9,6 +9,7 @@ from addons.agcm.api.weather import router as weather_router
 from addons.agcm.api.photos import router as photos_router
 from addons.agcm.api.dashboard import router as dashboard_router
 from addons.agcm.api.comments import router as comments_router
+from addons.agcm.api.approvals import router as approvals_router
 
 router = APIRouter()
 router.include_router(projects_router)
@@ -18,3 +19,4 @@ router.include_router(weather_router)
 router.include_router(photos_router)
 router.include_router(dashboard_router)
 router.include_router(comments_router)
+router.include_router(approvals_router)

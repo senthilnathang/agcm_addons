@@ -110,9 +110,24 @@ When writing or modifying code, verify every endpoint against this checklist:
 ### Generic Systems
 - **Comments:** `EntityComment` (agcm_entity_comments) — any entity via entity_type+entity_id
 - **Attachments:** `agcm_entity_attachments` M2M — links any entity to documents
-- **Approvals:** `from addons.agcm.services.approval_integration import submit_for_approval`
-  - Wraps core `base_automation` ApprovalChain/ApprovalTask system
-  - Supports: purchase_order, change_order, subcontract, submittal, estimate, vendor_bill
+- **Approvals:** Wired into core `base_automation` ApprovalChain/ApprovalTask system
+  - Integration: `addons.agcm.services.approval_integration` — submit, check, list pending
+  - Handlers: `addons.agcm.services.approval_handlers` — entity-specific completion callbacks
+  - API: `POST /agcm/approvals/{task_id}/approve|reject`, `GET /agcm/approvals/pending`
+  - Entities: purchase_order, change_order, subcontract, estimate, vendor_bill, proposal
+  - **Backward compatible**: if no chain configured, entities auto-approve instantly
+  - **With chain**: entity status → `pending_approval`, tasks created, chain runs
+  - **On completion**: handler in `approval_handlers.py` updates entity status + side effects
+  - CO budget update preserved: committed_amount updated when CO chain approves
+  - Demo chains: `agcm/scripts/seed_approval_chains.py` (PO, CO, Subcontract — 2-step each)
+  - Pattern for new approve methods:
+    ```python
+    tasks = submit_for_approval(db, entity_type, entity_id, user_id, company_id, amount)
+    if tasks:
+        entity.status = "pending_approval"  # chain will handle completion
+    else:
+        entity.status = "approved"  # no chain — auto-approve
+    ```
 
 ### Reports
 - Overview Canvas: SVG charts (donut, bars) in daily log reports

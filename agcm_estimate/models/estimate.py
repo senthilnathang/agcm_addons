@@ -20,6 +20,35 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
+class EstimateStatus(str, enum.Enum):
+    DRAFT = "draft"
+    IN_PROGRESS = "in_progress"
+    IN_REVIEW = "in_review"
+    PENDING_REVIEW = "pending_review"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SUPERSEDED = "superseded"
+
+
+class EstimateType(str, enum.Enum):
+    PRELIMINARY = "preliminary"
+    SCHEMATIC = "schematic"
+    DETAILED = "detailed"
+    STIPULATED_SUM = "stipulated_sum"
+    COST_PLUS = "cost_plus"
+    UNIT_PRICE = "unit_price"
+    DESIGN_BUILD = "design_build"
+
+
+class LineItemType(str, enum.Enum):
+    MATERIAL = "material"
+    LABOR = "labor"
+    EQUIPMENT = "equipment"
+    SUBCONTRACTOR = "subcontractor"
+    OTHER = "other"
+
+
 class Estimate(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Top-level estimate for a construction project."""
 

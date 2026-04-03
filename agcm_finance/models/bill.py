@@ -18,6 +18,14 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
+class BillStatus(str, enum.Enum):
+    DRAFT = "draft"
+    PENDING = "pending"
+    APPROVED = "approved"
+    PAID = "paid"
+    VOID = "void"
+
+
 class Bill(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Vendor bill for a construction project."""
 

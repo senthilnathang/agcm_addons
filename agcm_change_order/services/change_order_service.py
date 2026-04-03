@@ -223,17 +223,36 @@ class ChangeOrderService:
         co = self.get_change_order(co_id)
         if not co:
             return None
+
+        from addons.agcm.services.approval_integration import submit_for_approval
+        tasks = submit_for_approval(
+            db=self.db,
+            entity_type="change_order",
+            entity_id=co.id,
+            requester_id=self.user_id,
+            company_id=self.company_id,
+            amount=getattr(co, "cost_impact", None),
+        )
+        if tasks:
+            co.status = "pending_approval"
+            co.updated_by = self.user_id
+            self.db.commit()
+            self.db.refresh(co)
+            return co
+
+        return self._finalize_change_order_approval(co)
+
+    def _finalize_change_order_approval(self, co: ChangeOrder) -> ChangeOrder:
         co.status = "approved"
         co.approved_date = date.today()
         co.approved_by = self.user_id
         co.updated_by = self.user_id
 
-        # Update budget with change order cost impact
+        # Side effect: update budget with change order cost impact
         try:
             from addons.agcm_finance.models.budget import Budget
 
             if co.project_id and co.cost_impact:
-                # Find existing "Change Orders" budget line
                 budget_line = (
                     self.db.query(Budget)
                     .filter(

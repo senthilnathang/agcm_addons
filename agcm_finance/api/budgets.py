@@ -41,9 +41,7 @@ async def get_budget_summary(
 ):
     """Get aggregated budget summary for a project."""
     svc = _get_service(db, current_user)
-    summary = svc.get_budget_summary(project_id)
-    summary["lines"] = [BudgetResponse.model_validate(b).model_dump() for b in summary["lines"]]
-    return summary
+    return svc.get_budget_summary(project_id)
 
 
 @router.post("/budgets", response_model=BudgetResponse, status_code=201)

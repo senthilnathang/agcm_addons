@@ -19,6 +19,15 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, ActivityMixin
 
 
+class BidStatus(str, enum.Enum):
+    DRAFT = "draft"
+    SUBMITTED = "submitted"
+    UNDER_REVIEW = "under_review"
+    AWARDED = "awarded"
+    REJECTED = "rejected"
+    WITHDRAWN = "withdrawn"
+
+
 class BidPackage(Base, TimestampMixin, AuditMixin, ActivityMixin):
     """Bid request sent to subcontractors."""
 

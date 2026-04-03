@@ -19,6 +19,17 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
+class PurchaseOrderStatus(str, enum.Enum):
+    DRAFT = "draft"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    PARTIALLY_RECEIVED = "partially_received"
+    RECEIVED = "received"
+    CLOSED = "closed"
+    CANCELLED = "cancelled"
+
+
 class PurchaseOrder(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Purchase order for a construction project."""
 
@@ -97,6 +108,14 @@ class PurchaseOrder(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityM
         Index("ix_agcm_po_project_status", "project_id", "status"),
         Index("ix_agcm_po_company", "company_id"),
     )
+
+
+class ItemType(str, enum.Enum):
+    MATERIAL = "material"
+    LABOR = "labor"
+    EQUIPMENT = "equipment"
+    SUBCONTRACTOR = "subcontractor"
+    OTHER = "other"
 
 
 class PurchaseOrderLine(Base, TimestampMixin):

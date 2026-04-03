@@ -18,6 +18,15 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
+class InvoiceStatus(str, enum.Enum):
+    DRAFT = "draft"
+    SENT = "sent"
+    PARTIAL = "partial"
+    PAID = "paid"
+    OVERDUE = "overdue"
+    VOID = "void"
+
+
 class Invoice(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Customer invoice for a construction project."""
 

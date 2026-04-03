@@ -127,11 +127,11 @@ function handleFilterChange() {
 }
 
 function handleRowClick(record) {
-  router.push({ path: '/agcm/estimating/estimates/detail', query: { id: record.id } });
+  router.push({ path: '/agcm/estimate/estimates/detail', query: { id: record.id } });
 }
 
 function handleCreate() {
-  router.push({ path: '/agcm/estimating/estimates/detail', query: { id: 'new' } });
+  router.push({ path: '/agcm/estimate/estimates/detail', query: { id: 'new' } });
 }
 
 async function handleDelete(record) {

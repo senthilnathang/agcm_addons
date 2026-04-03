@@ -22,6 +22,7 @@ from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, Activit
 class ChangeOrderStatus(str, enum.Enum):
     DRAFT = "draft"
     PENDING = "pending"
+    PENDING_APPROVAL = "pending_approval"
     APPROVED = "approved"
     REJECTED = "rejected"
     VOID = "void"

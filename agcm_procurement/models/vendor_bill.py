@@ -24,6 +24,29 @@ from app.db.base import Base
 from app.models.base import TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin
 
 
+class BillRecordType(str, enum.Enum):
+    BILL = "bill"
+    CREDIT_MEMO = "credit_memo"
+    DEBIT_MEMO = "debit_memo"
+
+
+class VendorBillStatus(str, enum.Enum):
+    DRAFT = "draft"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    PARTIALLY_PAID = "partially_paid"
+    PAID = "paid"
+    VOID = "void"
+
+
+class BillLineType(str, enum.Enum):
+    MATERIAL = "material"
+    LABOR = "labor"
+    EQUIPMENT = "equipment"
+    SUBCONTRACTOR = "subcontractor"
+    OTHER = "other"
+
+
 class VendorBill(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
     """Enhanced vendor bill with line items, payments, OCR, and PO matching."""
 
@@ -79,6 +102,9 @@ class VendorBill(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixi
     balance_due = Column(Float, default=0, nullable=False)
 
     payment_terms = Column(String(100), nullable=True)
+
+    approved_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    approved_date = Column(Date, nullable=True)
 
     purchase_order_id = Column(
         Integer,
