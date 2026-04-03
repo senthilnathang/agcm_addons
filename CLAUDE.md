@@ -178,6 +178,22 @@ When writing or modifying code, verify every endpoint against this checklist:
 - Bid awarded → Subcontract: auto-creates draft Subcontract
 - BIM Viewpoints ↔ RFIs/Issues: cross-entity linking
 
+### Project-Level Access Control
+- **ProjectMember** (`agcm_project_members`): per-project user→role assignment
+- Roles: `owner` > `manager` > `member` > `viewer` (hierarchy)
+- Helper: `addons.agcm.services.project_access`
+  - `get_user_project_ids(db, user_id, company_id, min_role=)` — list accessible project IDs
+  - `has_project_access(db, user_id, project_id, min_role=)` — check single project
+  - `check_project_role(db, user_id, project_id, min_role=)` — role hierarchy check
+  - `get_project_role(db, user_id, project_id)` — get user's role string
+- API: `GET/POST /agcm/projects/{id}/members`, `PUT /agcm/project-members/{id}/role`, `DELETE /agcm/project-members/{id}`
+- Opt-in pattern for services:
+  ```python
+  from addons.agcm.services.project_access import get_user_project_ids
+  project_ids = get_user_project_ids(db, user_id, company_id)
+  query = query.filter(Model.project_id.in_(project_ids))
+  ```
+
 ### Audit Trail & Activity
 - **ActivityMixin**: 30+ models include `ActivityMixin` for automatic audit logging
 - All mutations (create/update/delete) automatically logged with user, timestamp, field changes

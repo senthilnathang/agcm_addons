@@ -104,6 +104,7 @@ _base_models = [
     ("agcm_inspection", _model_path("agcm", "inspection.py")),
     ("agcm_deficiency", _model_path("agcm", "deficiency.py")),
     ("agcm_accident", _model_path("agcm", "accident.py")),
+    ("agcm_project_member", _model_path("agcm", "project_member.py")),
 ]
 
 _addon_models = [

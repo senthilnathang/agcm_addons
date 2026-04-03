@@ -168,6 +168,12 @@ class Project(Base, TimestampMixin, AuditMixin, SoftDeleteMixin, ActivityMixin):
         lazy="dynamic",
     )
 
+    members = relationship(
+        "ProjectMember",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
+
     daily_activity_logs = relationship(
         "agcm_daily_activity_logs",
         back_populates="project",
