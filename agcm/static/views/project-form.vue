@@ -59,7 +59,7 @@ const users = ref([]);
 async function fetchMasterData() {
   try {
     const [usersData] = await Promise.all([
-      requestClient.get('/users/?limit=200'),
+      requestClient.get('/users/', { params: { page_size: 200 } }),
     ]);
     users.value = (usersData.items || usersData || []).map((u) => ({
       value: u.id,

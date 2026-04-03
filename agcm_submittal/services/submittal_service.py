@@ -421,6 +421,22 @@ class SubmittalService:
         self.db.refresh(obj)
         return obj
 
+    def update_type(self, type_id: int, data: SubmittalTypeCreate):
+        obj = (
+            self.db.query(SubmittalType)
+            .filter(
+                SubmittalType.id == type_id,
+                SubmittalType.company_id == self.company_id,
+            )
+            .first()
+        )
+        if not obj:
+            return None
+        obj.name = data.name
+        self.db.commit()
+        self.db.refresh(obj)
+        return obj
+
     def delete_type(self, type_id: int) -> bool:
         obj = (
             self.db.query(SubmittalType)

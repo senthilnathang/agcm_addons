@@ -222,6 +222,25 @@ async def delete_group(
 # ESTIMATE LINE ITEMS
 # =============================================================================
 
+@router.get("/estimate-line-items", response_model=dict)
+async def list_line_items(
+    estimate_id: Optional[int] = Query(None),
+    group_id: Optional[int] = Query(None),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=200),
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """List estimate line items with optional filters."""
+    svc = _get_service(db, current_user)
+    return svc.list_line_items(
+        estimate_id=estimate_id,
+        group_id=group_id,
+        page=page,
+        page_size=page_size,
+    )
+
+
 @router.post("/estimate-line-items", response_model=None, status_code=201)
 async def create_line_item(
     data: EstimateLineItemCreate,

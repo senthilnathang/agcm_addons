@@ -35,6 +35,7 @@ from addons.agcm_estimate.schemas.estimate import (
     EstimateGroupUpdate,
     EstimateLineItemCreate,
     EstimateLineItemUpdate,
+    EstimateLineItemResponse,
     EstimateMarkupCreate,
     EstimateMarkupUpdate,
     ProposalCreate,
@@ -985,6 +986,35 @@ class EstimateService:
     # =========================================================================
     # ESTIMATE LINE ITEM CRUD
     # =========================================================================
+
+    def list_line_items(
+        self,
+        estimate_id: int = None,
+        group_id: int = None,
+        page: int = 1,
+        page_size: int = 20,
+    ) -> dict:
+        page_size = min(page_size, 200)
+        q = self.db.query(EstimateLineItem).filter(
+            EstimateLineItem.company_id == self.company_id
+        )
+        if estimate_id:
+            q = q.filter(EstimateLineItem.estimate_id == estimate_id)
+        if group_id:
+            q = q.filter(EstimateLineItem.group_id == group_id)
+        total = q.count()
+        items = (
+            q.order_by(EstimateLineItem.display_order, EstimateLineItem.id)
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+            .all()
+        )
+        return {
+            "items": [EstimateLineItemResponse.model_validate(i).model_dump() for i in items],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+        }
 
     def create_line_item(self, data: EstimateLineItemCreate) -> EstimateLineItem:
         # Verify estimate belongs to this company (IDOR protection)

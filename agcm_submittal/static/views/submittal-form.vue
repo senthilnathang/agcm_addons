@@ -73,7 +73,7 @@ const priorityOptions = [
 async function fetchMasterData() {
   try {
     const [usersData, typesData, labelsData, projectsData] = await Promise.all([
-      requestClient.get('/users/?limit=200'),
+      requestClient.get('/users/', { params: { page_size: 200 } }),
       requestClient.get(`${BASE}/submittal-types`),
       requestClient.get(`${BASE}/submittal-labels`),
       requestClient.get('/agcm/projects', { params: { page_size: 200 } }),

@@ -158,7 +158,7 @@ async function fetchLookups() {
       requestClient.get('/agcm/inspection-types').catch(() => []),
       requestClient.get('/agcm/accident-types').catch(() => []),
       requestClient.get('/agcm/violation-types').catch(() => []),
-      requestClient.get('/users/', { params: { limit: 200 } }).catch(() => ({ items: [] })),
+      requestClient.get('/users/', { params: { page_size: 200 } }).catch(() => ({ items: [] })),
     ]);
     lookups.inspectionTypes = (inspTypes.items || inspTypes || []).map(t => ({ value: t.id, label: t.name }));
     lookups.accidentTypes = (accTypes.items || accTypes || []).map(t => ({ value: t.id, label: t.name }));

@@ -37,6 +37,30 @@ BuildForge is a comprehensive construction management platform built as 15 addon
 - NEVER add `prefix=` to `APIRouter()` — loader auto-mounts at `/api/v1/<module_name>`
 - Frontend `requestClient` already adds `/api/v1` — use paths like `/agcm/projects`
 
+### HTTP Error Prevention Checklist (404 / 422 / 500)
+When writing or modifying code, verify every endpoint against this checklist:
+
+**404 Prevention:**
+- Every frontend API call (`requestClient.get/post/put/delete`) MUST have a matching backend route with the same HTTP method and path
+- When adding a frontend CRUD view (list/create/edit/delete), ensure ALL four backend endpoints exist — missing PUT/PATCH for edit is a common gap
+- Use `page_size` (not `limit`) for pagination on `/users/` and all paginated endpoints — `limit` is silently ignored causing data truncation
+- Module must be in `installed_modules` table with `state="installed"` or all its routes return 404
+- Verify plural/singular consistency between frontend paths and backend route decorators
+
+**422 Prevention:**
+- Schema field names in frontend `requestClient` payloads MUST exactly match Pydantic schema field names (case-sensitive)
+- Required fields in `*Create` schemas must always be sent from the frontend form
+- `field_validator` constraints (e.g., `item_type` allowed values, `max_length`) must be respected in frontend forms — add client-side validation matching backend constraints
+- Query parameters must match FastAPI parameter names exactly (e.g., `page_size` not `limit`, `estimate_id` not `estimateId`)
+- Enum values sent from frontend must match backend enum `.value` strings exactly
+
+**500 Prevention:**
+- Always check `company_id` scoping — queries without company filter can leak data or hit unique constraints
+- Services that call `db.commit()` must handle `IntegrityError` (duplicate key, FK violation)
+- Null-check related objects before accessing their attributes (e.g., `estimate.project.name` when project could be None)
+- When adding new model fields, ensure existing records won't break — use `nullable=True` or provide defaults
+- File/attachment operations must handle missing files gracefully (S3 key deleted, local file moved)
+
 ### Database
 - All table names prefixed with `agcm_` (104 tables total)
 - Every model MUST have `company_id` FK to `companies.id`

@@ -223,6 +223,21 @@ async def create_type(
     return svc.create_type(data)
 
 
+@router.put("/submittal-types/{type_id}", response_model=SubmittalTypeResponse)
+async def update_type(
+    type_id: int,
+    data: SubmittalTypeCreate,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    """Update a submittal type."""
+    svc = _get_service(db, current_user)
+    result = svc.update_type(type_id, data)
+    if not result:
+        raise HTTPException(status_code=404, detail="Type not found")
+    return result
+
+
 @router.delete("/submittal-types/{type_id}", status_code=204)
 async def delete_type(
     type_id: int,
