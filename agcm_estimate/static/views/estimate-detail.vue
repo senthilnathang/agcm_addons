@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { requestClient } from '#/api/request';
 import { message, Tabs } from 'ant-design-vue';
 import {
+import { RecordPager } from '#/components'
   ArrowLeftOutlined,
   CalculatorOutlined,
   CheckOutlined,

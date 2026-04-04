@@ -28,6 +28,7 @@ import {
 
 import { requestClient } from '#/api/request';
 import { useRoute, useRouter } from 'vue-router';
+import { RecordPager } from '#/components'
 
 defineOptions({ name: 'AGCMBillForm' });
 
