@@ -680,27 +680,3 @@ onBeforeUnmount(() => {
     </Card>
   </Page>
 </template>
-
-<style scoped>
-.gantt-legend-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #555;
-}
-.gantt-legend-swatch {
-  display: inline-block;
-  width: 14px;
-  height: 10px;
-  border-radius: 2px;
-}
-.gantt-legend-diamond {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  background: #1890ff;
-  transform: rotate(45deg);
-  border-radius: 1px;
-}
-</style>
