@@ -23,7 +23,7 @@ import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons-vue';
 
 import { createProjectApi, getProjectApi, updateProjectApi } from '#/api/agcm';
 import { requestClient } from '#/api/request';
-import { RecordPager } from '#/components'
+import { RecordPager } from '#/components/common'
 
 defineOptions({ name: 'AGCMProjectForm' });
 

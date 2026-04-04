@@ -38,7 +38,7 @@ import {
 
 import { requestClient } from '#/api/request';
 import { message } from 'ant-design-vue';
-import { RecordPager } from '#/components'
+import { RecordPager } from '#/components/common'
 
 defineOptions({ name: 'AGCMDailyLogDetail' });
 

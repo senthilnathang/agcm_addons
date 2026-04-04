@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons-vue';
 
 import { getProjectApi } from '#/api/agcm';
-import { RecordPager } from '#/components'
+import { RecordPager } from '#/components/common'
 
 defineOptions({ name: 'AGCMProjectDetail' });
 
