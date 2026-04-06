@@ -453,6 +453,9 @@ async function fetchLog() {
   loading.value = true;
   try {
     log.value = await getDailyLogApi(logId.value);
+    if (log.value?.sequence_name) {
+      window.dispatchEvent(new CustomEvent('fastvue:set-record-name', { detail: { name: `Daily Log: ${log.value.sequence_name}` } }));
+    }
   } catch (error) {
     console.error('Failed to load daily log:', error);
   } finally {
@@ -602,23 +605,11 @@ onMounted(async () => {
 <template>
   <div class="p-6">
 <ASpin :spinning="loading">
-      <!-- Header -->
-      <div class="mb-4 flex items-center gap-3">
-        <AButton @click="handleBack">
-          <template #icon><ArrowLeftOutlined /></template>
-          Back
-        </AButton>
-        <template v-if="log">
-          <AButton type="primary" @click="handleExportPdf">
-            <template #icon><FilePdfOutlined /></template>
-            Export PDF
-          </AButton>
-          <AButton @click="handleCopy">
-            <template #icon><CopyOutlined /></template>
-            Copy Log
-          </AButton>
-        </template>
-      </div>
+      <!-- Teleport actions into ModuleView toolbar -->
+      <Teleport to="#fv-toolbar-actions" v-if="log">
+        <AButton size="small" type="primary" @click="handleExportPdf"><FilePdfOutlined /> Export PDF</AButton>
+        <AButton size="small" @click="handleCopy"><CopyOutlined /> Copy Log</AButton>
+      </Teleport>
 
       <template v-if="log">
         <!-- Title Card -->

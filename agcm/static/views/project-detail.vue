@@ -42,6 +42,9 @@ async function fetchProject() {
   loading.value = true;
   try {
     project.value = await getProjectApi(projectId.value);
+    if (project.value?.name) {
+      window.dispatchEvent(new CustomEvent('fastvue:set-record-name', { detail: { name: project.value.name } }));
+    }
   } catch (error) {
     console.error('Failed to load project:', error);
   } finally {
@@ -71,23 +74,11 @@ onMounted(fetchProject);
 <template>
   <div class="p-6">
 <ASpin :spinning="loading">
-      <!-- Header -->
-      <div class="mb-4 flex items-center gap-3">
-        <AButton @click="handleBack">
-          <template #icon><ArrowLeftOutlined /></template>
-          Back
-        </AButton>
-        <template v-if="project">
-          <AButton @click="handleEdit">
-            <template #icon><EditOutlined /></template>
-            Edit
-          </AButton>
-          <AButton type="primary" @click="handleNewLog">
-            <template #icon><PlusOutlined /></template>
-            New Daily Log
-          </AButton>
-        </template>
-      </div>
+      <!-- Teleport actions into ModuleView toolbar -->
+      <Teleport to="#fv-toolbar-actions" v-if="project">
+        <AButton size="small" @click="handleEdit"><EditOutlined /> Edit</AButton>
+        <AButton size="small" type="primary" @click="handleNewLog"><PlusOutlined /> New Daily Log</AButton>
+      </Teleport>
 
       <template v-if="project">
         <!-- Title Card -->

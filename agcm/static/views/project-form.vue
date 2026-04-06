@@ -142,22 +142,16 @@ onMounted(() => {
 <template>
   <Page auto-content-height>
     <Card :bordered="false">
-      <!-- Header -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <Space>
-          <Button @click="goBack">
-            <template #icon><ArrowLeftOutlined /></template>
-            Back
-          </Button>
-          <h3 style="margin: 0;">
-            {{ isEdit ? 'Edit Project' : 'New Project' }}
-          </h3>
-        </Space>
-        <Button type="primary" :loading="saving" @click="handleSave">
+      <!-- Teleport actions into ModuleView toolbar -->
+      <Teleport to="#fv-toolbar-actions">
+        <Button size="small" type="primary" :loading="saving" @click="handleSave">
           <template #icon><SaveOutlined /></template>
           Save
         </Button>
-      </div>
+        <Button size="small" @click="goBack">Cancel</Button>
+      </Teleport>
+
+      <h3 style="margin: 0 0 16px;">{{ isEdit ? 'Edit Project' : 'New Project' }}</h3>
 
       <Divider />
 
