@@ -20,7 +20,6 @@ import {
 import { ArrowLeftOutlined, SaveOutlined } from '@ant-design/icons-vue';
 
 import { createDailyLogApi, getProjectsApi } from '#/api/agcm';
-import { RecordPager } from '#/components/common'
 
 defineOptions({ name: 'AGCMDailyLogForm' });
 

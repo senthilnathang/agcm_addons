@@ -28,7 +28,6 @@ import {
 } from '@ant-design/icons-vue';
 
 import { requestClient } from '#/api/request';
-import { RecordPager } from '#/components/common'
 
 defineOptions({ name: 'AGCMSubmittalForm' });
 

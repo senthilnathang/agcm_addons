@@ -12,7 +12,6 @@ import {
 } from '@ant-design/icons-vue';
 
 import { getProjectApi } from '#/api/agcm';
-import { RecordPager } from '#/components/common'
 
 defineOptions({ name: 'AGCMProjectDetail' });
 
@@ -71,8 +70,7 @@ onMounted(fetchProject);
 
 <template>
   <div class="p-6">
-    <RecordPager v-if="$route.params.id || $route.query.id" model="" :record-id="Number($route.params.id || $route.query.id || 0)" :show-back="true" list-title="Back" />
-    <ASpin :spinning="loading">
+<ASpin :spinning="loading">
       <!-- Header -->
       <div class="mb-4 flex items-center gap-3">
         <AButton @click="handleBack">
